@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.*'
+      - 'tsconfig*.json'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.*'
+      - 'tsconfig*.json'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if Node project exists
+        id: check-node
+        run: |
+          if [ -f "package.json" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Node project not found. Skipping build."
+          fi
+
+      - name: Setup Node.js
+        if: steps.check-node.outputs.exists == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: steps.check-node.outputs.exists == 'true'
+        run: npm ci
+
+      - name: Lint
+        if: steps.check-node.outputs.exists == 'true'
+        run: npm run lint --if-present
+
+      - name: Build
+        if: steps.check-node.outputs.exists == 'true'
+        run: npm run build
+
+      - name: Test
+        if: steps.check-node.outputs.exists == 'true'
+        run: npm run test --if-present
