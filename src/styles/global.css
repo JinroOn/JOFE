@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface;
+    font-family: 'Pretendard', sans-serif;
+  }
+}
+
+@layer components {
+  .glass-nav {
+    @apply backdrop-blur-xl bg-slate-50/70;
+  }
+  .cloud-shadow {
+    box-shadow: 0px 20px 40px rgba(10, 25, 47, 0.06);
+  }
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+}
