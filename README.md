@@ -15,14 +15,36 @@
 ## 📂 Project Structure
 ```text
 src/
- ├─ api/         # API 통신 설정 (Axios)
- ├─ components/  # 재사용 가능한 UI 컴포넌트
- ├─ hooks/       # 커스텀 React Hooks
- ├─ pages/       # 페이지 단위 컴포넌트
- ├─ styles/      # 전역 스타일 및 Tailwind 설정
- ├─ types/       # 타입스크립트 타입 정의
- └─ App.tsx      # 루트 컴포넌트
+ ├─ api/                  # API 호출 함수 (axios 인스턴스, 엔드포인트별 함수)
+ ├─ assets/               # 이미지, 폰트 등 정적 파일
+ ├─ components/
+ │   ├─ common/           # 버튼, 인풋 등 여러 페이지에서 쓰는 공통 UI
+ │   └─ layout/           # Header, Footer 등 레이아웃 컴포넌트
+ ├─ hooks/                # 커스텀 React Hooks (파일명: use*.ts)
+ ├─ pages/
+ │   └─ PageName/
+ │       ├─ index.tsx     # 페이지 진입점
+ │       └─ components/  # 해당 페이지에서만 쓰는 컴포넌트 (선택)
+ ├─ styles/               # 전역 스타일 및 Tailwind 설정
+ ├─ types/                # TypeScript 타입/인터페이스 정의
+ └─ App.tsx               # 루트 컴포넌트 (라우팅 설정)
 ```
+
+### 폴더 사용 규칙
+
+| 작업 | 위치 |
+|------|------|
+| axios 인스턴스 및 API 호출 함수 작성 | `api/` |
+| 여러 페이지에서 공통으로 쓰는 컴포넌트 | `components/common/` |
+| 헤더, 푸터, 사이드바 등 레이아웃 | `components/layout/` |
+| 새 페이지 추가 | `pages/페이지명/index.tsx` |
+| useState/useEffect 묶은 커스텀 훅 | `hooks/` |
+| 타입, 인터페이스 정의 | `types/` |
+
+> **주의사항**
+> - 페이지는 반드시 `pages/페이지명/` 폴더로 만들고 `index.tsx`를 진입점으로 사용하세요.
+> - 컴포넌트 안에 axios를 직접 쓰지 말고, `api/`에 함수를 만들어 호출하세요.
+> - 특정 페이지에서만 쓰는 컴포넌트는 `pages/페이지명/components/`에 넣으세요.
 
 ## ⚙️ Getting Started
 
