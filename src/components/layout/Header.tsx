@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
-import logo from '../../assets/logo.png';
+import logo from '../../assets/logo.svg';
 
 const NAV_LINKS = [
   { label: '역량진단', to: '/diagnosis' },
