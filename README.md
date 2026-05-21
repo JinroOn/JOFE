@@ -3,9 +3,9 @@
 **JinroOn**은 수천 개의 학과 데이터와 실시간 취업 트렌드를 AI로 분석하여 학생들에게 최적의 전공 경로를 제안하는 맞춤형 전공 설계 플랫폼입니다. 이 프로젝트는 진로 탐색의 어려움을 해결하고, 데이터에 기반한 체계적인 진로 설계를 돕기 위해 시작되었습니다.
 
 ## 🔗 Quick Links
-- **서비스 바로가기:** [https://jinro-on.vercel.app](https://jinro-on.vercel.app)
-- **구현 순서:** [프론트엔드 구현순서](https://www.notion.so/3679a6af2b478008a158eb672dde7b83)
-- **Figma 디자인:** [바로가기](https://www.figma.com/design/bnMgmSntJGcQ2ePNab7UWT)
+- **서비스 바로가기:** [웹페이지 바로가기](https://jinro-on.vercel.app)
+- **구현 순서:** [노션 바로가기](https://www.notion.so/3679a6af2b478008a158eb672dde7b83)
+- **Figma 디자인:** [Figma 바로가기](https://www.figma.com/design/bnMgmSntJGcQ2ePNab7UWT)
 
 ## 🛠 Tech Stack
 - **Framework:** React 19 (TypeScript)
