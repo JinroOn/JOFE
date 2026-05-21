@@ -3,6 +3,8 @@ import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import Home from './pages/Home';
 import Login from './pages/Auth/Login';
+import Signup from './pages/Auth/Signup';
+import FindPassword from './pages/Auth/FindPassword';
 
 const Placeholder = ({ name }: { name: string }) => (
   <div className="flex items-center justify-center min-h-[60vh] text-on-surface-variant text-lg">
@@ -19,7 +21,8 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/auth/login" element={<Login />} />
-            <Route path="/auth/signup" element={<Placeholder name="회원가입" />} />
+            <Route path="/auth/signup" element={<Signup />} />
+            <Route path="/auth/find-password" element={<FindPassword />} />
             <Route path="/diagnosis" element={<Placeholder name="역량진단" />} />
             <Route path="/analysis/*" element={<Placeholder name="진로분석" />} />
             <Route path="/library" element={<Placeholder name="자료실" />} />
