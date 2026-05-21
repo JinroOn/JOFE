@@ -1,41 +1,97 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
 import logo from '../../assets/logo.svg';
 
 const NAV_LINKS = [
-  { label: '역량진단', to: '/diagnosis' },
-  { label: '진로분석', to: '/analysis' },
-  { label: '자료실', to: '/library' },
+  {
+    label: '역량진단',
+    to: '/diagnosis',
+    sub: [
+      { label: '전공 진단', to: '/diagnosis' },
+      { label: '역량 평가 퀴즈', to: '/diagnosis/quiz' },
+      { label: '결과 리포트', to: '/diagnosis/report' },
+      { label: '전공 탐색', to: '/diagnosis/explore' },
+    ],
+  },
+  {
+    label: '진로분석',
+    to: '/analysis',
+    sub: [
+      { label: '결과 리포트', to: '/analysis/dashboard' },
+      { label: '취약 역량 분석', to: '/analysis/weak' },
+      { label: '전공 및 시뮬레이션', to: '/analysis/compare' },
+    ],
+  },
+  {
+    label: '자료실',
+    to: '/library',
+    sub: [
+      { label: '공지사항 및 자료실', to: '/library' },
+      { label: '학습콘텐츠', to: '/library/content' },
+    ],
+  },
 ];
 
 const Header = () => {
   const { isLoggedIn, user } = useAuthStore();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMenuEnter = (label: string) => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setOpenMenu(label);
+  };
+
+  const handleMenuLeave = () => {
+    closeTimer.current = setTimeout(() => setOpenMenu(null), 150);
+  };
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-[12px] bg-[rgba(248,250,252,0.7)] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]">
       <nav className="max-w-[1280px] mx-auto px-8 h-20 flex items-center justify-between">
 
-        {/* 로고 */}
         <div className="flex items-center gap-10">
           <Link to="/">
             <img src={logo} alt="JinroOn" className="h-[51px] w-[205px] object-contain" />
           </Link>
 
-          {/* 데스크탑 Nav */}
           <div className="hidden md:flex items-center gap-6">
-            {NAV_LINKS.map(({ label, to }) => (
-              <NavLink
+            {NAV_LINKS.map(({ label, to, sub }) => (
+              <div
                 key={to}
-                to={to}
-                className={({ isActive }) =>
-                  `flex items-center gap-1 text-[16px] font-bold text-[#0a192f] hover:opacity-70 transition-opacity ${isActive ? 'opacity-100' : ''}`
-                }
+                className="relative"
+                onMouseEnter={() => handleMenuEnter(label)}
+                onMouseLeave={handleMenuLeave}
               >
-                {label}
-                <span className="material-symbols-outlined text-[14px]">keyboard_arrow_down</span>
-              </NavLink>
+                <NavLink
+                  to={to}
+                  className={({ isActive }) =>
+                    `flex items-center gap-1 text-[16px] font-bold text-[#0a192f] hover:opacity-70 transition-opacity ${isActive ? 'opacity-100' : ''}`
+                  }
+                >
+                  {label}
+                  <span className="material-symbols-outlined text-[14px]">keyboard_arrow_down</span>
+                </NavLink>
+
+                {openMenu === label && (
+                  <div className="absolute top-full left-0 mt-2 w-44 bg-white rounded-xl shadow-lg border border-outline-variant/20 py-1 z-50">
+                    {sub.map((item) => (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        onClick={() => setOpenMenu(null)}
+                        className={({ isActive }) =>
+                          `block px-4 py-2.5 text-sm font-medium text-[#0a192f] hover:bg-surface-container-low transition-colors ${isActive ? 'text-secondary font-bold' : ''}`
+                        }
+                      >
+                        {item.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
             <Link
               to="/ai-chat"
@@ -46,14 +102,37 @@ const Header = () => {
           </div>
         </div>
 
-        {/* 우측 영역 */}
         <div className="flex items-center gap-4">
-          {/* 데스크탑 */}
           <div className="hidden md:flex items-center gap-4">
             {isLoggedIn ? (
-              <Link to="/mypage" className="w-10 h-10 rounded-full bg-secondary ring-2 ring-slate-100 overflow-hidden flex items-center justify-center text-white font-bold text-sm">
-                {user?.nickname?.[0] ?? 'U'}
-              </Link>
+              <div
+                className="relative"
+                onMouseEnter={() => handleMenuEnter('profile')}
+                onMouseLeave={handleMenuLeave}
+              >
+                <button className="w-10 h-10 rounded-full bg-secondary ring-2 ring-slate-100 overflow-hidden flex items-center justify-center text-white font-bold text-sm">
+                  {user?.nickname?.[0] ?? 'U'}
+                </button>
+                {openMenu === 'profile' && (
+                  <div className="absolute top-full right-0 mt-2 w-36 bg-white rounded-xl shadow-lg border border-outline-variant/20 py-1 z-50">
+                    <Link
+                      to="/mypage"
+                      onClick={() => setOpenMenu(null)}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-[#0a192f] hover:bg-surface-container-low transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-base">person</span>
+                      프로필 보기
+                    </Link>
+                    <button
+                      onClick={() => setOpenMenu(null)}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-error hover:bg-surface-container-low transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-base">logout</span>
+                      로그아웃
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <>
                 <Link to="/auth/login" className="px-6 py-2 text-[#0f172a] font-semibold text-[16px] hover:bg-slate-100/50 rounded-lg transition-all">
@@ -66,7 +145,6 @@ const Header = () => {
             )}
           </div>
 
-          {/* 모바일 햄버거 */}
           <button
             className="md:hidden p-2 text-[#0a192f]"
             onClick={() => setMobileOpen((prev) => !prev)}
@@ -79,23 +157,31 @@ const Header = () => {
         </div>
       </nav>
 
-      {/* 모바일 드로어 */}
       {mobileOpen && (
-        <div className="md:hidden bg-[rgba(248,250,252,0.97)] backdrop-blur-xl border-t border-outline-variant/20 px-8 py-6 flex flex-col gap-4">
-          {NAV_LINKS.map(({ label, to }) => (
-            <NavLink
-              key={to}
-              to={to}
-              onClick={() => setMobileOpen(false)}
-              className="text-[16px] font-bold text-[#0a192f] py-2 border-b border-outline-variant/10"
-            >
-              {label}
-            </NavLink>
+        <div className="md:hidden bg-[rgba(248,250,252,0.97)] backdrop-blur-xl border-t border-outline-variant/20 px-8 py-6 flex flex-col gap-2">
+          {NAV_LINKS.map(({ label, to, sub }) => (
+            <div key={to}>
+              <p className="text-[16px] font-bold text-[#0a192f] py-2 border-b border-outline-variant/10">{label}</p>
+              <div className="pl-4 flex flex-col gap-1 mt-1 mb-2">
+                {sub.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setMobileOpen(false)}
+                    className={({ isActive }) =>
+                      `text-sm py-1.5 text-[#0a192f] ${isActive ? 'text-secondary font-bold' : 'font-medium'}`
+                    }
+                  >
+                    {item.label}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
           ))}
           <Link
             to="/ai-chat"
             onClick={() => setMobileOpen(false)}
-            className="py-2 text-[16px] font-extrabold text-secondary"
+            className="py-2 text-[16px] font-extrabold text-secondary border-b border-outline-variant/10"
           >
             AI챗봇
           </Link>

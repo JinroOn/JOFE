@@ -5,6 +5,7 @@ import Home from './pages/Home';
 import Login from './pages/Auth/Login';
 import Signup from './pages/Auth/Signup';
 import FindPassword from './pages/Auth/FindPassword';
+import MyPage from './pages/MyPage';
 
 const Placeholder = ({ name }: { name: string }) => (
   <div className="flex items-center justify-center min-h-[60vh] text-on-surface-variant text-lg">
@@ -29,7 +30,7 @@ const AppLayout = () => {
           <Route path="/analysis/*" element={<Placeholder name="진로분석" />} />
           <Route path="/library" element={<Placeholder name="자료실" />} />
           <Route path="/ai-chat" element={<Placeholder name="AI챗봇" />} />
-          <Route path="/mypage" element={<Placeholder name="마이페이지" />} />
+          <Route path="/mypage" element={<MyPage />} />
           <Route path="*" element={<Placeholder name="404 - 찾을 수 없는" />} />
         </Routes>
       </div>
