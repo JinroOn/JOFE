@@ -4,7 +4,7 @@
 
 ## 🔗 Quick Links
 - **서비스 바로가기:** [https://jinro-on.vercel.app](https://jinro-on.vercel.app)
-- **구현 순서:** [프론트엔드_구현순서.md](./프론트엔드_구현순서.md)
+- **구현 순서:** [프론트엔드 구현순서](https://www.notion.so/3679a6af2b478008a158eb672dde7b83)
 - **Figma 디자인:** [바로가기](https://www.figma.com/design/bnMgmSntJGcQ2ePNab7UWT)
 
 ## 🛠 Tech Stack
