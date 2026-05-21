@@ -144,7 +144,7 @@ const Home = () => {
             </div>
             <div className="bg-primary-container p-12">
               <h4 className="text-secondary-container font-bold mb-8 flex items-center gap-2">
-                <span className="material-symbols-outlined">auto_awesome</span> JinroOn AI 진단
+                <span className="material-symbols-outlined">auto_awesome</span> JinroOn 진단
               </h4>
               <ul className="space-y-6">
                 <li className="flex items-start gap-3 text-white">
