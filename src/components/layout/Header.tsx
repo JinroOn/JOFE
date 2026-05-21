@@ -34,7 +34,7 @@ const NAV_LINKS = [
 ];
 
 const Header = () => {
-  const { isLoggedIn, user } = useAuthStore();
+  const { isLoggedIn, user, logout } = useAuthStore();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -124,7 +124,7 @@ const Header = () => {
                       프로필 보기
                     </Link>
                     <button
-                      onClick={() => setOpenMenu(null)}
+                      onClick={() => { logout(); setOpenMenu(null); }}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-error hover:bg-surface-container-low transition-colors"
                     >
                       <span className="material-symbols-outlined text-base">logout</span>
