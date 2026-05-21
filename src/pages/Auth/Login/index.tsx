@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/AuthLayout';
+import useAuthStore from '../../../store/useAuthStore';
 
 interface FormState {
   email: string;
@@ -22,6 +23,7 @@ const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login } = useAuthStore();
   const [form, setForm] = useState<FormState>({ email: '', password: '', keepLogin: false });
   const [errors, setErrors] = useState<FormErrors>({});
   const [emailTouched, setEmailTouched] = useState(false);
@@ -39,8 +41,15 @@ const Login = () => {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    // TODO: API 연동
+    // TODO: API 연동 — 현재는 목업 로그인 (test123 / test123)
     await new Promise((r) => setTimeout(r, 1000));
+    if (form.email === 'test123@gmail.com' && form.password === 'test123') {
+      login({ id: 1, email: 'test123@gmail.com', nickname: 'test123' }, 'mock-token');
+    } else {
+      setErrors({ password: '이메일 또는 비밀번호가 올바르지 않습니다.' });
+      setLoading(false);
+      return;
+    }
     setLoading(false);
     navigate('/');
   };
