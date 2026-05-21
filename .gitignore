@@ -39,3 +39,7 @@ vite.config.ts.timestamp-*
 .env
 .env.*
 !.env.example
+
+# Claude Code 내부 문서 (커밋 제외)
+CLAUDE.md
+프론트엔드_구현순서.md
