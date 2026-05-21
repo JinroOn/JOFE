@@ -57,7 +57,7 @@ const Signup = () => {
   };
 
   return (
-    <AuthLayout>
+    <AuthLayout blurSize="lg">
       <div className="w-full max-w-[480px]">
         <div className="bg-white rounded-[14px] border border-outline-variant/10 shadow-[0px_20px_40px_rgba(10,25,47,0.06)] overflow-hidden">
           {/* 탭 */}

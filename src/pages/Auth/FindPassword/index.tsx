@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import AuthLayout from '../components/AuthLayout';
 
 interface FormState {
   name: string;
@@ -36,11 +37,7 @@ const FindPassword = () => {
   };
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col items-center justify-center px-4 py-16 relative overflow-hidden">
-      {/* 배경 블러 장식 */}
-      <div className="absolute top-1/4 left-1/4 w-[40rem] h-[40rem] bg-secondary-container/10 rounded-full blur-[120px] pointer-events-none -z-10" />
-      <div className="absolute bottom-1/4 right-1/4 w-[30rem] h-[30rem] bg-primary-container/5 rounded-full blur-[100px] pointer-events-none -z-10" />
-
+    <AuthLayout blurSize="lg" showLogo={false}>
       <div className="w-full max-w-[480px]">
         {/* 타이틀 */}
         <div className="text-center mb-8">
@@ -132,7 +129,7 @@ const FindPassword = () => {
           </div>
         </div>
       </div>
-    </div>
+    </AuthLayout>
   );
 };
 
