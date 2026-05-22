@@ -16,6 +16,9 @@ const DiagnosisMajor = () => {
   const [grade, setGrade] = useState<(typeof GRADES)[number]>('1학년');
   const [dreamJob, setDreamJob] = useState('');
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(['과학']);
+  const [studyHours, setStudyHours] = useState(4.5);
+  const [learningStyle, setLearningStyle] = useState<'theory' | 'practice'>('theory');
+  const [exploreSpectrum, setExploreSpectrum] = useState(50);
 
   const toggleSubject = (subject: string) => {
     setSelectedSubjects((prev) =>
@@ -122,6 +125,85 @@ const DiagnosisMajor = () => {
                   </button>
                 );
               })}
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 sm:p-8 mb-6 shadow-[0_4px_12px_rgba(10,25,47,0.04)]">
+          <h2 className="flex items-center gap-2 text-lg font-bold text-primary-container mb-6">
+            <span className="material-symbols-outlined text-secondary">monitoring</span>
+            학습 패턴 및 성향 분석
+          </h2>
+
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-sm font-semibold text-on-surface-variant">일일 평균 자기주도 학습 시간</label>
+              <span className="px-3 py-1 bg-secondary-container/20 text-secondary text-xs font-bold rounded-full">
+                {studyHours}시간
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={10}
+              step={0.5}
+              value={studyHours}
+              onChange={(e) => setStudyHours(Number(e.target.value))}
+              className="w-full accent-secondary"
+            />
+            <div className="flex justify-between text-xs text-outline mt-2">
+              <span>0시간</span>
+              <span>5시간</span>
+              <span>10시간+</span>
+            </div>
+          </div>
+
+          <div className="mb-8">
+            <label className="block text-sm font-semibold text-on-surface-variant mb-3">선호하는 학습 방식</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                { id: 'theory', icon: 'menu_book', title: '이론 및 원리 중심', desc: '개념의 기초를 다지고 논리적인 인과관계를 파악하는 공부를 즐깁니다.' },
+                { id: 'practice', icon: 'science', title: '실습 및 응용 중심', desc: '배운 내용을 직접 실험하거나 프로젝트를 통해 결과물을 만드는 것을 선호합니다.' },
+              ].map(({ id, icon, title, desc }) => {
+                const active = learningStyle === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setLearningStyle(id as typeof learningStyle)}
+                    className={`text-left p-4 rounded-xl border transition-all ${
+                      active
+                        ? 'border-secondary bg-secondary-container/10'
+                        : 'border-outline-variant/40 hover:bg-surface-container-low'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className={`material-symbols-outlined text-[20px] ${active ? 'text-secondary' : 'text-on-surface-variant'}`}>
+                        {icon}
+                      </span>
+                      <span className={`text-sm font-bold ${active ? 'text-secondary' : 'text-primary-container'}`}>
+                        {title}
+                      </span>
+                    </div>
+                    <p className="text-xs text-on-surface-variant leading-relaxed">{desc}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-on-surface-variant mb-3">탐구 성향 스펙트럼</label>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={exploreSpectrum}
+              onChange={(e) => setExploreSpectrum(Number(e.target.value))}
+              className="w-full accent-secondary"
+            />
+            <div className="flex justify-between text-xs text-outline mt-2">
+              <span>익숙함 선호</span>
+              <span>새로운 도전 선호</span>
             </div>
           </div>
         </section>
