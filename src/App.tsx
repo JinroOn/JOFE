@@ -6,6 +6,7 @@ import Login from './pages/Auth/Login';
 import Signup from './pages/Auth/Signup';
 import FindPassword from './pages/Auth/FindPassword';
 import MyPage from './pages/MyPage';
+import DiagnosisMajor from './pages/Diagnosis/Major';
 import LibraryNotice from './pages/Library/Notice';
 import LibraryContent from './pages/Library/Content';
 import LibraryContentDetail from './pages/Library/Content/Detail';
@@ -29,7 +30,7 @@ const AppLayout = () => {
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/signup" element={<Signup />} />
           <Route path="/auth/find-password" element={<FindPassword />} />
-          <Route path="/diagnosis" element={<Placeholder name="역량진단" />} />
+          <Route path="/diagnosis" element={<DiagnosisMajor />} />
           <Route path="/analysis/*" element={<Placeholder name="진로분석" />} />
           <Route path="/library" element={<LibraryNotice />} />
           <Route path="/library/content" element={<LibraryContent />} />
