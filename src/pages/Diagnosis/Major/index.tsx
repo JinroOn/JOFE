@@ -12,6 +12,8 @@ const SUBJECTS = [
   { label: '정보/코딩', icon: 'code' },
 ];
 
+const COMPETENCIES = ['문제 해결 능력', '창의적 사고', '협업 및 소통'] as const;
+
 const DiagnosisMajor = () => {
   const [grade, setGrade] = useState<(typeof GRADES)[number]>('1학년');
   const [dreamJob, setDreamJob] = useState('');
@@ -19,6 +21,14 @@ const DiagnosisMajor = () => {
   const [studyHours, setStudyHours] = useState(4.5);
   const [learningStyle, setLearningStyle] = useState<'theory' | 'practice'>('theory');
   const [exploreSpectrum, setExploreSpectrum] = useState(50);
+  const [scores, setScores] = useState<Record<string, number>>({
+    '문제 해결 능력': 4,
+    '창의적 사고': 3,
+    '협업 및 소통': 5,
+  });
+  const [aspiration, setAspiration] = useState(
+    '저는 인공지능 기술이 교육의 불평등을 해소하는 미래를 꿈꿉니다. 단순히 지식을 전달하는 것을 넘어, 개인별 맞춤형 커리큘럼을 제안하는 시스템을 설계하는 데이터 사이언티스트가 되고 싶습니다. 이를 위해 컴퓨터공학과 데이터 과학을 융합적으로 공부하고자 합니다.',
+  );
 
   const toggleSubject = (subject: string) => {
     setSelectedSubjects((prev) =>
@@ -205,6 +215,64 @@ const DiagnosisMajor = () => {
               <span>익숙함 선호</span>
               <span>새로운 도전 선호</span>
             </div>
+          </div>
+        </section>
+
+        <section className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 sm:p-8 mb-8 shadow-[0_4px_12px_rgba(10,25,47,0.04)]">
+          <h2 className="flex items-center gap-2 text-lg font-bold text-primary-container mb-6">
+            <span className="material-symbols-outlined text-secondary">workspace_premium</span>
+            역량 자가 진단 및 포부
+          </h2>
+
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-on-surface-variant mb-3">핵심 역량 점수 (5점 만점)</label>
+            <div className="space-y-2.5">
+              {COMPETENCIES.map((name) => (
+                <div
+                  key={name}
+                  className="flex items-center justify-between px-4 py-2.5 bg-surface-container-low rounded-xl"
+                >
+                  <span className="text-sm font-medium text-on-surface-variant">{name}</span>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((n) => {
+                      const filled = n <= scores[name];
+                      return (
+                        <button
+                          key={n}
+                          onClick={() => setScores((prev) => ({ ...prev, [name]: n }))}
+                          aria-label={`${name} ${n}점`}
+                          className="leading-none"
+                        >
+                          <span
+                            className={`material-symbols-outlined text-[20px] transition-colors ${
+                              filled ? 'text-secondary' : 'text-outline-variant'
+                            }`}
+                            style={{ fontVariationSettings: filled ? "'FILL' 1" : "'FILL' 0" }}
+                          >
+                            star
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-semibold text-on-surface-variant">
+                향후 10년 뒤 나의 모습과 커리어 목표
+              </label>
+              <span className="text-xs text-outline">{aspiration.length} / 500자</span>
+            </div>
+            <textarea
+              value={aspiration}
+              onChange={(e) => setAspiration(e.target.value.slice(0, 500))}
+              rows={5}
+              className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/40 rounded-xl text-sm leading-relaxed text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary-container focus:border-transparent transition-all resize-none"
+            />
           </div>
         </section>
 
