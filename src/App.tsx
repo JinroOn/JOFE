@@ -6,6 +6,9 @@ import Login from './pages/Auth/Login';
 import Signup from './pages/Auth/Signup';
 import FindPassword from './pages/Auth/FindPassword';
 import MyPage from './pages/MyPage';
+import LibraryNotice from './pages/Library/Notice';
+import LibraryContent from './pages/Library/Content';
+import LibraryContentDetail from './pages/Library/Content/Detail';
 
 const Placeholder = ({ name }: { name: string }) => (
   <div className="flex items-center justify-center min-h-[60vh] text-on-surface-variant text-lg">
@@ -28,7 +31,9 @@ const AppLayout = () => {
           <Route path="/auth/find-password" element={<FindPassword />} />
           <Route path="/diagnosis" element={<Placeholder name="역량진단" />} />
           <Route path="/analysis/*" element={<Placeholder name="진로분석" />} />
-          <Route path="/library" element={<Placeholder name="자료실" />} />
+          <Route path="/library" element={<LibraryNotice />} />
+          <Route path="/library/content" element={<LibraryContent />} />
+          <Route path="/library/content/:id" element={<LibraryContentDetail />} />
           <Route path="/ai-chat" element={<Placeholder name="AI챗봇" />} />
           <Route path="/mypage" element={<MyPage />} />
           <Route path="*" element={<Placeholder name="404 - 찾을 수 없는" />} />

@@ -65,15 +65,10 @@ const Header = () => {
                 onMouseEnter={() => handleMenuEnter(label)}
                 onMouseLeave={handleMenuLeave}
               >
-                <NavLink
-                  to={to}
-                  className={({ isActive }) =>
-                    `flex items-center gap-1 text-[16px] font-bold text-[#0a192f] hover:opacity-70 transition-opacity ${isActive ? 'opacity-100' : ''}`
-                  }
-                >
+                <button className="flex items-center gap-1 text-[16px] font-bold text-[#0a192f] hover:opacity-70 transition-opacity">
                   {label}
                   <span className="material-symbols-outlined text-[14px]">keyboard_arrow_down</span>
-                </NavLink>
+                </button>
 
                 {openMenu === label && (
                   <div className="absolute top-full left-0 mt-2 w-44 bg-white rounded-xl shadow-lg border border-outline-variant/20 py-1 z-50">
@@ -81,9 +76,10 @@ const Header = () => {
                       <NavLink
                         key={item.to}
                         to={item.to}
+                        end
                         onClick={() => setOpenMenu(null)}
                         className={({ isActive }) =>
-                          `block px-4 py-2.5 text-sm font-medium text-[#0a192f] hover:bg-surface-container-low transition-colors ${isActive ? 'text-secondary font-bold' : ''}`
+                          `block px-4 py-2.5 text-sm font-medium hover:bg-surface-container-low transition-colors ${isActive ? 'text-secondary font-bold' : 'text-[#0a192f]'}`
                         }
                       >
                         {item.label}
