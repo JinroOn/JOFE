@@ -185,7 +185,7 @@ const AiChat = () => {
   const [activeChatKey, setActiveChatKey] = useState<string | null>('recent-0');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [navVisible, setNavVisible] = useState(false);
-  const navTimer = useRef<ReturnType<typeof setTimeout>>();
+  const navTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const showNav = () => {
     clearTimeout(navTimer.current);
