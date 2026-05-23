@@ -8,6 +8,7 @@ import Signup from './pages/Auth/Signup';
 import FindPassword from './pages/Auth/FindPassword';
 import MyPage from './pages/MyPage';
 import DiagnosisMajor from './pages/Diagnosis/Major';
+import DiagnosisLoading from './pages/Diagnosis/Loading';
 import LibraryNotice from './pages/Library/Notice';
 import LibraryContent from './pages/Library/Content';
 import LibraryContentDetail from './pages/Library/Content/Detail';
@@ -22,10 +23,11 @@ const AppLayout = () => {
   const location = useLocation();
   const isAuthPage = location.pathname.startsWith('/auth');
   const isMainPage = location.pathname === '/';
+  const isLoadingPage = location.pathname === '/diagnosis/loading';
 
   return (
     <div className="flex flex-col min-h-screen">
-      {!isAuthPage && <Header />}
+      {!isAuthPage && !isLoadingPage && <Header />}
       <div className="flex-grow flex flex-col">
         <Routes>
           <Route path="/" element={<><Home /><Footer /></>} />
@@ -33,6 +35,7 @@ const AppLayout = () => {
           <Route path="/auth/signup" element={<Signup />} />
           <Route path="/auth/find-password" element={<FindPassword />} />
           <Route path="/diagnosis" element={<DiagnosisMajor />} />
+          <Route path="/diagnosis/loading" element={<DiagnosisLoading />} />
           <Route path="/analysis/*" element={<Placeholder name="진로분석" />} />
           <Route path="/library" element={<LibraryNotice />} />
           <Route path="/library/content" element={<LibraryContent />} />
@@ -42,7 +45,7 @@ const AppLayout = () => {
           <Route path="*" element={<Placeholder name="404 - 찾을 수 없는" />} />
         </Routes>
       </div>
-      {!isAuthPage && !isMainPage && <FooterSimple />}
+      {!isAuthPage && !isMainPage && !isLoadingPage && <FooterSimple />}
     </div>
   );
 };
