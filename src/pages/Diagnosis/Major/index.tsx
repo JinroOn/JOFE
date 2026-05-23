@@ -55,7 +55,7 @@ const DiagnosisMajor = () => {
         <div className="mb-8">
           <div className="flex items-end justify-between mb-2">
             <div>
-              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-primary-container">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-primary-container">
                 전공 적성 정밀 진단
               </h1>
               <p className="text-on-surface-variant text-sm mt-2">
@@ -276,7 +276,7 @@ const DiagnosisMajor = () => {
           </div>
         </section>
 
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <button className="flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary-container transition-colors">
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             이전 단계

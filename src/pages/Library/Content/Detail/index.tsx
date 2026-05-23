@@ -13,7 +13,7 @@ const curriculum = [
 
 const LibraryContentDetail = () => {
   return (
-    <div className="pt-8 pb-20 px-8 max-w-[1280px] mx-auto">
+    <div className="pt-8 pb-20 px-4 sm:px-8 max-w-[1280px] mx-auto">
       <section className="mb-12">
         <div className="relative w-full aspect-video rounded-[14px] overflow-hidden shadow-[0px_20px_40px_rgba(10,25,47,0.1)] bg-black">
           <div className="absolute inset-0 flex items-center justify-center group cursor-pointer">
@@ -46,17 +46,17 @@ const LibraryContentDetail = () => {
               </span>
             ))}
           </div>
-          <h1 className="text-4xl font-extrabold text-on-surface mb-6 tracking-tight leading-tight">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-on-surface mb-6 tracking-tight leading-tight">
             취약 역량 보완을 위한 이산수학 기초
           </h1>
 
-          <div className="flex items-center gap-4 py-4 border-y border-outline-variant/15">
+          <div className="flex flex-wrap items-center gap-4 py-4 border-y border-outline-variant/15">
             <div className="w-12 h-12 rounded-full bg-secondary-container flex items-center justify-center text-white font-bold text-lg">김</div>
             <div>
               <p className="font-bold text-on-surface">김진로 교수</p>
               <p className="text-sm text-on-surface-variant">JinroOn AI 전임 멘토 • 데이터 사이언스 전문가</p>
             </div>
-            <div className="ml-auto flex gap-3">
+            <div className="sm:ml-auto flex gap-3">
               <button className="flex items-center gap-2 px-4 py-2 bg-surface-container-low rounded-lg hover:bg-surface-container-high transition-all text-sm font-semibold">
                 <span className="material-symbols-outlined text-[20px]">bookmark</span>
                 저장하기
@@ -69,7 +69,7 @@ const LibraryContentDetail = () => {
           </div>
         </div>
 
-        <div className="bg-surface-container-low p-8 rounded-[14px] border-l-4 border-secondary">
+        <div className="bg-surface-container-low p-4 sm:p-6 md:p-8 rounded-[14px] border-l-4 border-secondary">
           <div className="flex items-center gap-3 mb-4 text-secondary">
             <span className="material-symbols-outlined">psychology</span>
             <h3 className="font-bold text-lg">AI 맞춤 추천 가이드</h3>

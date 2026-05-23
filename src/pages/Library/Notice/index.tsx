@@ -15,9 +15,9 @@ const Notice = () => {
   const [search, setSearch] = useState('');
 
   return (
-    <div className="pt-8 pb-20 px-8 max-w-[1280px] mx-auto">
+    <div className="pt-8 pb-20 px-4 sm:px-8 max-w-[1280px] mx-auto overflow-x-hidden">
       <div className="mb-12">
-        <h1 className="text-4xl font-extrabold tracking-tight text-primary-container mb-4">공지사항 및 자료실</h1>
+        <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-primary-container mb-4">공지사항 및 자료실</h1>
         <p className="text-on-surface-variant max-w-2xl leading-relaxed">
           진로 설계의 핵심 정보를 확인하세요. 최신 입시 뉴스부터 전공별 심층 리포트까지 인공지능이 큐레이션한 가이드라인을 제공합니다.
         </p>
@@ -50,7 +50,7 @@ const Notice = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-12">
         <div className="md:col-span-2 relative overflow-hidden rounded-[14px] bg-primary-container text-white p-8 group cursor-pointer shadow-[0_20px_40px_rgba(10,25,47,0.06)]">
           <div className="absolute inset-0 bg-gradient-to-br from-secondary/20 to-transparent" />
           <div className="relative z-10">
@@ -81,14 +81,14 @@ const Notice = () => {
         </div>
       </div>
 
-      <div className="bg-surface-container-lowest rounded-[14px] overflow-hidden shadow-[0_20px_40px_rgba(10,25,47,0.06)]">
+      <div className="bg-surface-container-lowest rounded-[14px] shadow-[0_20px_40px_rgba(10,25,47,0.06)]">
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-surface-container-low border-b border-outline-variant/10">
-              <th className="px-6 py-5 text-left text-xs font-bold text-on-surface-variant uppercase tracking-wider w-16">No</th>
-              <th className="px-6 py-5 text-left text-xs font-bold text-on-surface-variant uppercase tracking-wider">Title</th>
-              <th className="px-6 py-5 text-center text-xs font-bold text-on-surface-variant uppercase tracking-wider w-32">Date</th>
-              <th className="px-6 py-5 text-center text-xs font-bold text-on-surface-variant uppercase tracking-wider w-24">Views</th>
+              <th className="hidden sm:table-cell px-6 py-5 text-left text-xs font-bold text-on-surface-variant uppercase tracking-wider w-16">No</th>
+              <th className="px-4 sm:px-6 py-5 text-left text-xs font-bold text-on-surface-variant uppercase tracking-wider">Title</th>
+              <th className="hidden sm:table-cell px-6 py-5 text-center text-xs font-bold text-on-surface-variant uppercase tracking-wider w-32">Date</th>
+              <th className="hidden md:table-cell px-6 py-5 text-center text-xs font-bold text-on-surface-variant uppercase tracking-wider w-24">Views</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-outline-variant/10">
@@ -96,20 +96,20 @@ const Notice = () => {
               .filter((n) => n.title.includes(search))
               .map((n) => (
                 <tr key={n.id} className="hover:bg-surface-container-low transition-colors group cursor-pointer">
-                  <td className="px-6 py-6 text-sm text-on-surface-variant">{String(n.id).padStart(2, '0')}</td>
-                  <td className="px-6 py-6">
+                  <td className="hidden sm:table-cell px-6 py-6 text-sm text-on-surface-variant">{String(n.id).padStart(2, '0')}</td>
+                  <td className="px-4 sm:px-6 py-4 sm:py-6">
                     <div className="flex items-center gap-3">
                       {n.badge && (
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${n.badgeClass}`}>{n.badge}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold shrink-0 ${n.badgeClass}`}>{n.badge}</span>
                       )}
                       <span className="text-on-surface font-medium group-hover:text-secondary transition-colors">{n.title}</span>
                       {n.attachment && (
-                        <span className="material-symbols-outlined text-secondary-container text-lg">attachment</span>
+                        <span className="material-symbols-outlined text-secondary-container text-lg shrink-0">attachment</span>
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-6 text-center text-sm text-on-surface-variant">{n.date}</td>
-                  <td className="px-6 py-6 text-center text-sm text-on-surface-variant">{n.views}</td>
+                  <td className="hidden sm:table-cell px-6 py-6 text-center text-sm text-on-surface-variant">{n.date}</td>
+                  <td className="hidden md:table-cell px-6 py-6 text-center text-sm text-on-surface-variant">{n.views}</td>
                 </tr>
               ))}
           </tbody>
