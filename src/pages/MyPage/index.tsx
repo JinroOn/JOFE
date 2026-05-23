@@ -27,7 +27,7 @@ const MyPage = () => {
   const initial = displayName[0];
 
   return (
-    <div className="pt-16 pb-24 px-8 max-w-[1280px] mx-auto">
+    <div className="pt-16 pb-24 px-4 sm:px-8 max-w-[1280px] mx-auto">
       {/* Profile Hero */}
       <section className="mb-16 flex flex-col md:flex-row items-center md:items-end gap-8">
         <div className="relative">
@@ -61,7 +61,7 @@ const MyPage = () => {
       </section>
 
       {/* Stats Bento Grid */}
-      <section className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-16">
+      <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-16">
         <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="bg-white p-8 rounded-[14px] shadow-[0px_20px_40px_rgba(10,25,47,0.06)] hover:-translate-y-1 transition-transform">
             <span className="material-symbols-outlined text-secondary text-3xl mb-4 block">analytics</span>
@@ -101,7 +101,7 @@ const MyPage = () => {
       </section>
 
       {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
         <div className="lg:col-span-2 space-y-12">
           {/* Diagnosis History */}
           <section>
@@ -164,7 +164,7 @@ const MyPage = () => {
 
         {/* Account Settings */}
         <aside>
-          <div className="bg-surface-container-low rounded-3xl p-8 sticky top-24">
+          <div className="bg-surface-container-low rounded-3xl p-8 sticky top-20">
             <h3 className="text-xl font-bold text-primary-container mb-6 flex items-center gap-2">
               <span className="material-symbols-outlined">manage_accounts</span> 계정 설정
             </h3>

@@ -50,7 +50,7 @@ const Header = () => {
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-[12px] bg-[rgba(248,250,252,0.7)] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]">
-      <nav className="max-w-[1280px] mx-auto px-8 h-20 flex items-center justify-between">
+      <nav className="max-w-[1280px] mx-auto px-4 sm:px-8 h-20 flex items-center justify-between">
 
         <div className="flex items-center gap-10">
           <Link to="/">
@@ -154,7 +154,7 @@ const Header = () => {
       </nav>
 
       {mobileOpen && (
-        <div className="md:hidden bg-[rgba(248,250,252,0.97)] backdrop-blur-xl border-t border-outline-variant/20 px-8 py-6 flex flex-col gap-2">
+        <div className="md:hidden bg-[rgba(248,250,252,0.97)] backdrop-blur-xl border-t border-outline-variant/20 px-4 sm:px-8 py-6 flex flex-col gap-2">
           {NAV_LINKS.map(({ label, to, sub }) => (
             <div key={to}>
               <p className="text-[16px] font-bold text-[#0a192f] py-2 border-b border-outline-variant/10">{label}</p>
