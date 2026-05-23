@@ -25,6 +25,7 @@ const AppLayout = () => {
   const isAuthPage = location.pathname.startsWith('/auth');
   const isMainPage = location.pathname === '/';
   const isLoadingPage = location.pathname === '/diagnosis/loading';
+  const isChatPage = location.pathname === '/ai-chat';
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -46,7 +47,7 @@ const AppLayout = () => {
           <Route path="*" element={<Placeholder name="404 - 찾을 수 없는" />} />
         </Routes>
       </div>
-      {!isAuthPage && !isMainPage && !isLoadingPage && <FooterSimple />}
+      {!isAuthPage && !isMainPage && !isLoadingPage && !isChatPage && <FooterSimple />}
     </div>
   );
 };

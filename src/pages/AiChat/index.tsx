@@ -93,14 +93,12 @@ const createRecentChatMessages = (chatTitle: string, index: number): ChatMessage
       {
         id: 2,
         role: 'user',
-        content:
-          '소프트웨어학부에 진학하려면 어떤 과목이랑 역량을 먼저 준비해야 하나요?',
+        content: '소프트웨어학부에 진학하려면 어떤 과목이랑 역량을 먼저 준비해야 하나요?',
       },
       {
         id: 3,
         role: 'assistant',
-        content:
-          '소프트웨어학부를 준비한다면 다음 3가지 역량을 우선적으로 쌓는 것을 추천합니다.',
+        content: '소프트웨어학부를 준비한다면 다음 3가지 역량을 우선적으로 쌓는 것을 추천합니다.',
         steps: [
           {
             title: '프로그래밍 기초',
@@ -229,13 +227,11 @@ const AiChat = () => {
         steps: [
           {
             title: '현재 관심 분야 정리',
-            description:
-              '먼저 관심 있는 전공이나 직무를 기준으로 필요한 핵심 역량을 분류합니다.',
+            description: '먼저 관심 있는 전공이나 직무를 기준으로 필요한 핵심 역량을 분류합니다.',
           },
           {
             title: '부족한 역량 확인',
-            description:
-              '진단 결과와 비교해 현재 부족한 역량을 우선순위별로 확인합니다.',
+            description: '진단 결과와 비교해 현재 부족한 역량을 우선순위별로 확인합니다.',
           },
           {
             title: '학습 로드맵 구성',
@@ -256,22 +252,20 @@ const AiChat = () => {
   };
 
   return (
-    <main className="min-h-[calc(100vh-80px)] bg-[#f4f8fb]">
-      <section className="mx-auto flex min-h-[calc(100vh-80px)] w-full max-w-[1360px] overflow-hidden bg-[#f4f8fb]">
-        <aside className="hidden w-[320px] shrink-0 flex-col border-r border-[#e3eaf0] bg-[#edf3f7] lg:flex">
+    <main className="min-h-[calc(100vh-80px)] bg-surface">
+      <section className="mx-auto flex min-h-[calc(100vh-80px)] w-full max-w-[1360px] overflow-hidden bg-surface">
+        <aside className="hidden w-[320px] shrink-0 flex-col border-r border-outline-variant/20 bg-surface-container-low lg:flex">
           <div className="flex-1 px-7 py-9">
             <button
               onClick={handleNewChat}
-              className="mb-9 flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-white text-sm font-bold text-[#0f172a] shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              className="mb-9 flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-white text-sm font-bold text-on-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full border border-[#0f172a] text-xs">
-                +
-              </span>
+              <span className="material-symbols-outlined text-[18px]">add</span>
               새로운 상담 시작
             </button>
 
             <div className="mb-10">
-              <p className="mb-4 text-xs font-medium text-[#9aa6b2]">최근 7일</p>
+              <p className="mb-4 text-xs font-medium text-outline">최근 7일</p>
 
               <div className="space-y-2">
                 {recentChats.map((chat, index) => (
@@ -280,11 +274,13 @@ const AiChat = () => {
                     onClick={() => handleSelectRecentChat(chat, index)}
                     className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm transition ${
                       activeChatKey === `recent-${index}`
-                        ? 'bg-[#dce3eb] font-bold text-[#0f172a]'
-                        : 'text-[#536170] hover:bg-white'
+                        ? 'bg-surface-container-high font-bold text-on-surface'
+                        : 'text-on-surface-variant hover:bg-white'
                     }`}
                   >
-                    <span className="text-lg">{index === 0 ? '□' : '↻'}</span>
+                    <span className="material-symbols-outlined shrink-0 text-[18px]">
+                      {index === 0 ? 'chat_bubble' : 'history'}
+                    </span>
                     <span className="truncate">{chat}</span>
                   </button>
                 ))}
@@ -292,7 +288,7 @@ const AiChat = () => {
             </div>
 
             <div>
-              <p className="mb-4 text-xs font-medium text-[#9aa6b2]">지난 한 달</p>
+              <p className="mb-4 text-xs font-medium text-outline">지난 한 달</p>
 
               <div className="space-y-2">
                 {lastMonthChats.map((chat, index) => (
@@ -301,11 +297,11 @@ const AiChat = () => {
                     onClick={() => handleSelectLastMonthChat(chat, index)}
                     className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm transition ${
                       activeChatKey === `last-${index}`
-                        ? 'bg-[#dce3eb] font-bold text-[#0f172a]'
-                        : 'text-[#536170] hover:bg-white'
+                        ? 'bg-surface-container-high font-bold text-on-surface'
+                        : 'text-on-surface-variant hover:bg-white'
                     }`}
                   >
-                    <span className="text-lg">↻</span>
+                    <span className="material-symbols-outlined shrink-0 text-[18px]">history</span>
                     <span className="truncate">{chat}</span>
                   </button>
                 ))}
@@ -313,46 +309,48 @@ const AiChat = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-between border-t border-[#e0e7ee] px-7 py-5">
+          <div className="flex items-center justify-between border-t border-outline-variant/20 px-7 py-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-xl shadow-sm">
-                👨🏻‍🎓
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary-container/20 text-secondary shadow-sm">
+                <span className="material-symbols-outlined text-[20px]">school</span>
               </div>
               <div>
-                <p className="text-sm font-bold text-[#111827]">김진로 학생</p>
-                <p className="text-xs text-[#7b8794]">표준 요금제 이용 중</p>
+                <p className="text-sm font-bold text-on-surface">김진로 학생</p>
+                <p className="text-xs text-on-surface-variant">표준 요금제 이용 중</p>
               </div>
             </div>
 
-            <button className="text-xl text-[#7b8794] transition hover:rotate-45 hover:text-[#111827]">
-              ⚙
+            <button className="text-outline transition hover:rotate-45 hover:text-on-surface">
+              <span className="material-symbols-outlined text-[20px]">settings</span>
             </button>
           </div>
         </aside>
 
-        <section className="flex min-w-0 flex-1 flex-col bg-[#f4f8fb]">
+        <section className="flex min-w-0 flex-1 flex-col bg-surface">
           <div className="flex items-center justify-between px-7 py-9 md:px-12">
             <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#1398df] text-xl shadow-md">
-                🤖
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-white shadow-md">
+                <span className="material-symbols-outlined text-[24px]">smart_toy</span>
               </div>
 
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-lg font-extrabold text-[#0f172a]">
+                  <h1 className="text-lg font-extrabold text-on-surface">
                     JinroOn AI 진로 컨설턴트
                   </h1>
-                  <span className="h-2 w-2 rounded-full bg-[#22c55e]" />
+                  <span className="h-2 w-2 rounded-full bg-green-500" />
                 </div>
-                <p className="text-sm text-[#8a96a3]">
-                  언제든 궁금한 진로 질문을 던져보세요.
-                </p>
+                <p className="text-sm text-outline">언제든 궁금한 진로 질문을 던져보세요.</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-4 text-xl text-[#8a96a3]">
-              <button className="transition hover:text-[#0f172a]">⇧</button>
-              <button className="transition hover:text-[#0f172a]">⋮</button>
+            <div className="flex items-center gap-4 text-outline">
+              <button className="transition hover:text-on-surface">
+                <span className="material-symbols-outlined">ios_share</span>
+              </button>
+              <button className="transition hover:text-on-surface">
+                <span className="material-symbols-outlined">more_vert</span>
+              </button>
             </div>
           </div>
 
@@ -362,12 +360,12 @@ const AiChat = () => {
                 if (chat.role === 'user') {
                   return (
                     <div key={chat.id} className="flex justify-end">
-                      <div className="max-w-[760px] rounded-t-2xl rounded-bl-2xl bg-[#071b35] px-6 py-5 text-sm font-semibold leading-7 text-white shadow-xl">
+                      <div className="max-w-[760px] rounded-t-2xl rounded-bl-2xl bg-primary-container px-6 py-5 text-sm font-semibold leading-7 text-white shadow-xl">
                         {chat.content}
                       </div>
 
-                      <div className="ml-4 mt-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dceafe] text-sm">
-                        👤
+                      <div className="ml-4 mt-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary-container/20 text-secondary">
+                        <span className="material-symbols-outlined text-[18px]">person</span>
                       </div>
                     </div>
                   );
@@ -375,13 +373,13 @@ const AiChat = () => {
 
                 return (
                   <div key={chat.id} className="flex gap-4">
-                    <div className="mt-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#071b35] text-sm">
-                      🤖
+                    <div className="mt-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-container text-white">
+                      <span className="material-symbols-outlined text-[18px]">smart_toy</span>
                     </div>
 
                     <div
-                      className={`max-w-[780px] rounded-2xl bg-white px-7 py-6 text-sm leading-7 text-[#1f2937] shadow-sm ${
-                        chat.steps ? 'border-l-4 border-[#00c2e8]' : ''
+                      className={`max-w-[780px] rounded-2xl bg-white px-7 py-6 text-sm leading-7 text-on-surface shadow-sm ${
+                        chat.steps ? 'border-l-4 border-secondary-container' : ''
                       }`}
                     >
                       {chat.content.split('\n').map((line, lineIndex) => (
@@ -395,7 +393,7 @@ const AiChat = () => {
                           {chat.tags.map((tag) => (
                             <span
                               key={tag}
-                              className="rounded-full bg-[#bdefff] px-4 py-1.5 text-xs font-bold text-[#07718a]"
+                              className="rounded-full bg-secondary-container/30 px-4 py-1.5 text-xs font-bold text-secondary"
                             >
                               {tag}
                             </span>
@@ -407,11 +405,11 @@ const AiChat = () => {
                         <div className="mt-5 space-y-4">
                           {chat.steps.map((step, index) => (
                             <div key={step.title} className="flex gap-3">
-                              <span className="shrink-0 font-extrabold text-[#00b8df]">
+                              <span className="shrink-0 font-extrabold text-secondary-container">
                                 {String(index + 1).padStart(2, '0')}.
                               </span>
                               <p>
-                                <strong className="font-extrabold text-[#111827]">
+                                <strong className="font-extrabold text-on-surface">
                                   {step.title}:{' '}
                                 </strong>
                                 {step.description}
@@ -434,7 +432,7 @@ const AiChat = () => {
                   <button
                     key={question}
                     onClick={() => handleQuickQuestionClick(question)}
-                    className="rounded-full border border-[#e0e6ed] bg-white px-4 py-2 text-xs font-medium text-[#4b5563] shadow-sm transition hover:-translate-y-0.5 hover:border-[#00b8df] hover:text-[#00a0c4]"
+                    className="rounded-full border border-outline-variant/30 bg-white px-4 py-2 text-xs font-medium text-on-surface-variant shadow-sm transition hover:-translate-y-0.5 hover:border-secondary-container hover:text-secondary"
                   >
                     {question}
                   </button>
@@ -449,32 +447,32 @@ const AiChat = () => {
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
                   placeholder="AI 컨설턴트에게 진로 고민을 물어보세요..."
-                  className="h-11 flex-1 bg-transparent text-sm text-[#111827] outline-none placeholder:text-[#9aa6b2]"
+                  className="h-11 flex-1 bg-transparent text-sm text-on-surface outline-none placeholder:text-outline"
                 />
 
                 <button
                   type="button"
-                  className="hidden text-xl text-[#8a96a3] transition hover:text-[#0f172a] sm:block"
+                  className="hidden text-outline transition hover:text-on-surface sm:block"
                 >
-                  📎
+                  <span className="material-symbols-outlined">attach_file</span>
                 </button>
 
                 <button
                   type="button"
-                  className="hidden text-xl text-[#8a96a3] transition hover:text-[#0f172a] sm:block"
+                  className="hidden text-outline transition hover:text-on-surface sm:block"
                 >
-                  🖼
+                  <span className="material-symbols-outlined">image</span>
                 </button>
 
                 <button
                   type="submit"
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#071b35] text-xl text-white shadow-md transition hover:-translate-y-0.5 hover:bg-[#0b2547]"
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-container text-white shadow-md transition hover:-translate-y-0.5 hover:opacity-90"
                 >
-                  ↑
+                  <span className="material-symbols-outlined">arrow_upward</span>
                 </button>
               </form>
 
-              <p className="mt-4 text-center text-[10px] font-semibold tracking-[0.25em] text-[#a0aab6]">
+              <p className="mt-4 text-center text-[10px] font-semibold tracking-[0.25em] text-outline">
                 POWERED BY JINROON ADVANCED CAREER ENGINE V2.0
               </p>
             </div>
