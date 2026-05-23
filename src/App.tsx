@@ -29,7 +29,7 @@ const AppLayout = () => {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {!isAuthPage && !isLoadingPage && <Header />}
+      {!isAuthPage && !isLoadingPage && !isChatPage && <Header />}
       <div className="flex-grow flex flex-col">
         <Routes>
           <Route path="/" element={<><Home /><Footer /></>} />
