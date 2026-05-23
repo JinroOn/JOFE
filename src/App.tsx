@@ -10,6 +10,7 @@ import DiagnosisMajor from './pages/Diagnosis/Major';
 import LibraryNotice from './pages/Library/Notice';
 import LibraryContent from './pages/Library/Content';
 import LibraryContentDetail from './pages/Library/Content/Detail';
+import AiChat from './pages/AiChat';
 
 const Placeholder = ({ name }: { name: string }) => (
   <div className="flex items-center justify-center min-h-[60vh] text-on-surface-variant text-lg">
@@ -35,7 +36,7 @@ const AppLayout = () => {
           <Route path="/library" element={<LibraryNotice />} />
           <Route path="/library/content" element={<LibraryContent />} />
           <Route path="/library/content/:id" element={<LibraryContentDetail />} />
-          <Route path="/ai-chat" element={<Placeholder name="AI챗봇" />} />
+          <Route path="/ai-chat" element={<AiChat />} />
           <Route path="/mypage" element={<MyPage />} />
           <Route path="*" element={<Placeholder name="404 - 찾을 수 없는" />} />
         </Routes>
