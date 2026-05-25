@@ -19,6 +19,8 @@ const OPTIONS = [
 const DiagnosisQuiz = () => {
   const [category, setCategory] = useState<CategoryId>('math');
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const questionNumber = 4;
+  const totalQuestions = 20;
   const progress = 20;
 
   return (
@@ -46,26 +48,53 @@ const DiagnosisQuiz = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {OPTIONS.map(({ id, text }) => {
-            const active = selectedOption === id;
-            return (
-              <button
-                key={id}
-                onClick={() => setSelectedOption(id)}
-                className={`text-left p-4 rounded-xl border bg-surface-container-lowest transition-all ${
-                  active
-                    ? 'border-secondary bg-secondary-container/10 shadow-[0_0_0_3px_rgba(0,210,255,0.12)]'
-                    : 'border-outline-variant/40 hover:bg-surface-container-low'
-                }`}
-              >
-                <p className={`text-xs font-bold tracking-widest mb-1.5 ${active ? 'text-secondary' : 'text-on-surface-variant'}`}>
-                  OPTION {id}
-                </p>
-                <p className="text-sm text-on-surface leading-relaxed">{text}</p>
-              </button>
-            );
-          })}
+        <section className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 sm:p-8 shadow-[0_4px_12px_rgba(10,25,47,0.04)]">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <span className="text-xs font-bold tracking-widest text-on-surface-variant">
+              QUESTION {String(questionNumber).padStart(2, '0')} / {totalQuestions}
+            </span>
+            <span className="flex items-center gap-1.5 text-xs font-bold text-secondary shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
+              AI LIVE ANALYZING
+            </span>
+          </div>
+
+          <h2 className="text-xl sm:text-2xl font-bold text-primary-container leading-snug mb-6">
+            다음 주어진 데이터 세트에서 변수 간의 상관관계를 분석했을 때, 가장 유의미한 결론을 도출할 수 있는 가설은 무엇입니까?
+          </h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {OPTIONS.map(({ id, text }) => {
+              const active = selectedOption === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => setSelectedOption(id)}
+                  className={`text-left p-4 rounded-xl border transition-all ${
+                    active
+                      ? 'border-secondary bg-secondary-container/10 shadow-[0_0_0_3px_rgba(0,210,255,0.12)]'
+                      : 'border-outline-variant/40 hover:bg-surface-container-low'
+                  }`}
+                >
+                  <p className={`text-xs font-bold tracking-widest mb-1.5 ${active ? 'text-secondary' : 'text-on-surface-variant'}`}>
+                    OPTION {id}
+                  </p>
+                  <p className="text-sm text-on-surface leading-relaxed">{text}</p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <div className="flex items-center justify-between mt-4 px-2">
+          <button className="flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary-container transition-colors">
+            <span className="material-symbols-outlined text-[18px]">double_arrow</span>
+            이 문제 건너뛰기
+          </button>
+          <button className="flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary-container transition-colors">
+            <span className="material-symbols-outlined text-[18px]">help</span>
+            힌트 보기
+          </button>
         </div>
       </div>
 
