@@ -9,8 +9,16 @@ const CATEGORIES = [
 
 type CategoryId = (typeof CATEGORIES)[number]['id'];
 
+const OPTIONS = [
+  { id: 'A', text: '독립 변수의 증가가 종속 변수의 급격한 하락을 유도한다.' },
+  { id: 'B', text: '두 변수 사이에는 통계적으로 유의미한 선형 관계가 존재하지 않는다.' },
+  { id: 'C', text: '표본의 크기를 확장할 경우 신뢰 구간이 95% 이상으로 수렴한다.' },
+  { id: 'D', text: '외부 변수의 통제가 이루어지지 않아 인과 관계 설정이 불가능하다.' },
+] as const;
+
 const DiagnosisQuiz = () => {
   const [category, setCategory] = useState<CategoryId>('math');
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const progress = 20;
 
   return (
@@ -36,6 +44,28 @@ const DiagnosisQuiz = () => {
               );
             })}
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {OPTIONS.map(({ id, text }) => {
+            const active = selectedOption === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setSelectedOption(id)}
+                className={`text-left p-4 rounded-xl border bg-surface-container-lowest transition-all ${
+                  active
+                    ? 'border-secondary bg-secondary-container/10 shadow-[0_0_0_3px_rgba(0,210,255,0.12)]'
+                    : 'border-outline-variant/40 hover:bg-surface-container-low'
+                }`}
+              >
+                <p className={`text-xs font-bold tracking-widest mb-1.5 ${active ? 'text-secondary' : 'text-on-surface-variant'}`}>
+                  OPTION {id}
+                </p>
+                <p className="text-sm text-on-surface leading-relaxed">{text}</p>
+              </button>
+            );
+          })}
         </div>
       </div>
 
