@@ -22,6 +22,9 @@ const DiagnosisQuiz = () => {
   const questionNumber = 4;
   const totalQuestions = 20;
   const progress = 20;
+  const timerSeconds = 8;
+  const timerTotal = 30;
+  const timerOffset = 100 - (timerSeconds / timerTotal) * 100;
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
@@ -100,13 +103,45 @@ const DiagnosisQuiz = () => {
             </div>
           </div>
 
-          <aside className="bg-primary-container text-white rounded-2xl p-5 shadow-[0_8px_20px_rgba(13,28,50,0.12)]">
-            <p className="text-xs font-bold tracking-widest text-secondary-container mb-2">
-              MEMBER TIP
-            </p>
-            <p className="text-sm leading-relaxed text-white/90">
-              이 유형의 문제는 데이터 시각화 역량을 평가합니다. '상관관계'와 '인과관계'의 차이에 집중해 보세요.
-            </p>
+          <aside className="flex flex-col gap-4">
+            <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 shadow-[0_4px_12px_rgba(10,25,47,0.04)] flex flex-col items-center">
+              <div className="relative w-32 h-32">
+                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                  <circle cx="50" cy="50" r="46" fill="none" stroke="#e0e3e6" strokeWidth="4" />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="46"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeDasharray="289"
+                    strokeDashoffset={(289 * timerOffset) / 100}
+                    className="text-secondary transition-all"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <p className="text-3xl font-extrabold text-primary-container leading-none">
+                    {String(timerSeconds).padStart(2, '0')}
+                  </p>
+                  <p className="text-[10px] tracking-widest text-on-surface-variant mt-1">SECONDS</p>
+                </div>
+              </div>
+              <p className="text-base font-bold text-primary-container mt-5">Time is running out!</p>
+              <p className="text-xs text-on-surface-variant text-center mt-1">
+                빠른 판단이 높은 점수로 이어집니다.
+              </p>
+            </div>
+
+            <div className="bg-primary-container text-white rounded-2xl p-5 shadow-[0_8px_20px_rgba(13,28,50,0.12)]">
+              <p className="text-xs font-bold tracking-widest text-secondary-container mb-2">
+                MEMBER TIP
+              </p>
+              <p className="text-sm leading-relaxed text-white/90">
+                이 유형의 문제는 데이터 시각화 역량을 평가합니다. '상관관계'와 '인과관계'의 차이에 집중해 보세요.
+              </p>
+            </div>
           </aside>
         </div>
       </div>
