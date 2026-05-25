@@ -9,6 +9,7 @@ import FindPassword from './pages/Auth/FindPassword';
 import MyPage from './pages/MyPage';
 import DiagnosisMajor from './pages/Diagnosis/Major';
 import DiagnosisLoading from './pages/Diagnosis/Loading';
+import DiagnosisQuiz from './pages/Diagnosis/Quiz';
 import LibraryNotice from './pages/Library/Notice';
 import LibraryContent from './pages/Library/Content';
 import LibraryContentDetail from './pages/Library/Content/Detail';
@@ -38,6 +39,7 @@ const AppLayout = () => {
           <Route path="/auth/find-password" element={<FindPassword />} />
           <Route path="/diagnosis" element={<DiagnosisMajor />} />
           <Route path="/diagnosis/loading" element={<DiagnosisLoading />} />
+          <Route path="/diagnosis/quiz" element={<DiagnosisQuiz />} />
           <Route path="/analysis/*" element={<Placeholder name="진로분석" />} />
           <Route path="/library" element={<LibraryNotice />} />
           <Route path="/library/content" element={<LibraryContent />} />
