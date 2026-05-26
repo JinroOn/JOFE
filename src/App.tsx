@@ -16,6 +16,7 @@ import LibraryContentDetail from './pages/Library/Content/Detail';
 import AiChat from './pages/AiChat';
 import MajorExplore from './pages/Analysis/MajorExplore';
 import WeakCapability from './pages/Analysis/WeakCapability';
+import MajorCompare from './pages/Analysis/MajorCompare';
 
 const Placeholder = ({ name }: { name: string }) => (
   <div className="flex items-center justify-center min-h-[60vh] text-on-surface-variant text-lg">
@@ -44,6 +45,7 @@ const AppLayout = () => {
           <Route path="/diagnosis/quiz" element={<DiagnosisQuiz />} />
           <Route path="/diagnosis/explore" element={<MajorExplore />} />
           <Route path="/analysis/weak" element={<WeakCapability />} />
+          <Route path="/analysis/compare" element={<MajorCompare />} />
           <Route path="/analysis/*" element={<Placeholder name="진로분석" />} />
           <Route path="/library" element={<LibraryNotice />} />
           <Route path="/library/content" element={<LibraryContent />} />
