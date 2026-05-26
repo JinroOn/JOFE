@@ -33,7 +33,7 @@ const DiagnosisLoading = () => {
 
         {/* 중앙 AI 시각화 */}
         <div className="flex w-full max-w-2xl flex-1 flex-col items-center justify-center">
-          <div className="relative mb-12 flex h-72 w-72 items-center justify-center">
+          <div className="relative mb-12 flex h-48 w-48 sm:h-64 sm:w-64 md:h-72 md:w-72 items-center justify-center">
             {/* 회전 링 */}
             <div className="ring-spin absolute inset-0 rounded-full border-[0.5px] border-secondary-container/20">
               <div className="absolute left-1/2 top-0 h-2 w-2 -translate-x-1/2 rounded-full bg-secondary-container shadow-[0_0_8px_rgba(0,210,255,0.5)]" />

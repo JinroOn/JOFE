@@ -195,7 +195,7 @@ const WeakCapability = () => {
               진행률 <span className="font-bold text-secondary">25%</span>
             </span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {ROADMAP_WEEKS.map((w) => (
               <div
                 key={w.week}
@@ -219,7 +219,7 @@ const WeakCapability = () => {
             {VIDEOS.map((v, i) => (
               <div
                 key={i}
-                className="shrink-0 w-56 bg-white rounded-2xl border border-outline-variant/10 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer overflow-hidden"
+                className="shrink-0 w-48 sm:w-56 bg-white rounded-2xl border border-outline-variant/10 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer overflow-hidden"
               >
                 <div className="h-32 bg-gradient-to-br from-primary-container/80 to-secondary flex items-center justify-center">
                   <span className="material-symbols-outlined text-white text-[48px]">play_circle</span>

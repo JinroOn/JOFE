@@ -51,7 +51,7 @@ const LibraryContentList = () => {
 
   return (
     <div className="min-h-screen">
-      <section className="relative overflow-hidden pt-8 pb-12 px-8">
+      <section className="relative overflow-hidden pt-8 pb-12 px-4 sm:px-8">
         <div className="max-w-[1280px] mx-auto relative z-10">
           <div className="flex flex-col items-center text-center space-y-6">
             <span className="inline-block px-4 py-1.5 bg-secondary-container/20 text-secondary text-sm font-bold rounded-full">
@@ -85,7 +85,7 @@ const LibraryContentList = () => {
         <div className="absolute top-48 -left-24 w-64 h-64 bg-primary/5 blur-[80px] rounded-full pointer-events-none" />
       </section>
 
-      <section className="max-w-[1280px] mx-auto px-8 py-12">
+      <section className="max-w-[1280px] mx-auto px-4 sm:px-8 py-12">
         <div className="flex flex-col lg:flex-row gap-12">
           <aside className="w-full lg:w-64 flex-shrink-0 space-y-10">
             <div>
