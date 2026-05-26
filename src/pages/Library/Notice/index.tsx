@@ -81,8 +81,8 @@ const Notice = () => {
         </div>
       </div>
 
-      <div className="bg-surface-container-lowest rounded-[14px] shadow-[0_20px_40px_rgba(10,25,47,0.06)]">
-        <table className="w-full border-collapse">
+      <div className="bg-surface-container-lowest rounded-[14px] shadow-[0_20px_40px_rgba(10,25,47,0.06)] overflow-x-auto">
+        <table className="w-full border-collapse min-w-[480px]">
           <thead>
             <tr className="bg-surface-container-low border-b border-outline-variant/10">
               <th className="hidden sm:table-cell px-6 py-5 text-left text-xs font-bold text-on-surface-variant uppercase tracking-wider w-16">No</th>

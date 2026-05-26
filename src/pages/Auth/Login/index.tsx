@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/AuthLayout';
 import useAuthStore from '../../../store/useAuthStore';
+import { labelClass, isValidEmail } from '../constants';
 
 interface FormState {
   email: string;
@@ -16,10 +17,6 @@ interface FormErrors {
 
 const inputClass =
   'w-full bg-surface-container-high border-b-2 border-transparent focus:border-secondary px-4 py-4 rounded-t-lg transition-all text-on-surface placeholder:text-on-surface-variant/40 outline-none pr-10';
-
-const labelClass = 'block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-1 ml-1';
-
-const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
 const Login = () => {
   const navigate = useNavigate();

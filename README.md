@@ -31,16 +31,17 @@ src/
  │   │   ├─ Login/
  │   │   ├─ Signup/
  │   │   ├─ FindPassword/
- │   │   └─ components/
+ │   │   ├─ components/       # AuthLayout, SessionModal
+ │   │   └─ constants.ts      # 공통 입력 스타일, 유효성 검사 함수
  │   ├─ Home/                 # 메인 페이지
- │   ├─ Diagnosis/            # 역량진단 섹션
+ │   ├─ Diagnosis/            # 역량진단 섹션 (전공진단, 퀴즈, 로딩)
  │   ├─ Analysis/             # 진로분석 결과 섹션
  │   │   ├─ Dashboard/
- │   │   ├─ WeakCapability/
- │   │   ├─ MajorExplore/
+ │   │   ├─ WeakCapability/   # components/RadarChart.tsx (9축 듀얼 차트)
+ │   │   ├─ MajorExplore/     # types.ts + components/ (RadarChart, MajorCard, DetailPanel, FilterContent)
  │   │   └─ MajorCompare/
  │   ├─ Library/              # 자료실 섹션
- │   ├─ AiChat/               # AI 상담 채팅
+ │   ├─ AiChat/               # AI 상담 채팅 — types.ts + components/ (Sidebar, MessageList, InputArea)
  │   ├─ MyPage/               # 마이페이지
  │   ├─ Admin/                # 관리자
  │   └─ Error/                # 오류 안내

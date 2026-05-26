@@ -6,9 +6,15 @@ interface Props {
 }
 
 const ProfileEditModal = ({ onClose }: Props) => {
-  const { user } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
   const [name, setName] = useState(user?.nickname ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
+
+  const handleSave = () => {
+    if (!user) return;
+    updateUser({ ...user, nickname: name, email });
+    onClose();
+  };
 
   const initial = name ? name[0] : '?';
 
@@ -69,7 +75,10 @@ const ProfileEditModal = ({ onClose }: Props) => {
           >
             취소
           </button>
-          <button className="flex-[1.5] px-4 py-3.5 bg-[#FFAB00] text-white font-bold rounded-xl hover:brightness-105 active:scale-[0.98] transition-all shadow-[0_4px_12px_rgba(255,171,0,0.3)]">
+          <button
+            onClick={handleSave}
+            className="flex-[1.5] px-4 py-3.5 bg-[#FFAB00] text-white font-bold rounded-xl hover:brightness-105 active:scale-[0.98] transition-all shadow-[0_4px_12px_rgba(255,171,0,0.3)]"
+          >
             변경 내용 저장
           </button>
         </div>
