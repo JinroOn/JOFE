@@ -14,6 +14,7 @@ import LibraryNotice from './pages/Library/Notice';
 import LibraryContent from './pages/Library/Content';
 import LibraryContentDetail from './pages/Library/Content/Detail';
 import AiChat from './pages/AiChat';
+import MajorExplore from './pages/Analysis/MajorExplore';
 
 const Placeholder = ({ name }: { name: string }) => (
   <div className="flex items-center justify-center min-h-[60vh] text-on-surface-variant text-lg">
@@ -41,6 +42,7 @@ const AppLayout = () => {
           <Route path="/diagnosis/loading" element={<DiagnosisLoading />} />
           <Route path="/diagnosis/quiz" element={<DiagnosisQuiz />} />
           <Route path="/analysis/*" element={<Placeholder name="진로분석" />} />
+          <Route path="/diagnosis/explore" element={<MajorExplore />} />
           <Route path="/library" element={<LibraryNotice />} />
           <Route path="/library/content" element={<LibraryContent />} />
           <Route path="/library/content/:id" element={<LibraryContentDetail />} />

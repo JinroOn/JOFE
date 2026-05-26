@@ -10,8 +10,6 @@ const NAV_LINKS = [
     sub: [
       { label: '전공 진단', to: '/diagnosis' },
       { label: '역량 평가 퀴즈', to: '/diagnosis/quiz' },
-      { label: '결과 리포트', to: '/diagnosis/report' },
-      { label: '전공 탐색', to: '/diagnosis/explore' },
     ],
   },
   {
@@ -20,7 +18,8 @@ const NAV_LINKS = [
     sub: [
       { label: '결과 리포트', to: '/analysis/dashboard' },
       { label: '취약 역량 분석', to: '/analysis/weak' },
-      { label: '전공 및 시뮬레이션', to: '/analysis/compare' },
+      { label: '전공 탐색', to: '/diagnosis/explore' },
+      { label: '전공 시뮬레이션', to: '/analysis/compare' },
     ],
   },
   {
