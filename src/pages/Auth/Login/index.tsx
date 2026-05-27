@@ -40,7 +40,12 @@ const Login = () => {
     setLoading(true);
     // TODO: API 연동 — 현재는 목업 로그인 (test123 / test123)
     await new Promise((r) => setTimeout(r, 1000));
-    if (form.email === 'test123@gmail.com' && form.password === 'test123') {
+    if (form.email === 'admin123@gmail.com' && form.password === 'admin123') {
+      login({ id: 0, email: 'admin123@gmail.com', nickname: 'Admin', role: 'admin' }, 'mock-admin-token');
+      setLoading(false);
+      navigate('/admin');
+      return;
+    } else if (form.email === 'test123@gmail.com' && form.password === 'test123') {
       login({ id: 1, email: 'test123@gmail.com', nickname: 'test123' }, 'mock-token');
     } else {
       setErrors({ password: '이메일 또는 비밀번호가 올바르지 않습니다.' });
