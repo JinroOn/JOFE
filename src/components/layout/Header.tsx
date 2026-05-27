@@ -118,6 +118,16 @@ const Header = () => {
                       <span className="material-symbols-outlined text-base">person</span>
                       프로필 보기
                     </Link>
+                    {user?.role === 'admin' && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setOpenMenu(null)}
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-secondary hover:bg-surface-container-low transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-base">admin_panel_settings</span>
+                        관리자
+                      </Link>
+                    )}
                     <button
                       onClick={() => { logout(); setOpenMenu(null); }}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-error hover:bg-surface-container-low transition-colors"

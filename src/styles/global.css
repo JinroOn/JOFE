@@ -16,6 +16,9 @@
   .cloud-shadow {
     box-shadow: 0px 20px 40px rgba(10, 25, 47, 0.06);
   }
+  .shadow-inner-right {
+    box-shadow: inset -10px 0 20px -10px rgba(10, 25, 47, 0.05);
+  }
   .material-symbols-outlined {
     font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   }

@@ -1,4 +1,6 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import useAuthStore from './store/useAuthStore';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import FooterSimple from './components/layout/FooterSimple';
@@ -18,6 +20,9 @@ import MajorExplore from './pages/Analysis/MajorExplore';
 import WeakCapability from './pages/Analysis/WeakCapability';
 import MajorCompare from './pages/Analysis/MajorCompare';
 import Dashboard from './pages/Analysis/Dashboard';
+import AdminLayout from './pages/Admin';
+import AdminDashboard from './pages/Admin/Dashboard';
+import AdminMajorManage from './pages/Admin/MajorManage';
 
 const Placeholder = ({ name }: { name: string }) => (
   <div className="flex items-center justify-center min-h-[60vh] text-on-surface-variant text-lg">
@@ -25,39 +30,57 @@ const Placeholder = ({ name }: { name: string }) => (
   </div>
 );
 
+const UserOnlyRoute = ({ children }: { children: ReactNode }) => {
+  const { user } = useAuthStore();
+  if (user?.role === 'admin') return <Navigate to="/admin" replace />;
+  return <>{children}</>;
+};
+
+const AdminOnlyRoute = ({ children }: { children: ReactNode }) => {
+  const { isLoggedIn, user } = useAuthStore();
+  if (!isLoggedIn) return <Navigate to="/auth/login" replace />;
+  if (user?.role !== 'admin') return <Navigate to="/" replace />;
+  return <>{children}</>;
+};
+
 const AppLayout = () => {
   const location = useLocation();
   const isAuthPage = location.pathname.startsWith('/auth');
   const isMainPage = location.pathname === '/';
   const isLoadingPage = location.pathname === '/diagnosis/loading';
   const isChatPage = location.pathname === '/ai-chat';
+  const isAdminPage = location.pathname.startsWith('/admin');
 
   return (
     <div className="flex flex-col min-h-screen">
-      {!isAuthPage && !isLoadingPage && !isChatPage && <Header />}
+      {!isAuthPage && !isLoadingPage && !isChatPage && !isAdminPage && <Header />}
       <div className="flex-grow flex flex-col">
         <Routes>
-          <Route path="/" element={<><Home /><Footer /></>} />
+          <Route path="/" element={<UserOnlyRoute><><Home /><Footer /></></UserOnlyRoute>} />
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/signup" element={<Signup />} />
           <Route path="/auth/find-password" element={<FindPassword />} />
-          <Route path="/diagnosis" element={<DiagnosisMajor />} />
-          <Route path="/diagnosis/loading" element={<DiagnosisLoading />} />
-          <Route path="/diagnosis/quiz" element={<DiagnosisQuiz />} />
-          <Route path="/diagnosis/explore" element={<MajorExplore />} />
-          <Route path="/analysis/weak" element={<WeakCapability />} />
-          <Route path="/analysis/dashboard" element={<Dashboard />} />
-          <Route path="/analysis/compare" element={<MajorCompare />} />
-          <Route path="/analysis/*" element={<Placeholder name="진로분석" />} />
-          <Route path="/library" element={<LibraryNotice />} />
-          <Route path="/library/content" element={<LibraryContent />} />
-          <Route path="/library/content/:id" element={<LibraryContentDetail />} />
-          <Route path="/ai-chat" element={<AiChat />} />
-          <Route path="/mypage" element={<MyPage />} />
+          <Route path="/diagnosis" element={<UserOnlyRoute><DiagnosisMajor /></UserOnlyRoute>} />
+          <Route path="/diagnosis/loading" element={<UserOnlyRoute><DiagnosisLoading /></UserOnlyRoute>} />
+          <Route path="/diagnosis/quiz" element={<UserOnlyRoute><DiagnosisQuiz /></UserOnlyRoute>} />
+          <Route path="/diagnosis/explore" element={<UserOnlyRoute><MajorExplore /></UserOnlyRoute>} />
+          <Route path="/analysis/weak" element={<UserOnlyRoute><WeakCapability /></UserOnlyRoute>} />
+          <Route path="/analysis/dashboard" element={<UserOnlyRoute><Dashboard /></UserOnlyRoute>} />
+          <Route path="/analysis/compare" element={<UserOnlyRoute><MajorCompare /></UserOnlyRoute>} />
+          <Route path="/analysis/*" element={<UserOnlyRoute><Placeholder name="진로분석" /></UserOnlyRoute>} />
+          <Route path="/library" element={<UserOnlyRoute><LibraryNotice /></UserOnlyRoute>} />
+          <Route path="/library/content" element={<UserOnlyRoute><LibraryContent /></UserOnlyRoute>} />
+          <Route path="/library/content/:id" element={<UserOnlyRoute><LibraryContentDetail /></UserOnlyRoute>} />
+          <Route path="/ai-chat" element={<UserOnlyRoute><AiChat /></UserOnlyRoute>} />
+          <Route path="/mypage" element={<UserOnlyRoute><MyPage /></UserOnlyRoute>} />
+          <Route path="/admin" element={<AdminOnlyRoute><AdminLayout /></AdminOnlyRoute>}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="majors" element={<AdminMajorManage />} />
+          </Route>
           <Route path="*" element={<Placeholder name="404 - 찾을 수 없는" />} />
         </Routes>
       </div>
-      {!isAuthPage && !isMainPage && !isLoadingPage && !isChatPage && <FooterSimple />}
+      {!isAuthPage && !isMainPage && !isLoadingPage && !isChatPage && !isAdminPage && <FooterSimple />}
     </div>
   );
 };
