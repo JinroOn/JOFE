@@ -57,7 +57,7 @@ const LibraryContentList = () => {
             <span className="inline-block px-4 py-1.5 bg-secondary-container/20 text-secondary text-sm font-bold rounded-full">
               Elevate Your Skills
             </span>
-            <h1 className="text-5xl md:text-6xl font-extrabold tracking-tighter text-primary">
+            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-primary">
               학습 콘텐츠
             </h1>
             <p className="text-on-surface-variant max-w-xl text-lg leading-relaxed">
