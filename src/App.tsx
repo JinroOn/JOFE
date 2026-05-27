@@ -1,10 +1,29 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import useAuthStore from './store/useAuthStore';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
+import FooterSimple from './components/layout/FooterSimple';
 import Home from './pages/Home';
 import Login from './pages/Auth/Login';
 import Signup from './pages/Auth/Signup';
 import FindPassword from './pages/Auth/FindPassword';
+import MyPage from './pages/MyPage';
+import DiagnosisMajor from './pages/Diagnosis/Major';
+import DiagnosisLoading from './pages/Diagnosis/Loading';
+import DiagnosisQuiz from './pages/Diagnosis/Quiz';
+import LibraryNotice from './pages/Library/Notice';
+import LibraryContent from './pages/Library/Content';
+import LibraryContentDetail from './pages/Library/Content/Detail';
+import AiChat from './pages/AiChat';
+import MajorExplore from './pages/Analysis/MajorExplore';
+import WeakCapability from './pages/Analysis/WeakCapability';
+import MajorCompare from './pages/Analysis/MajorCompare';
+import Dashboard from './pages/Analysis/Dashboard';
+import AdminLayout from './pages/Admin';
+import AdminDashboard from './pages/Admin/Dashboard';
+import AdminMajorManage from './pages/Admin/MajorManage';
+import ErrorPage from './pages/Error';
 
 const Placeholder = ({ name }: { name: string }) => (
   <div className="flex items-center justify-center min-h-[60vh] text-on-surface-variant text-lg">
@@ -12,27 +31,58 @@ const Placeholder = ({ name }: { name: string }) => (
   </div>
 );
 
+const UserOnlyRoute = ({ children }: { children: ReactNode }) => {
+  const { user } = useAuthStore();
+  if (user?.role === 'admin') return <Navigate to="/admin" replace />;
+  return <>{children}</>;
+};
+
+const AdminOnlyRoute = ({ children }: { children: ReactNode }) => {
+  const { isLoggedIn, user } = useAuthStore();
+  if (!isLoggedIn) return <Navigate to="/auth/login" replace />;
+  if (user?.role !== 'admin') return <Navigate to="/" replace />;
+  return <>{children}</>;
+};
+
 const AppLayout = () => {
   const location = useLocation();
   const isAuthPage = location.pathname.startsWith('/auth');
+  const isMainPage = location.pathname === '/';
+  const isLoadingPage = location.pathname === '/diagnosis/loading';
+  const isChatPage = location.pathname === '/ai-chat';
+  const isAdminPage = location.pathname.startsWith('/admin');
 
   return (
     <div className="flex flex-col min-h-screen">
-      {!isAuthPage && <Header />}
+      {!isAuthPage && !isLoadingPage && !isChatPage && !isAdminPage && <Header />}
       <div className="flex-grow flex flex-col">
         <Routes>
-          <Route path="/" element={<><Home /><Footer /></>} />
+          <Route path="/" element={<UserOnlyRoute><><Home /><Footer /></></UserOnlyRoute>} />
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/signup" element={<Signup />} />
           <Route path="/auth/find-password" element={<FindPassword />} />
-          <Route path="/diagnosis" element={<Placeholder name="역량진단" />} />
-          <Route path="/analysis/*" element={<Placeholder name="진로분석" />} />
-          <Route path="/library" element={<Placeholder name="자료실" />} />
-          <Route path="/ai-chat" element={<Placeholder name="AI챗봇" />} />
-          <Route path="/mypage" element={<Placeholder name="마이페이지" />} />
+          <Route path="/diagnosis" element={<UserOnlyRoute><DiagnosisMajor /></UserOnlyRoute>} />
+          <Route path="/diagnosis/loading" element={<UserOnlyRoute><DiagnosisLoading /></UserOnlyRoute>} />
+          <Route path="/diagnosis/quiz" element={<UserOnlyRoute><DiagnosisQuiz /></UserOnlyRoute>} />
+          <Route path="/diagnosis/explore" element={<UserOnlyRoute><MajorExplore /></UserOnlyRoute>} />
+          <Route path="/analysis/weak" element={<UserOnlyRoute><WeakCapability /></UserOnlyRoute>} />
+          <Route path="/analysis/dashboard" element={<UserOnlyRoute><Dashboard /></UserOnlyRoute>} />
+          <Route path="/analysis/compare" element={<UserOnlyRoute><MajorCompare /></UserOnlyRoute>} />
+          <Route path="/analysis/*" element={<UserOnlyRoute><Placeholder name="진로분석" /></UserOnlyRoute>} />
+          <Route path="/library" element={<UserOnlyRoute><LibraryNotice /></UserOnlyRoute>} />
+          <Route path="/library/content" element={<UserOnlyRoute><LibraryContent /></UserOnlyRoute>} />
+          <Route path="/library/content/:id" element={<UserOnlyRoute><LibraryContentDetail /></UserOnlyRoute>} />
+          <Route path="/ai-chat" element={<UserOnlyRoute><AiChat /></UserOnlyRoute>} />
+          <Route path="/mypage" element={<UserOnlyRoute><MyPage /></UserOnlyRoute>} />
+          <Route path="/admin" element={<AdminOnlyRoute><AdminLayout /></AdminOnlyRoute>}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="majors" element={<AdminMajorManage />} />
+          </Route>
+          <Route path="/error" element={<ErrorPage />} />
           <Route path="*" element={<Placeholder name="404 - 찾을 수 없는" />} />
         </Routes>
       </div>
+      {!isAuthPage && !isMainPage && !isLoadingPage && !isChatPage && !isAdminPage && <FooterSimple />}
     </div>
   );
 };

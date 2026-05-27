@@ -31,16 +31,17 @@ src/
  │   │   ├─ Login/
  │   │   ├─ Signup/
  │   │   ├─ FindPassword/
- │   │   └─ components/
+ │   │   ├─ components/       # AuthLayout, SessionModal
+ │   │   └─ constants.ts      # 공통 입력 스타일, 유효성 검사 함수
  │   ├─ Home/                 # 메인 페이지
- │   ├─ Diagnosis/            # 역량진단 섹션
+ │   ├─ Diagnosis/            # 역량진단 섹션 (전공진단, 퀴즈, 로딩)
  │   ├─ Analysis/             # 진로분석 결과 섹션
  │   │   ├─ Dashboard/
- │   │   ├─ WeakCapability/
- │   │   ├─ MajorExplore/
+ │   │   ├─ WeakCapability/   # components/RadarChart.tsx (9축 듀얼 차트)
+ │   │   ├─ MajorExplore/     # types.ts + components/ (RadarChart, MajorCard, DetailPanel, FilterContent)
  │   │   └─ MajorCompare/
  │   ├─ Library/              # 자료실 섹션
- │   ├─ AiChat/               # AI 상담 채팅
+ │   ├─ AiChat/               # AI 상담 채팅 — types.ts + components/ (Sidebar, MessageList, InputArea)
  │   ├─ MyPage/               # 마이페이지
  │   ├─ Admin/                # 관리자
  │   └─ Error/                # 오류 안내
@@ -69,6 +70,15 @@ src/
 > - 컴포넌트 안에 axios를 직접 쓰지 말고, `api/`에 함수를 만들어 호출하세요.
 > - 특정 페이지에서만 쓰는 컴포넌트는 `pages/섹션명/페이지명/components/`에 넣으세요.
 > - 전역 상태는 반드시 store action을 통해서만 변경하세요.
+
+## 🔐 Test Accounts
+
+| 구분 | 이메일 | 비밀번호 |
+|------|--------|----------|
+| 일반 사용자 | `test123@gmail.com` | `test123` |
+| 관리자 | `admin123@gmail.com` | `admin123` |
+
+> 목업 계정입니다. API 연동 후 제거됩니다.
 
 ## ⚙️ Getting Started
 

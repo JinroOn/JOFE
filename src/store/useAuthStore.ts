@@ -5,6 +5,7 @@ interface User {
   id: number;
   email: string;
   nickname: string;
+  role?: 'admin' | 'user';
 }
 
 interface AuthState {
@@ -13,6 +14,7 @@ interface AuthState {
   isLoggedIn: boolean;
   login: (user: User, token: string) => void;
   logout: () => void;
+  updateUser: (user: User) => void;
 }
 
 const useAuthStore = create<AuthState>()(
@@ -23,6 +25,7 @@ const useAuthStore = create<AuthState>()(
       isLoggedIn: false,
       login: (user, token) => set({ user, accessToken: token, isLoggedIn: true }),
       logout: () => set({ user: null, accessToken: null, isLoggedIn: false }),
+      updateUser: (user) => set({ user }),
     }),
     { name: 'auth' }
   )
