@@ -71,6 +71,15 @@ src/
 > - 특정 페이지에서만 쓰는 컴포넌트는 `pages/섹션명/페이지명/components/`에 넣으세요.
 > - 전역 상태는 반드시 store action을 통해서만 변경하세요.
 
+## 🔐 Test Accounts
+
+| 구분 | 이메일 | 비밀번호 |
+|------|--------|----------|
+| 일반 사용자 | `test123@gmail.com` | `test123` |
+| 관리자 | `admin123@gmail.com` | `admin123` |
+
+> 목업 계정입니다. API 연동 후 제거됩니다.
+
 ## ⚙️ Getting Started
 
 ### Prerequisites

@@ -190,7 +190,7 @@ const WeakCapability = () => {
 
         <div>
           <div className="flex items-center justify-between mb-5">
-            <h2 className="font-black text-2xl text-primary-container">12주 학습 로드맵</h2>
+            <h2 className="font-black text-xl text-primary-container">12주 학습 로드맵</h2>
             <span className="text-sm text-on-surface-variant bg-surface-container px-3 py-1 rounded-full">
               진행률 <span className="font-bold text-secondary">25%</span>
             </span>
@@ -214,7 +214,7 @@ const WeakCapability = () => {
         </div>
 
         <div>
-          <h2 className="font-black text-2xl text-primary-container mb-5">추천 학습 콘텐츠</h2>
+          <h2 className="font-black text-xl text-primary-container mb-5">추천 학습 콘텐츠</h2>
           <div className="flex gap-4 overflow-x-auto pb-3 [&::-webkit-scrollbar]:hidden">
             {VIDEOS.map((v, i) => (
               <div
