@@ -1,35 +1,95 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/AuthLayout';
-import { labelClass, inputClass } from '../constants';
+import { labelClass, inputClass, isValidEmail, pwChecks } from '../constants';
+import { sendPasswordResetCode, verifyPasswordResetCode, resetPassword } from '../../../api/auth';
 
-interface FormState {
-  name: string;
-  id: string;
-  newPassword: string;
-  passwordConfirm: string;
-}
+const COUNTDOWN_SEC = 180;
 
 const FindPassword = () => {
   const navigate = useNavigate();
-  const [form, setForm] = useState<FormState>({ name: '', id: '', newPassword: '', passwordConfirm: '' });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const setField = <K extends keyof FormState>(k: K, v: string) =>
-    setForm((p) => ({ ...p, [k]: v }));
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+
+  const [codeSent, setCodeSent] = useState(false);
+  const [codeVerified, setCodeVerified] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+
+  const [error, setError] = useState('');
+  const [sendLoading, setSendLoading] = useState(false);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false);
+
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
+
+  const startCountdown = () => {
+    setCountdown(COUNTDOWN_SEC);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) { clearInterval(timerRef.current!); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const formatTime = (sec: number) =>
+    `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
+
+  const handleSendCode = async () => {
+    if (!name.trim()) return setError('이름을 입력해 주세요.');
+    if (!isValidEmail(email)) return setError('올바른 이메일 형식을 입력해 주세요.');
+    setError('');
+    setSendLoading(true);
+    try {
+      await sendPasswordResetCode(email);
+      setCodeSent(true);
+      setCode('');
+      startCountdown();
+    } catch {
+      setError('인증 코드 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setSendLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (!code.trim()) return setError('인증 코드를 입력해 주세요.');
+    setError('');
+    setVerifyLoading(true);
+    try {
+      await verifyPasswordResetCode(email, code);
+      setCodeVerified(true);
+      if (timerRef.current) clearInterval(timerRef.current);
+      setCountdown(0);
+    } catch {
+      setError('인증 코드가 올바르지 않거나 만료되었습니다.');
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.id) return setError('이름과 아이디를 입력해 주세요.');
-    if (form.newPassword.length < 8) return setError('비밀번호는 8자 이상이어야 합니다.');
-    if (form.newPassword !== form.passwordConfirm) return setError('비밀번호가 일치하지 않습니다.');
+    if (!codeVerified) return setError('이메일 인증을 완료해 주세요.');
+    if (!pwChecks.every((c) => c.test(newPassword))) return setError('비밀번호 조건을 모두 충족해 주세요.');
+    if (newPassword !== passwordConfirm) return setError('비밀번호가 일치하지 않습니다.');
     setError('');
-    setLoading(true);
-    // TODO: API 연동
-    await new Promise((r) => setTimeout(r, 1000));
-    setLoading(false);
-    navigate('/auth/login');
+    setSubmitLoading(true);
+    try {
+      await resetPassword({ email, code, newPassword });
+      navigate('/auth/login', { state: { passwordReset: true } });
+    } catch {
+      setError('비밀번호 재설정에 실패했습니다. 다시 시도해 주세요.');
+    } finally {
+      setSubmitLoading(false);
+    }
   };
 
   return (
@@ -38,7 +98,7 @@ const FindPassword = () => {
         {/* 타이틀 */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-extrabold text-primary-container tracking-tight mb-3">계정 정보 찾기</h1>
-          <p className="text-on-surface-variant text-lg">가입하신 정보로 계정을 확인하실 수 있습니다.</p>
+          <p className="text-on-surface-variant text-lg">가입하신 이메일로 계정을 확인하실 수 있습니다.</p>
         </div>
 
         {/* 카드 */}
@@ -47,58 +107,144 @@ const FindPassword = () => {
             <h2 className="text-xl font-bold text-primary-container text-center mb-8">비밀번호 찾기</h2>
 
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* 이름 */}
               <div>
                 <label className={labelClass}>이름</label>
                 <input
                   type="text"
-                  value={form.name}
-                  onChange={(e) => setField('name', e.target.value)}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="성명을 입력해 주세요"
                   className={inputClass}
+                  disabled={codeVerified}
                 />
               </div>
+
+              {/* 이메일 + 인증코드 발송 */}
               <div>
-                <label className={labelClass}>아이디</label>
-                <input
-                  type="text"
-                  value={form.id}
-                  onChange={(e) => setField('id', e.target.value)}
-                  placeholder="사용중인 아이디를 입력해 주세요"
-                  className={inputClass}
-                />
+                <label className={labelClass}>이메일</label>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setCodeSent(false); setCodeVerified(false); setCode(''); }}
+                    placeholder="가입한 이메일을 입력해 주세요"
+                    className={inputClass + ' flex-1 min-w-0'}
+                    disabled={codeVerified}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendCode}
+                    disabled={sendLoading || codeVerified}
+                    className="shrink-0 px-4 py-2 bg-primary-container text-white text-sm font-bold rounded-lg hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {sendLoading ? '발송 중...' : codeSent ? '재발송' : '인증코드 발송'}
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className={labelClass}>새 비밀번호</label>
-                <input
-                  type="password"
-                  value={form.newPassword}
-                  onChange={(e) => setField('newPassword', e.target.value)}
-                  placeholder="새로운 비밀번호를 입력해 주세요"
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>비밀번호 확인</label>
-                <input
-                  type="password"
-                  value={form.passwordConfirm}
-                  onChange={(e) => setField('passwordConfirm', e.target.value)}
-                  placeholder="비밀번호를 한 번 더 입력해 주세요"
-                  className={inputClass}
-                />
-              </div>
+
+              {/* 인증코드 입력 */}
+              {codeSent && !codeVerified && (
+                <div>
+                  <label className={labelClass}>인증 코드</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1 min-w-0">
+                      <input
+                        type="text"
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        placeholder="인증 코드 6자리를 입력해 주세요"
+                        maxLength={6}
+                        className={inputClass + ' pr-16'}
+                      />
+                      {countdown > 0 && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-error font-mono pointer-events-none">
+                          {formatTime(countdown)}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleVerifyCode}
+                      disabled={verifyLoading || countdown === 0}
+                      className="shrink-0 px-4 py-2 bg-secondary text-white text-sm font-bold rounded-lg hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
+                    >
+                      {verifyLoading ? '확인 중...' : '확인'}
+                    </button>
+                  </div>
+                  {countdown === 0 && (
+                    <p className="text-xs text-error mt-1 ml-1">인증 시간이 만료되었습니다. 재발송을 클릭해 주세요.</p>
+                  )}
+                </div>
+              )}
+
+              {/* 인증 완료 표시 */}
+              {codeVerified && (
+                <div className="flex items-center gap-2 text-green-600 text-sm">
+                  <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    check_circle
+                  </span>
+                  이메일 인증이 완료되었습니다.
+                </div>
+              )}
+
+              {/* 새 비밀번호 (인증 완료 후 표시) */}
+              {codeVerified && (
+                <>
+                  <div>
+                    <label className={labelClass}>새 비밀번호</label>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="새로운 비밀번호를 입력해 주세요"
+                      className={inputClass}
+                    />
+                    {newPassword && (
+                      <div className="grid grid-cols-2 gap-1 mt-2 px-1">
+                        {pwChecks.map(({ label, test }) => (
+                          <span
+                            key={label}
+                            className={`flex items-center gap-1 text-xs ${test(newPassword) ? 'text-green-600' : 'text-on-surface-variant/50'}`}
+                          >
+                            <span
+                              className="material-symbols-outlined text-[14px]"
+                              style={{ fontVariationSettings: "'FILL' 1" }}
+                            >
+                              {test(newPassword) ? 'check_circle' : 'radio_button_unchecked'}
+                            </span>
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className={labelClass}>비밀번호 확인</label>
+                    <input
+                      type="password"
+                      value={passwordConfirm}
+                      onChange={(e) => setPasswordConfirm(e.target.value)}
+                      placeholder="비밀번호를 한 번 더 입력해 주세요"
+                      className={inputClass}
+                    />
+                  </div>
+                </>
+              )}
 
               {error && <p className="text-error text-sm">{error}</p>}
 
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-[#FFAB00] text-primary-container font-bold py-5 rounded-lg shadow-lg shadow-[#FFAB00]/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 disabled:opacity-60"
-                >
-                  {loading ? '처리 중...' : '비밀번호 재설정'}
-                </button>
-              </div>
+              {codeVerified && (
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={submitLoading}
+                    className="w-full bg-[#FFAB00] text-primary-container font-bold py-5 rounded-lg shadow-lg shadow-[#FFAB00]/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 disabled:opacity-60"
+                  >
+                    {submitLoading ? '처리 중...' : '비밀번호 재설정'}
+                  </button>
+                </div>
+              )}
             </form>
           </div>
         </div>

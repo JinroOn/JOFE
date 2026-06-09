@@ -24,3 +24,12 @@ export const changePassword = (data: {
   currentPassword: string;
   newPassword: string;
 }) => api.post('/auth/password', data);
+
+export const sendPasswordResetCode = (email: string) =>
+  api.post('/auth/password/reset-code', { email });
+
+export const verifyPasswordResetCode = (email: string, code: string) =>
+  api.post('/auth/password/verify-code', { email, code });
+
+export const resetPassword = (data: { email: string; code: string; newPassword: string }) =>
+  api.post('/auth/password/reset', data);
