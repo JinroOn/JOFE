@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
+import { logout as logoutApi } from '../../api/auth';
 import logo from '../../assets/logo.svg';
 
 const NAV_LINKS = [
@@ -33,7 +34,15 @@ const NAV_LINKS = [
 ];
 
 const Header = () => {
-  const { isLoggedIn, user, logout } = useAuthStore();
+  const { isLoggedIn, user, logout, refreshToken } = useAuthStore();
+
+  const handleLogout = async () => {
+    if (refreshToken) {
+      await logoutApi(refreshToken).catch(() => {});
+    }
+    logout();
+    setOpenMenu(null);
+  };
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -129,7 +138,7 @@ const Header = () => {
                       </Link>
                     )}
                     <button
-                      onClick={() => { logout(); setOpenMenu(null); }}
+                      onClick={handleLogout}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-error hover:bg-surface-container-low transition-colors"
                     >
                       <span className="material-symbols-outlined text-base">logout</span>
