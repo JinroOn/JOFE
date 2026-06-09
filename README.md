@@ -71,15 +71,6 @@ src/
 > - 특정 페이지에서만 쓰는 컴포넌트는 `pages/섹션명/페이지명/components/`에 넣으세요.
 > - 전역 상태는 반드시 store action을 통해서만 변경하세요.
 
-## 🔐 Test Accounts
-
-| 구분 | 이메일 | 비밀번호 |
-|------|--------|----------|
-| 일반 사용자 | `test123@gmail.com` | `test123` |
-| 관리자 | `admin123@gmail.com` | `admin123` |
-
-> 목업 계정입니다. API 연동 후 제거됩니다.
-
 ## ⚙️ Getting Started
 
 ### Prerequisites
@@ -107,8 +98,10 @@ npm run build
 ## 🌐 Environment Variables
 프로젝트 루트에 `.env` 파일을 생성하고 아래 변수를 설정해 주세요.
 ```env
-VITE_API_BASE_URL=your_api_server_url
+VITE_API_BASE_URL=http://52.79.202.196:8080/api
 ```
+
+> 설정하지 않으면 `http://52.79.202.196:8080/api` 로 자동 연결됩니다.
 
 ---
 © 2024 JinroOn AI. Empowering the next generation of scholars.

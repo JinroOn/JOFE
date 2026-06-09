@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import AuthLayout from '../components/AuthLayout';
 import useAuthStore from '../../../store/useAuthStore';
+import { login as loginApi } from '../../../api/auth';
 import { labelClass, isValidEmail } from '../constants';
 
 interface FormState {
@@ -38,22 +40,23 @@ const Login = () => {
     e.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    // TODO: API 연동 — 현재는 목업 로그인 (test123 / test123)
-    await new Promise((r) => setTimeout(r, 1000));
-    if (form.email === 'admin123@gmail.com' && form.password === 'admin123') {
-      login({ id: 0, email: 'admin123@gmail.com', nickname: 'Admin', role: 'admin' }, 'mock-admin-token');
+    try {
+      const data = await loginApi(form.email, form.password);
+      login(
+        { id: data.user.id, email: data.user.email, nickname: data.user.nickname, role: data.user.role },
+        data.accessToken,
+        data.refreshToken,
+      );
+      navigate(data.user.role === 'admin' ? '/admin' : '/');
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        setErrors({ password: '이메일 또는 비밀번호가 올바르지 않습니다.' });
+      } else {
+        setErrors({ password: '로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' });
+      }
+    } finally {
       setLoading(false);
-      navigate('/admin');
-      return;
-    } else if (form.email === 'test123@gmail.com' && form.password === 'test123') {
-      login({ id: 1, email: 'test123@gmail.com', nickname: 'test123' }, 'mock-token');
-    } else {
-      setErrors({ password: '이메일 또는 비밀번호가 올바르지 않습니다.' });
-      setLoading(false);
-      return;
     }
-    setLoading(false);
-    navigate('/');
   };
 
   return (

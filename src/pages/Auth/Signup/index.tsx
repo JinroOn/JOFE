@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import AuthLayout from '../components/AuthLayout';
+import { signup as signupApi } from '../../../api/auth';
 import { labelClass, inputClass, isValidEmail, pwChecks } from '../constants';
 
 interface FormState {
   email: string;
+  nickname: string;
   password: string;
   passwordConfirm: string;
   agreeAll: boolean;
@@ -16,7 +19,7 @@ interface FormState {
 const Signup = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState<FormState>({
-    email: '', password: '', passwordConfirm: '',
+    email: '', nickname: '', password: '', passwordConfirm: '',
     agreeAll: false, agreeTerms: false, agreePrivacy: false, agreeMarketing: false,
   });
   const [emailTouched, setEmailTouched] = useState(false);
@@ -32,15 +35,32 @@ const Signup = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isValidEmail(form.email)) return setSubmitError('올바른 이메일 형식을 입력해 주세요.');
+    if (!form.nickname.trim()) return setSubmitError('닉네임을 입력해 주세요.');
+    if (form.nickname.length > 50) return setSubmitError('닉네임은 50자 이하로 입력해 주세요.');
     if (!pwChecks.every((c) => c.test(form.password))) return setSubmitError('비밀번호 조건을 모두 충족해 주세요.');
     if (form.password !== form.passwordConfirm) return setSubmitError('비밀번호가 일치하지 않습니다.');
     if (!form.agreeTerms || !form.agreePrivacy) return setSubmitError('필수 약관에 동의해 주세요.');
     setSubmitError('');
     setLoading(true);
-    // TODO: API 연동
-    await new Promise((r) => setTimeout(r, 1000));
-    setLoading(false);
-    navigate('/auth/login');
+    try {
+      await signupApi({
+        email: form.email,
+        password: form.password,
+        nickname: form.nickname.trim(),
+        termsAgreed: form.agreeTerms,
+        privacyAgreed: form.agreePrivacy,
+        marketingAgreed: form.agreeMarketing,
+      });
+      navigate('/auth/login', { state: { signedUp: true } });
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        setSubmitError('이미 사용 중인 이메일입니다.');
+      } else {
+        setSubmitError('회원가입 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -83,6 +103,18 @@ const Signup = () => {
                     </span>
                   )}
                 </div>
+              </div>
+
+              {/* 닉네임 */}
+              <div>
+                <label className={labelClass}>닉네임</label>
+                <input
+                  type="text"
+                  value={form.nickname}
+                  onChange={(e) => setField('nickname', e.target.value)}
+                  placeholder="사용할 닉네임을 입력하세요 (최대 50자)"
+                  className={inputClass}
+                />
               </div>
 
               {/* 비밀번호 */}
