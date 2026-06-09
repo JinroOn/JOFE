@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/AuthLayout';
 import { labelClass, inputClass, isValidEmail, pwChecks } from '../constants';
-import { sendPasswordResetCode, verifyPasswordResetCode, resetPassword } from '../../../api/auth';
+import { sendPasswordResetCode, resetPassword } from '../../../api/auth';
 
 const COUNTDOWN_SEC = 180;
 
@@ -21,7 +21,6 @@ const FindPassword = () => {
 
   const [error, setError] = useState('');
   const [sendLoading, setSendLoading] = useState(false);
-  const [verifyLoading, setVerifyLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -59,20 +58,13 @@ const FindPassword = () => {
     }
   };
 
-  const handleVerifyCode = async () => {
+  const handleVerifyCode = () => {
     if (!code.trim()) return setError('인증 코드를 입력해 주세요.');
+    if (!/^\d{6}$/.test(code)) return setError('인증 코드는 숫자 6자리를 입력해 주세요.');
     setError('');
-    setVerifyLoading(true);
-    try {
-      await verifyPasswordResetCode(email, code);
-      setCodeVerified(true);
-      if (timerRef.current) clearInterval(timerRef.current);
-      setCountdown(0);
-    } catch {
-      setError('인증 코드가 올바르지 않거나 만료되었습니다.');
-    } finally {
-      setVerifyLoading(false);
-    }
+    setCodeVerified(true);
+    if (timerRef.current) clearInterval(timerRef.current);
+    setCountdown(0);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -166,10 +158,10 @@ const FindPassword = () => {
                     <button
                       type="button"
                       onClick={handleVerifyCode}
-                      disabled={verifyLoading || countdown === 0}
+                      disabled={countdown === 0}
                       className="shrink-0 px-4 py-2 bg-secondary text-white text-sm font-bold rounded-lg hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
                     >
-                      {verifyLoading ? '확인 중...' : '확인'}
+                      확인
                     </button>
                   </div>
                   {countdown === 0 && (

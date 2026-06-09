@@ -103,5 +103,21 @@ VITE_API_BASE_URL=http://52.79.202.196:8080/api
 
 > 설정하지 않으면 `http://52.79.202.196:8080/api` 로 자동 연결됩니다.
 
+## 🔐 Auth API 주요 흐름
+
+| 기능 | 메서드 | 엔드포인트 | 비고 |
+|------|--------|------------|------|
+| 회원가입 | POST | `/auth/signup` | |
+| 로그인 | POST | `/auth/login` | |
+| 토큰 갱신 | POST | `/auth/refresh` | |
+| 로그아웃 | POST | `/auth/logout` | |
+| 비밀번호 변경 | POST | `/auth/password` | 로그인 상태 필요 |
+| 비밀번호 재설정 코드 발송 | POST | `/auth/password-resets` | `{ email }` |
+| 비밀번호 재설정 확인 | POST | `/auth/password-resets/confirm` | `{ email, code, newPassword }` |
+| 이메일 인증 코드 발송 | POST | `/auth/email-verifications` | 가입 완료 후 사용 |
+| 이메일 인증 확인 | POST | `/auth/email-verifications/confirm` | `{ email, token }` |
+
+> **주의**: `email-verifications`는 **이미 가입된 유저**의 이메일을 인증하는 용도입니다. 회원가입 전에는 호출할 수 없습니다.
+
 ---
-© 2024 JinroOn AI. Empowering the next generation of scholars.
+© 2026 JinroOn AI. Empowering the next generation of scholars.
