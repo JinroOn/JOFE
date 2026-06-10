@@ -43,7 +43,7 @@ const Login = () => {
     try {
       const data = await loginApi(form.email, form.password);
       login(
-        { id: data.user.id, email: data.user.email, nickname: data.user.nickname, role: data.user.role },
+        { id: data.user.id, email: data.user.email, nickname: data.user.nickname, profileImageUrl: data.user.profileImageUrl, role: data.user.role },
         data.accessToken,
         data.refreshToken,
       );
