@@ -16,21 +16,23 @@ const LibraryNotice = () => {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<Notice | null>(null);
 
   useEffect(() => {
     if (activeTab !== 'notice') return;
-    setLoading(true);
-    setError(false);
     getNotices(currentPage)
       .then((data) => {
         setNotices(data.content);
         setTotalPages(data.totalPages);
+        setError(false);
+        setLoading(false);
       })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        setError(true);
+        setLoading(false);
+      });
   }, [activeTab, currentPage]);
 
   const filtered = notices
@@ -51,7 +53,7 @@ const LibraryNotice = () => {
       <div className="bg-surface-container-low p-6 rounded-2xl mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="flex gap-2 p-1 bg-surface-container-high rounded-xl w-full md:w-auto">
           <button
-            onClick={() => { setActiveTab('notice'); setCurrentPage(0); }}
+            onClick={() => { setActiveTab('notice'); setCurrentPage(0); setLoading(true); }}
             className={`px-6 py-2 rounded-lg font-bold transition-all ${activeTab === 'notice' ? 'bg-surface-container-lowest text-primary shadow-sm' : 'text-on-surface-variant font-medium hover:bg-surface-container-highest'}`}
           >
             공지사항
@@ -131,7 +133,7 @@ const LibraryNotice = () => {
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2 py-8 border-t border-outline-variant/10">
               <button
-                onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                onClick={() => { setLoading(true); setCurrentPage((p) => Math.max(0, p - 1)); }}
                 disabled={currentPage === 0}
                 className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors disabled:opacity-30"
               >
@@ -140,14 +142,14 @@ const LibraryNotice = () => {
               {pageNumbers.map((p) => (
                 <button
                   key={p}
-                  onClick={() => setCurrentPage(p)}
+                  onClick={() => { setLoading(true); setCurrentPage(p); }}
                   className={`w-10 h-10 flex items-center justify-center rounded-lg font-bold transition-colors ${p === currentPage ? 'bg-primary-container text-white' : 'hover:bg-surface-container-high font-medium'}`}
                 >
                   {p + 1}
                 </button>
               ))}
               <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
+                onClick={() => { setLoading(true); setCurrentPage((p) => Math.min(totalPages - 1, p + 1)); }}
                 disabled={currentPage === totalPages - 1}
                 className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors disabled:opacity-30"
               >

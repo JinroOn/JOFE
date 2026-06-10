@@ -23,7 +23,7 @@ const AdminNoticeManage = () => {
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Notice | null>(null);
@@ -37,16 +37,15 @@ const AdminNoticeManage = () => {
   const titleRef = useRef<HTMLInputElement>(null);
 
   const fetchNotices = (page = 0) => {
-    setLoading(true);
     getNotices(page, 10)
       .then((data) => {
         setNotices(data.content);
         setTotalElements(data.totalElements);
         setTotalPages(data.totalPages);
         setCurrentPage(data.number);
+        setLoading(false);
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .catch(() => setLoading(false));
   };
 
   useEffect(() => { fetchNotices(0); }, []);
@@ -94,6 +93,7 @@ const AdminNoticeManage = () => {
         await createNotice(payload);
       }
       setModalOpen(false);
+      setLoading(true);
       fetchNotices(editTarget ? currentPage : 0);
     } catch {
       setFormError('저장에 실패했습니다. 다시 시도해주세요.');
@@ -108,6 +108,7 @@ const AdminNoticeManage = () => {
     try {
       await deleteNotice(deleteTarget.id);
       setDeleteTarget(null);
+      setLoading(true);
       fetchNotices(notices.length === 1 && currentPage > 0 ? currentPage - 1 : currentPage);
     } catch {
       setDeleteTarget(null);
@@ -212,7 +213,7 @@ const AdminNoticeManage = () => {
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-2 py-6 border-t border-outline-variant/10">
             <button
-              onClick={() => fetchNotices(Math.max(0, currentPage - 1))}
+              onClick={() => { setLoading(true); fetchNotices(Math.max(0, currentPage - 1)); }}
               disabled={currentPage === 0}
               className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors disabled:opacity-30"
             >
@@ -221,7 +222,7 @@ const AdminNoticeManage = () => {
             {pageNumbers.map((p) => (
               <button
                 key={p}
-                onClick={() => fetchNotices(p)}
+                onClick={() => { setLoading(true); fetchNotices(p); }}
                 className={`w-9 h-9 flex items-center justify-center rounded-lg font-bold transition-colors ${
                   p === currentPage ? 'bg-primary-container text-white' : 'hover:bg-surface-container-high'
                 }`}
@@ -230,7 +231,7 @@ const AdminNoticeManage = () => {
               </button>
             ))}
             <button
-              onClick={() => fetchNotices(Math.min(totalPages - 1, currentPage + 1))}
+              onClick={() => { setLoading(true); fetchNotices(Math.min(totalPages - 1, currentPage + 1)); }}
               disabled={currentPage === totalPages - 1}
               className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors disabled:opacity-30"
             >
