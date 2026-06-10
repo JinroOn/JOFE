@@ -46,6 +46,19 @@ const AiChat = () => {
   const [sending, setSending] = useState(false);
   const navTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  const loadSessionLogs = async (sessionId: number) => {
+    setLoadingLogs(true);
+    setActiveSessionId(sessionId);
+    try {
+      const logs = await getSessionLogs(sessionId);
+      setMessages(logs.length > 0 ? logs.map(logToMessage) : [WELCOME_MESSAGE]);
+    } catch {
+      setMessages([WELCOME_MESSAGE]);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -65,19 +78,6 @@ const AiChat = () => {
     };
     load();
   }, []);
-
-  const loadSessionLogs = async (sessionId: number) => {
-    setLoadingLogs(true);
-    setActiveSessionId(sessionId);
-    try {
-      const logs = await getSessionLogs(sessionId);
-      setMessages(logs.length > 0 ? logs.map(logToMessage) : [WELCOME_MESSAGE]);
-    } catch {
-      setMessages([WELCOME_MESSAGE]);
-    } finally {
-      setLoadingLogs(false);
-    }
-  };
 
   const handleNewChat = async () => {
     try {
