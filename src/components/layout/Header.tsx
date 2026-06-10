@@ -115,7 +115,11 @@ const Header = () => {
                 onMouseLeave={handleMenuLeave}
               >
                 <button className="w-10 h-10 rounded-full bg-secondary ring-2 ring-slate-100 overflow-hidden flex items-center justify-center text-white font-bold text-sm">
-                  {user?.nickname?.[0] ?? 'U'}
+                  {user?.profileImageUrl ? (
+                    <img src={user.profileImageUrl} alt="profile" className="w-full h-full object-cover" />
+                  ) : (
+                    user?.nickname?.[0] ?? 'U'
+                  )}
                 </button>
                 {openMenu === 'profile' && (
                   <div className="absolute top-full right-0 mt-2 w-36 bg-white rounded-xl shadow-lg border border-outline-variant/20 py-1 z-50">
