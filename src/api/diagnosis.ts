@@ -1,7 +1,11 @@
 import api from './axios';
 import type {
+  CompetencyResult,
   DiagnosisSession,
   EssayAnswer,
+  ExamAnswer,
+  ExamAnswerPayload,
+  ExamQuestion,
   InProgressSession,
   SessionPayload,
 } from '../types/diagnosis';
@@ -27,3 +31,15 @@ export const createEssayAnswer = (data: {
   questionNo: number;
   answerText: string;
 }) => api.post<EssayAnswer>('/diagnoses/essay-answers', data).then((r) => r.data);
+
+// 전체 시험 문항 조회
+export const getQuestions = () =>
+  api.get<ExamQuestion[]>('/diagnoses/questions').then((r) => r.data);
+
+// 객관식 답변 등록
+export const createExamAnswer = (data: ExamAnswerPayload) =>
+  api.post<ExamAnswer>('/diagnoses/exam-answers', data).then((r) => r.data);
+
+// 역량 점수 자동 산출
+export const scoreSession = (sessionId: number) =>
+  api.post<CompetencyResult>(`/diagnoses/sessions/${sessionId}/score`).then((r) => r.data);
