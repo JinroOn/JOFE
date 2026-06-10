@@ -42,3 +42,49 @@ export interface SessionPayload {
   completedAt?: string;
   inputSnapshot?: string;
 }
+
+export type CompetencyCategory =
+  | 'math_logic'
+  | 'problem_solving'
+  | 'info_tech'
+  | 'implementation'
+  | 'system_understanding'
+  | 'data_analysis'
+  | 'communication'
+  | 'collaboration'
+  | 'self_management';
+
+export interface ExamQuestion {
+  id: number;
+  competencyCategory: CompetencyCategory;
+  questionText: string;
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+  correctAnswer: string; // 'A' | 'B' | 'C' | 'D'
+  timeLimitSec: number;
+  difficulty: number;
+}
+
+export interface ExamAnswerPayload {
+  diagnosisSessionId: number;
+  examQuestionId: number;
+  selectedAnswer: string;
+  correct: boolean;
+  responseSec: number;
+}
+
+export interface CompetencyResult {
+  id: number;
+  diagnosisSessionId: number;
+  mathLogic: number;
+  problemSolving: number;
+  infoTech: number;
+  implementation: number;
+  systemUnderstanding: number;
+  dataAnalysis: number;
+  communication: number;
+  collaboration: number;
+  selfManagement: number;
+}

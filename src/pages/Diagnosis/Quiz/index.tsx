@@ -1,53 +1,190 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import useAuthStore from '../../../store/useAuthStore';
+import {
+  getInProgressSession,
+  createSession,
+  getQuestions,
+  createExamAnswer,
+  scoreSession,
+} from '../../../api/diagnosis';
+import type { CompetencyCategory, ExamQuestion } from '../../../types/diagnosis';
 
-const CATEGORIES = [
-  { id: 'logic', label: '논리력', icon: 'psychology' },
-  { id: 'math', label: '수리력', icon: 'calculate' },
-  { id: 'data', label: '데이터 분석', icon: 'bar_chart' },
-  { id: 'situation', label: '상황 판단', icon: 'gavel' },
-] as const;
+const CATEGORY_LABELS: Record<CompetencyCategory, { label: string; icon: string }> = {
+  math_logic: { label: '수리·논리', icon: 'calculate' },
+  problem_solving: { label: '문제 해결', icon: 'lightbulb' },
+  info_tech: { label: '정보·기술', icon: 'memory' },
+  implementation: { label: '구현', icon: 'code' },
+  system_understanding: { label: '시스템 이해', icon: 'account_tree' },
+  data_analysis: { label: '데이터 분석', icon: 'bar_chart' },
+  communication: { label: '의사소통', icon: 'forum' },
+  collaboration: { label: '협업', icon: 'groups' },
+  self_management: { label: '자기관리', icon: 'self_improvement' },
+};
 
-type CategoryId = (typeof CATEGORIES)[number]['id'];
-
-const OPTIONS = [
-  { id: 'A', text: '독립 변수의 증가가 종속 변수의 급격한 하락을 유도한다.' },
-  { id: 'B', text: '두 변수 사이에는 통계적으로 유의미한 선형 관계가 존재하지 않는다.' },
-  { id: 'C', text: '표본의 크기를 확장할 경우 신뢰 구간이 95% 이상으로 수렴한다.' },
-  { id: 'D', text: '외부 변수의 통제가 이루어지지 않아 인과 관계 설정이 불가능하다.' },
-] as const;
+const OPTION_IDS = ['A', 'B', 'C', 'D'] as const;
 
 const DiagnosisQuiz = () => {
-  const [category, setCategory] = useState<CategoryId>('math');
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
-  const questionNumber = 4;
-  const totalQuestions = 20;
-  const progress = 20;
-  const timerSeconds = 8;
-  const timerTotal = 30;
-  const timerOffset = 100 - (timerSeconds / timerTotal) * 100;
+  const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+
+  const [questions, setQuestions] = useState<ExamQuestion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<number | null>(null);
+
+  const [index, setIndex] = useState(0);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [remaining, setRemaining] = useState(0);
+  const [advancing, setAdvancing] = useState(false);
+
+  // 콜백에서 최신 값 참조용 ref
+  const remainingRef = useRef(0);
+  const selectedRef = useRef<string | null>(null);
+  const advancingRef = useRef(false);
+  useEffect(() => {
+    remainingRef.current = remaining;
+  }, [remaining]);
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
+
+  // 현재 타이머가 적용된 문항 id (문항 변경 감지용)
+  const [trackedId, setTrackedId] = useState<number | null>(null);
+
+  const current = questions[index];
+  const total = questions.length;
+
+  // 마운트: 진행 중 세션 확보 + 문항 로드
+  useEffect(() => {
+    (async () => {
+      try {
+        const [inProgress, qs] = await Promise.all([getInProgressSession(), getQuestions()]);
+        let sid = inProgress?.session?.id ?? null;
+        if (!sid) {
+          const created = await createSession({
+            userId: user?.id,
+            status: 'in_progress',
+            currentStep: 2,
+            startedAt: new Date().toISOString(),
+            inputSnapshot: '{}',
+          });
+          sid = created.id;
+        }
+        setSessionId(sid);
+        setQuestions(qs);
+        if (qs.length === 0) setError('등록된 시험 문항이 없습니다.');
+      } catch {
+        setError('문항을 불러오지 못했습니다. 다시 시도해 주세요.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 답변 제출 후 다음 문항으로 (또는 마지막이면 점수 산출 후 로딩 화면)
+  const advance = async (answer: string | null) => {
+    if (advancingRef.current) return;
+    advancingRef.current = true;
+    setAdvancing(true);
+
+    const q = questions[index];
+    try {
+      if (sessionId && q) {
+        await createExamAnswer({
+          diagnosisSessionId: sessionId,
+          examQuestionId: q.id,
+          selectedAnswer: answer ?? '',
+          correct: answer === q.correctAnswer,
+          responseSec: Math.max(0, q.timeLimitSec - remainingRef.current),
+        });
+      }
+    } catch {
+      /* 답변 저장 실패해도 진단은 계속 진행 */
+    }
+
+    if (index >= questions.length - 1) {
+      try {
+        if (sessionId) await scoreSession(sessionId);
+      } catch {
+        /* 점수 산출 실패해도 다음 화면으로 */
+      }
+      navigate('/diagnosis/loading');
+      return;
+    }
+
+    setIndex((i) => i + 1);
+    setSelected(null);
+    advancingRef.current = false;
+    setAdvancing(false);
+  };
+
+  // 문항이 바뀌면 타이머 초기화 (렌더 단계에서 보정 — React 권장 패턴)
+  if (current && current.id !== trackedId) {
+    setTrackedId(current.id);
+    setRemaining(current.timeLimitSec);
+  }
+
+  // 1초마다 카운트다운
+  useEffect(() => {
+    if (!current) return;
+    const timer = setInterval(() => {
+      setRemaining((s) => Math.max(0, s - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id]);
+
+  // 제한시간 종료 시 현재 선택값으로 자동 제출
+  useEffect(() => {
+    if (current && trackedId === current.id && remaining === 0) {
+      void advance(selectedRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remaining]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <p className="text-on-surface-variant text-sm">문항을 불러오는 중...</p>
+      </div>
+    );
+  }
+
+  if (error || !current) {
+    return (
+      <div className="min-h-screen bg-surface flex flex-col items-center justify-center gap-4">
+        <p className="text-on-surface-variant text-sm">{error ?? '표시할 문항이 없습니다.'}</p>
+        <button
+          onClick={() => navigate('/diagnosis')}
+          className="px-5 py-2.5 text-sm font-bold text-white bg-primary-container rounded-xl"
+        >
+          진단으로 돌아가기
+        </button>
+      </div>
+    );
+  }
+
+  const isLast = index === total - 1;
+  const progress = Math.round((index / total) * 100);
+  const timerOffset = 100 - (remaining / current.timeLimitSec) * 100;
+  const categoryMeta = CATEGORY_LABELS[current.competencyCategory] ?? {
+    label: current.competencyCategory,
+    icon: 'quiz',
+  };
+  const options = OPTION_IDS.map((id) => ({
+    id,
+    text: current[`option${id}` as 'optionA' | 'optionB' | 'optionC' | 'optionD'],
+  }));
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
       <div className="max-w-[1100px] w-full mx-auto px-4 sm:px-8 pt-8 pb-32 flex-1">
         <div className="flex justify-center mb-8">
-          <div className="flex gap-2 p-1 bg-surface-container-low rounded-full">
-            {CATEGORIES.map(({ id, label, icon }) => {
-              const active = category === id;
-              return (
-                <button
-                  key={id}
-                  onClick={() => setCategory(id)}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold transition-all ${
-                    active
-                      ? 'bg-secondary-container/30 text-secondary'
-                      : 'text-on-surface-variant hover:bg-surface-container'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[18px]">{icon}</span>
-                  {label}
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold bg-secondary-container/30 text-secondary">
+            <span className="material-symbols-outlined text-[18px]">{categoryMeta.icon}</span>
+            {categoryMeta.label}
           </div>
         </div>
 
@@ -56,7 +193,7 @@ const DiagnosisQuiz = () => {
             <section className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 sm:p-8 shadow-[0_4px_12px_rgba(10,25,47,0.04)]">
               <div className="flex items-start justify-between gap-4 mb-4">
                 <span className="text-xs font-bold tracking-widest text-on-surface-variant">
-                  QUESTION {String(questionNumber).padStart(2, '0')} / {totalQuestions}
+                  QUESTION {String(index + 1).padStart(2, '0')} / {total}
                 </span>
                 <span className="flex items-center gap-1.5 text-xs font-bold text-secondary shrink-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
@@ -65,17 +202,18 @@ const DiagnosisQuiz = () => {
               </div>
 
               <h2 className="text-xl sm:text-2xl font-bold text-primary-container leading-snug mb-6">
-                다음 주어진 데이터 세트에서 변수 간의 상관관계를 분석했을 때, 가장 유의미한 결론을 도출할 수 있는 가설은 무엇입니까?
+                {current.questionText}
               </h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {OPTIONS.map(({ id, text }) => {
-                  const active = selectedOption === id;
+                {options.map(({ id, text }) => {
+                  const active = selected === id;
                   return (
                     <button
                       key={id}
-                      onClick={() => setSelectedOption(id)}
-                      className={`text-left p-4 rounded-xl border transition-all ${
+                      onClick={() => setSelected(id)}
+                      disabled={advancing}
+                      className={`text-left p-4 rounded-xl border transition-all disabled:opacity-60 ${
                         active
                           ? 'border-secondary bg-secondary-container/10 shadow-[0_0_0_3px_rgba(0,210,255,0.12)]'
                           : 'border-outline-variant/40 hover:bg-surface-container-low'
@@ -92,13 +230,13 @@ const DiagnosisQuiz = () => {
             </section>
 
             <div className="flex items-center justify-between mt-4 px-2">
-              <button className="flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary-container transition-colors">
+              <button
+                onClick={() => advance(null)}
+                disabled={advancing}
+                className="flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary-container transition-colors disabled:opacity-60"
+              >
                 <span className="material-symbols-outlined text-[18px]">double_arrow</span>
                 이 문제 건너뛰기
-              </button>
-              <button className="flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary-container transition-colors">
-                <span className="material-symbols-outlined text-[18px]">help</span>
-                힌트 보기
               </button>
             </div>
           </div>
@@ -123,7 +261,7 @@ const DiagnosisQuiz = () => {
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                   <p className="text-3xl font-extrabold text-primary-container leading-none">
-                    {String(timerSeconds).padStart(2, '0')}
+                    {String(remaining).padStart(2, '0')}
                   </p>
                   <p className="text-[10px] tracking-widest text-on-surface-variant mt-1">SECONDS</p>
                 </div>
@@ -139,7 +277,7 @@ const DiagnosisQuiz = () => {
                 MEMBER TIP
               </p>
               <p className="text-sm leading-relaxed text-white/90">
-                이 유형의 문제는 데이터 시각화 역량을 평가합니다. '상관관계'와 '인과관계'의 차이에 집중해 보세요.
+                시간 안에 가장 적절한 선택지를 고르세요. 정답 여부와 응답 속도가 역량 점수에 반영됩니다.
               </p>
             </div>
           </aside>
@@ -165,8 +303,12 @@ const DiagnosisQuiz = () => {
               <p className="text-xs text-on-surface-variant">다음 단계</p>
               <p className="text-sm font-bold text-primary-container">AI 성향 매칭</p>
             </div>
-            <button className="flex items-center gap-1 px-5 py-2.5 text-sm font-bold text-white bg-primary-container rounded-xl shadow-[0_8px_20px_rgba(13,28,50,0.18)] hover:opacity-90 transition-opacity">
-              다음 질문
+            <button
+              onClick={() => advance(selected)}
+              disabled={advancing || !selected}
+              className="flex items-center gap-1 px-5 py-2.5 text-sm font-bold text-white bg-primary-container rounded-xl shadow-[0_8px_20px_rgba(13,28,50,0.18)] hover:opacity-90 transition-opacity disabled:opacity-60"
+            >
+              {isLast ? '결과 보기' : '다음 질문'}
               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
             </button>
           </div>
