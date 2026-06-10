@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthLayout from '../components/AuthLayout';
-import { signup as signupApi } from '../../../api/auth';
+import { signup as signupApi, sendEmailVerification, confirmEmailVerification } from '../../../api/auth';
 import { labelClass, inputClass, isValidEmail, pwChecks } from '../constants';
+import ConsentModal from './ConsentModal';
+import { CONSENT_TEXTS } from './consentTexts';
 
 interface FormState {
   email: string;
@@ -25,6 +27,12 @@ const Signup = () => {
   const [emailTouched, setEmailTouched] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [openConsent, setOpenConsent] = useState<keyof typeof CONSENT_TEXTS | null>(null);
+
+  const [step, setStep] = useState<'form' | 'verify'>('form');
+  const [verifyInput, setVerifyInput] = useState('');
+  const [verifyError, setVerifyError] = useState('');
+  const [verifyLoading, setVerifyLoading] = useState(false);
 
   const setField = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((p) => ({ ...p, [k]: v }));
@@ -51,7 +59,8 @@ const Signup = () => {
         privacyAgreed: form.agreePrivacy,
         marketingAgreed: form.agreeMarketing,
       });
-      navigate('/auth/login', { state: { signedUp: true } });
+      await sendEmailVerification(form.email);
+      setStep('verify');
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 409) {
         setSubmitError('이미 사용 중인 이메일입니다.');
@@ -60,6 +69,31 @@ const Signup = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    if (!verifyInput.trim()) { setVerifyError('인증 코드를 입력해주세요.'); return; }
+    if (!/^\d{6}$/.test(verifyInput.trim())) { setVerifyError('인증 코드는 숫자 6자리를 입력해주세요.'); return; }
+    setVerifyLoading(true);
+    setVerifyError('');
+    try {
+      await confirmEmailVerification(form.email, verifyInput.trim());
+      navigate('/auth/login', { state: { signedUp: true } });
+    } catch {
+      setVerifyError('인증 코드가 올바르지 않거나 만료되었습니다.');
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    try {
+      await sendEmailVerification(form.email);
+      setVerifyInput('');
+      setVerifyError('');
+    } catch {
+      setVerifyError('재발송에 실패했습니다. 잠시 후 다시 시도해주세요.');
     }
   };
 
@@ -80,6 +114,50 @@ const Signup = () => {
             </div>
           </div>
 
+          {step === 'verify' ? (
+          <div className="p-8 sm:p-10 space-y-6">
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-secondary/10 flex items-center justify-center mx-auto mb-4">
+                <span className="material-symbols-outlined text-secondary text-3xl">mark_email_unread</span>
+              </div>
+              <h2 className="text-xl font-bold text-primary-container mb-1">이메일 인증</h2>
+              <p className="text-sm text-on-surface-variant">
+                <span className="font-semibold text-on-surface">{form.email}</span>으로<br />인증 코드를 발송했습니다.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className={labelClass}>인증 코드</label>
+              <input
+                type="text"
+                value={verifyInput}
+                onChange={(e) => setVerifyInput(e.target.value)}
+                placeholder="이메일로 발송된 6자리 코드 입력"
+                maxLength={6}
+                className={inputClass}
+                autoFocus
+              />
+            </div>
+
+            {verifyError && <p className="text-error text-sm">{verifyError}</p>}
+
+            <button
+              type="button"
+              onClick={handleVerify}
+              disabled={verifyLoading}
+              className="w-full bg-[#FFAB00] text-primary-container font-bold py-5 rounded-lg shadow-lg shadow-[#FFAB00]/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 disabled:opacity-60"
+            >
+              {verifyLoading ? '확인 중...' : '인증 완료'}
+            </button>
+
+            <p className="text-center text-sm text-on-surface-variant">
+              코드를 받지 못하셨나요?{' '}
+              <button type="button" onClick={handleResend} className="text-secondary font-semibold hover:underline">
+                재발송
+              </button>
+            </p>
+          </div>
+          ) : (
           <div className="p-8 sm:p-10">
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* 이메일 */}
@@ -170,8 +248,8 @@ const Signup = () => {
                     { key: 'agreePrivacy' as const, label: '개인정보처리방침 동의 (필수)' },
                     { key: 'agreeMarketing' as const, label: '마케팅 정보 수신 동의 (선택)' },
                   ].map(({ key, label }) => (
-                    <label key={key} className="flex items-center justify-between cursor-pointer">
-                      <div className="flex items-center gap-2">
+                    <div key={key} className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={form[key]}
@@ -179,9 +257,15 @@ const Signup = () => {
                           className="w-4 h-4 rounded border-outline-variant accent-[#FFAB00]"
                         />
                         <span className="text-sm text-on-surface-variant">{label}</span>
-                      </div>
-                      <span className="material-symbols-outlined text-base text-on-surface-variant">chevron_right</span>
-                    </label>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setOpenConsent(key)}
+                        className="p-1 hover:text-secondary transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-base text-on-surface-variant">chevron_right</span>
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -206,8 +290,16 @@ const Signup = () => {
               </p>
             </form>
           </div>
+          )}
         </div>
       </div>
+      {openConsent && (
+        <ConsentModal
+          title={CONSENT_TEXTS[openConsent].title}
+          content={CONSENT_TEXTS[openConsent].content}
+          onClose={() => setOpenConsent(null)}
+        />
+      )}
     </AuthLayout>
   );
 };
