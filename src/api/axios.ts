@@ -15,7 +15,7 @@ instance.interceptors.request.use((config) => {
 instance.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && useAuthStore.getState().isLoggedIn) {
       useAuthStore.getState().logout();
       window.location.href = '/auth/login';
     }

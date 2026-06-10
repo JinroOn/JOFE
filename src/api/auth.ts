@@ -30,3 +30,9 @@ export const sendPasswordResetCode = (email: string) =>
 
 export const resetPassword = (data: { email: string; code: string; newPassword: string }) =>
   api.post('/auth/password-resets/confirm', data);
+
+export const sendEmailVerification = (email: string) =>
+  api.post<{ email: string; expiresAt: string }>('/auth/email-verifications', { email }).then((r) => r.data);
+
+export const confirmEmailVerification = (email: string, token: string) =>
+  api.post('/auth/email-verifications/confirm', { email, token });
