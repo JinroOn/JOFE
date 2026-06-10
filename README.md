@@ -47,7 +47,7 @@ src/
  │   └─ Error/                # 오류 안내
  ├─ store/                    # Zustand 전역 상태 (파일명: use*Store.ts)
  ├─ styles/                   # global.css (Tailwind 기반)
- ├─ types/                    # TypeScript 타입/인터페이스
+ ├─ types/                    # TypeScript 타입/인터페이스 (auth, user, major, consultation)
  └─ App.tsx                   # 루트 컴포넌트 (라우팅 설정)
 ```
 
@@ -103,21 +103,64 @@ VITE_API_BASE_URL=http://52.79.202.196:8080/api
 
 > 설정하지 않으면 `http://52.79.202.196:8080/api` 로 자동 연결됩니다.
 
-## 🔐 Auth API 주요 흐름
+## 📋 화면 구현 현황
 
-| 기능 | 메서드 | 엔드포인트 | 비고 |
-|------|--------|------------|------|
-| 회원가입 | POST | `/auth/signup` | |
-| 로그인 | POST | `/auth/login` | |
-| 토큰 갱신 | POST | `/auth/refresh` | |
-| 로그아웃 | POST | `/auth/logout` | |
-| 비밀번호 변경 | POST | `/auth/password` | 로그인 상태 필요 |
-| 비밀번호 재설정 코드 발송 | POST | `/auth/password-resets` | `{ email }` |
-| 비밀번호 재설정 확인 | POST | `/auth/password-resets/confirm` | `{ email, code, newPassword }` |
-| 이메일 인증 코드 발송 | POST | `/auth/email-verifications` | 가입 완료 후 사용 |
-| 이메일 인증 확인 | POST | `/auth/email-verifications/confirm` | `{ email, token }` |
+| 화면 | 상태 |
+|------|------|
+| 메인 페이지 (`/`) | 구현됨 |
+| 로그인 (`/auth/login`) | API 연동 완료 |
+| 회원가입 (`/auth/signup`) | API 연동 완료 (약관 동의 모달 + 이메일 인증 2단계) |
+| 비밀번호 찾기 (`/auth/find-password`) | API 연동 완료 (Gmail SMTP 설정 필요) |
+| 마이페이지 (`/mypage`) | API 연동 완료 (관심전공·프로필편집·비밀번호변경·회원탈퇴) |
+| 전공 진단 (`/diagnosis`) | 구현됨 |
+| 역량 평가 퀴즈 (`/diagnosis/quiz`) | 구현됨 |
+| 분석 로딩 (`/diagnosis/loading`) | 구현됨 |
+| 공지사항·자료실 (`/library`) | API 연동 완료 |
+| 학습 콘텐츠 (`/library/content`) | API 연동 완료 |
+| AI 상담 채팅 (`/ai-chat`) | 세션/로그 API 연동 완료 (AI 응답 생성 미구현) |
+| 전공 탐색 (`/diagnosis/explore`) | 목업 데이터 |
+| 취약 역량 분석 (`/analysis/weak`) | 목업 데이터 |
+| 전공 시뮬레이션 (`/analysis/compare`) | 목업 데이터 |
+| 결과 대시보드 (`/analysis/dashboard`) | 미구현 |
+| 관리자 (`/admin`) | 미구현 |
 
-> **주의**: `email-verifications`는 **이미 가입된 유저**의 이메일을 인증하는 용도입니다. 회원가입 전에는 호출할 수 없습니다.
+## 🔐 API 연동 현황
+
+### Auth (`src/api/auth.ts`)
+
+| 기능 | 메서드 | 엔드포인트 |
+|------|--------|------------|
+| 회원가입 | POST | `/auth/signup` |
+| 로그인 | POST | `/auth/login` |
+| 토큰 갱신 | POST | `/auth/refresh` |
+| 로그아웃 | POST | `/auth/logout` |
+| 비밀번호 변경 | POST | `/auth/password` |
+| 비밀번호 재설정 코드 발송 | POST | `/auth/password-resets` |
+| 비밀번호 재설정 확인 | POST | `/auth/password-resets/confirm` |
+| 이메일 인증 코드 발송 | POST | `/auth/email-verifications` |
+| 이메일 인증 확인 | POST | `/auth/email-verifications/confirm` |
+
+> 이메일 인증(`email-verifications`)은 **가입 완료 후** 호출합니다. 회원가입 플로우: 폼 제출 → 계정 생성 → 이메일 인증 코드 발송 → 6자리 코드 입력 확인 → 로그인 페이지.
+
+### User (`src/api/user.ts`)
+
+| 기능 | 메서드 | 엔드포인트 |
+|------|--------|------------|
+| 내 정보 조회 | GET | `/users/me` |
+| 내 정보 수정 (닉네임·아바타) | PATCH | `/users/me` |
+| 회원 탈퇴 | DELETE | `/users/me` |
+| 관심 전공 목록 | GET | `/users/me/favorites` |
+| 관심 전공 삭제 | DELETE | `/users/favorites/{id}` |
+
+### Consultation (`src/api/consultation.ts`)
+
+| 기능 | 메서드 | 엔드포인트 |
+|------|--------|------------|
+| 내 세션 목록 | GET | `/consultations/sessions/me` |
+| 세션 생성 | POST | `/consultations/sessions` |
+| 세션 로그(대화 내역) | GET | `/consultations/sessions/{id}/logs` |
+| 메시지 저장 | POST | `/consultations/logs` |
+| 세션 종료 | POST | `/consultations/sessions/{id}/end` |
 
 ---
 © 2026 JinroOn AI. Empowering the next generation of scholars.
