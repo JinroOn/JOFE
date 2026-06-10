@@ -23,6 +23,7 @@ import Dashboard from './pages/Analysis/Dashboard';
 import AdminLayout from './pages/Admin';
 import AdminDashboard from './pages/Admin/Dashboard';
 import AdminMajorManage from './pages/Admin/MajorManage';
+import AdminNoticeManage from './pages/Admin/NoticeManage';
 import ErrorPage from './pages/Error';
 
 const Placeholder = ({ name }: { name: string }) => (
@@ -77,6 +78,7 @@ const AppLayout = () => {
           <Route path="/admin" element={<AdminOnlyRoute><AdminLayout /></AdminOnlyRoute>}>
             <Route index element={<AdminDashboard />} />
             <Route path="majors" element={<AdminMajorManage />} />
+            <Route path="notices" element={<AdminNoticeManage />} />
           </Route>
           <Route path="/error" element={<ErrorPage />} />
           <Route path="*" element={<Placeholder name="404 - 찾을 수 없는" />} />

@@ -42,6 +42,10 @@ const AdminLayout = () => {
             <span className="material-symbols-outlined">school</span>
             <span>전공 관리</span>
           </NavLink>
+          <NavLink to="/admin/notices" className={sideNavClass}>
+            <span className="material-symbols-outlined">campaign</span>
+            <span>공지사항 관리</span>
+          </NavLink>
         </nav>
 
         {/* 하단: 사용자 정보 + 로그아웃 */}
@@ -96,6 +100,14 @@ const AdminLayout = () => {
               }
             >
               전공 관리
+            </NavLink>
+            <NavLink
+              to="/admin/notices"
+              className={({ isActive }) =>
+                `text-sm font-bold transition-colors ${isActive ? 'text-blue-400' : 'text-slate-400'}`
+              }
+            >
+              공지사항
             </NavLink>
           </nav>
         </div>
