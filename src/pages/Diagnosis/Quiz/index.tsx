@@ -105,12 +105,11 @@ const DiagnosisQuiz = () => {
     }
 
     if (index >= questions.length - 1) {
+      let competencyResult = null;
       try {
-        if (sessionId) await scoreSession(sessionId);
-      } catch {
-        /* 점수 산출 실패해도 다음 화면으로 */
-      }
-      navigate('/diagnosis/loading');
+        if (sessionId) competencyResult = await scoreSession(sessionId);
+      } catch { /* 점수 산출 실패해도 다음 화면으로 */ }
+      navigate('/diagnosis/loading', { state: { sessionId, competencyResult } });
       return;
     }
 
