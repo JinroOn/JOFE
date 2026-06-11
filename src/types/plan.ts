@@ -1,4 +1,4 @@
-import type { AiGenerationStatus } from './result';
+type AiGenerationStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
 
 export interface MajorWeeklyPlan {
   id: number;
