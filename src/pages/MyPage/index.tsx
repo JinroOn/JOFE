@@ -5,6 +5,7 @@ import ProfileEditModal from './components/ProfileEditModal';
 import PasswordChangeModal from './components/PasswordChangeModal';
 import { getFavorites, deleteFavorite, deleteMe } from '../../api/user';
 import { getMajor } from '../../api/major';
+import { getDiagnosisResults } from '../../api/results';
 import type { Major } from '../../types/major';
 
 interface FavoriteItem {
@@ -23,6 +24,8 @@ const MyPage = () => {
 
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [favoritesLoading, setFavoritesLoading] = useState(true);
+  const [diagnosisCount, setDiagnosisCount] = useState<number | null>(null);
+  const [lastDiagnosisDate, setLastDiagnosisDate] = useState<string | null>(null);
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
@@ -35,10 +38,11 @@ const MyPage = () => {
 
   useEffect(() => {
     const load = async () => {
-      try {
-        const list = await getFavorites();
+      const [list, results] = await Promise.allSettled([getFavorites(), getDiagnosisResults()]);
+
+      if (list.status === 'fulfilled') {
         const items = await Promise.all(
-          list.map(async (f) => {
+          list.value.map(async (f) => {
             try {
               const major = await getMajor(f.majorId);
               return { id: f.id, majorId: f.majorId, createdAt: f.createdAt, major };
@@ -48,8 +52,21 @@ const MyPage = () => {
           })
         );
         setFavorites(items);
-      } finally {
-        setFavoritesLoading(false);
+      }
+      setFavoritesLoading(false);
+
+      if (results.status === 'fulfilled' && results.value.length > 0) {
+        setDiagnosisCount(results.value.length);
+        const latest = results.value.reduce((a, b) =>
+          new Date(a.createdAt) > new Date(b.createdAt) ? a : b
+        );
+        setLastDiagnosisDate(
+          new Date(latest.createdAt).toLocaleDateString('ko-KR', {
+            year: 'numeric', month: 'long', day: 'numeric',
+          })
+        );
+      } else {
+        setDiagnosisCount(0);
       }
     };
     load();
@@ -116,7 +133,10 @@ const MyPage = () => {
           <div className="bg-white p-8 rounded-[14px] shadow-[0px_20px_40px_rgba(10,25,47,0.06)] hover:-translate-y-1 transition-transform">
             <span className="material-symbols-outlined text-secondary text-3xl mb-4 block">analytics</span>
             <p className="text-sm font-medium text-on-surface-variant mb-1">누적 진단 횟수</p>
-            <h3 className="text-3xl font-extrabold">-<span className="text-lg font-normal ml-1">회</span></h3>
+            <h3 className="text-3xl font-extrabold">
+              {diagnosisCount ?? '-'}
+              <span className="text-lg font-normal ml-1">회</span>
+            </h3>
           </div>
           <div className="bg-white p-8 rounded-[14px] shadow-[0px_20px_40px_rgba(10,25,47,0.06)] hover:-translate-y-1 transition-transform">
             <span className="material-symbols-outlined text-on-tertiary-container text-3xl mb-4 block">star</span>
@@ -129,7 +149,7 @@ const MyPage = () => {
           <div className="bg-white p-8 rounded-[14px] shadow-[0px_20px_40px_rgba(10,25,47,0.06)] hover:-translate-y-1 transition-transform">
             <span className="material-symbols-outlined text-secondary text-3xl mb-4 block">event_available</span>
             <p className="text-sm font-medium text-on-surface-variant mb-1">마지막 진단일</p>
-            <h3 className="text-xl font-bold mt-2">-</h3>
+            <h3 className="text-xl font-bold mt-2">{lastDiagnosisDate ?? '-'}</h3>
           </div>
         </div>
 
