@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Major } from '../types';
+import { getReqScores } from '../types';
 import RadarChart from './RadarChart';
 
 const DetailPanel = ({
@@ -7,13 +8,31 @@ const DetailPanel = ({
   onClose,
   onAddToCompare,
   inCompare,
+  bookmarked,
+  onBookmark,
 }: {
   major: Major;
   onClose: () => void;
   onAddToCompare: (m: Major) => void;
   inCompare: boolean;
+  bookmarked: boolean;
+  onBookmark: (id: number) => void;
 }) => {
-  const [bookmarked, setBookmarked] = useState(false);
+  const [bookmarking, setBookmarking] = useState(false);
+
+  const careerList = major.careerPaths
+    ? major.careerPaths.split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
+
+  const handleBookmark = async () => {
+    if (bookmarked || bookmarking) return;
+    setBookmarking(true);
+    try {
+      await onBookmark(major.id);
+    } finally {
+      setBookmarking(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[60] flex justify-end">
@@ -32,11 +51,10 @@ const DetailPanel = ({
         <div className="relative w-full h-[180px] sm:h-[200px] shrink-0 bg-gradient-to-br from-primary-container to-secondary flex items-end px-6 sm:px-8 pb-6">
           <div>
             <span className="inline-block bg-white/20 text-white px-3 py-1 rounded-md text-xs font-bold mb-2">
-              {major.category}
+              {major.category ?? '기타'}
             </span>
             <h2 className="text-3xl font-extrabold text-white leading-tight">
               {major.name}
-              <span className="block text-lg font-normal opacity-70 mt-1">({major.enName})</span>
             </h2>
           </div>
         </div>
@@ -47,7 +65,9 @@ const DetailPanel = ({
               <span className="w-1.5 h-5 bg-secondary-container rounded-full inline-block" />
               학과 소개
             </h3>
-            <p className="text-on-surface-variant leading-relaxed text-sm">{major.fullDescription}</p>
+            <p className="text-on-surface-variant leading-relaxed text-sm">
+              {major.description ?? ''}
+            </p>
           </section>
 
           <section className="bg-surface-container-low rounded-2xl p-6">
@@ -56,54 +76,74 @@ const DetailPanel = ({
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
               <div className="aspect-square max-w-[280px] mx-auto sm:max-w-none sm:mx-0">
-                <RadarChart scores={major.scores} />
+                <RadarChart scores={getReqScores(major)} />
               </div>
-              <div className="space-y-4">
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-secondary-container/20">
-                  <div className="text-xs text-on-surface-variant mb-1">AI 적합도</div>
-                  <div className="text-3xl font-extrabold text-secondary-container">{major.matchRate}%</div>
-                  <div className="w-full bg-surface-container-high h-1.5 mt-2 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-secondary-container rounded-full transition-all duration-700"
-                      style={{ width: `${major.matchRate}%` }}
-                    />
+              <div className="space-y-3">
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-outline-variant/20">
+                  <div className="text-xs text-on-surface-variant mb-2">난이도</div>
+                  <div className="text-lg font-extrabold text-secondary capitalize">
+                    {major.difficulty ?? '-'}
                   </div>
                 </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-[#FFAB00]/20">
-                  <div className="text-xs text-on-surface-variant mb-1">미래 전망</div>
-                  <div className="text-2xl font-extrabold text-[#FFAB00]">{major.prospect}</div>
-                  <p className="text-[11px] text-on-surface-variant mt-1">
-                    {major.prospect === 'HIGH'
-                      ? '지속적인 기술 혁신으로 인한 높은 인력 수요 예상'
-                      : '꾸준한 수요가 유지되는 안정적인 분야'}
-                  </p>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-error/20">
+                  <div className="text-xs text-on-surface-variant mb-3 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-error text-[14px]">warning</span>
+                    과락 기준
+                  </div>
+                  <div className="space-y-2">
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-on-surface-variant">수리·논리</span>
+                        <span className="font-bold text-error">{major.thrMathLogic ?? 0}</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-surface-container-high rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-error/60 rounded-full"
+                          style={{ width: `${major.thrMathLogic ?? 0}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-on-surface-variant">정보통신</span>
+                        <span className="font-bold text-error">{major.thrInfoTech ?? 0}</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-surface-container-high rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-error/60 rounded-full"
+                          style={{ width: `${major.thrInfoTech ?? 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </section>
 
-          <section>
-            <h3 className="text-base font-bold text-primary-container mb-4">졸업 후 진로 (Career Paths)</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {major.careers.map(({ icon, label }) => (
-                <div
-                  key={label}
-                  className="flex items-center p-4 bg-white border border-outline-variant/10 rounded-xl hover:shadow-md transition-shadow group"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center mr-3 group-hover:bg-secondary-container/10 transition-colors">
-                    <span className="material-symbols-outlined text-secondary">{icon}</span>
-                  </div>
-                  <span className="font-medium text-sm text-on-surface">{label}</span>
-                </div>
-              ))}
-            </div>
-          </section>
+          {careerList.length > 0 && (
+            <section>
+              <h3 className="text-base font-bold text-primary-container mb-4">졸업 후 진로 (Career Paths)</h3>
+              <div className="flex flex-wrap gap-2">
+                {careerList.map((career) => (
+                  <span
+                    key={career}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-white border border-outline-variant/20 rounded-full text-sm font-medium text-on-surface hover:border-secondary/40 hover:shadow-sm transition-all"
+                  >
+                    <span className="material-symbols-outlined text-secondary text-[16px]">work</span>
+                    {career}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
         <div className="p-4 sm:p-6 bg-white border-t border-outline-variant/20 flex gap-3 shrink-0">
           <button
-            onClick={() => setBookmarked(!bookmarked)}
-            className={`flex-1 py-3.5 px-5 rounded-xl border-2 font-bold flex items-center justify-center gap-2 transition-all ${
+            onClick={handleBookmark}
+            disabled={bookmarked || bookmarking}
+            className={`flex-1 py-3.5 px-5 rounded-xl border-2 font-bold flex items-center justify-center gap-2 transition-all ${bookmarking ? 'opacity-60' : ''} ${
               bookmarked
                 ? 'border-[#FFAB00] text-[#FFAB00]'
                 : 'border-primary-container text-primary-container hover:bg-primary-container/5'
@@ -113,9 +153,9 @@ const DetailPanel = ({
               className="material-symbols-outlined"
               style={{ fontVariationSettings: bookmarked ? "'FILL' 1" : "'FILL' 0" }}
             >
-              bookmark
+              {bookmarking ? 'hourglass_empty' : 'bookmark'}
             </span>
-            북마크
+            {bookmarked ? '북마크됨' : '북마크'}
           </button>
           <button
             onClick={() => onAddToCompare(major)}
