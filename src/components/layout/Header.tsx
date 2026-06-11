@@ -20,7 +20,6 @@ const NAV_LINKS = [
       { label: '결과 리포트', to: '/analysis/dashboard' },
       { label: '취약 역량 분석', to: '/analysis/weak' },
       { label: '전공 탐색', to: '/diagnosis/explore' },
-      { label: '전공 시뮬레이션', to: '/analysis/compare' },
     ],
   },
   {

@@ -12,5 +12,8 @@ export const deleteMe = () => api.delete('/users/me');
 export const getFavorites = () =>
   api.get<UserFavoriteResponse[]>('/users/me/favorites').then((r) => r.data);
 
+export const addFavorite = (majorId: number) =>
+  api.post<UserFavoriteResponse>('/users/favorites', { majorId }).then((r) => r.data);
+
 export const deleteFavorite = (favoriteId: number) =>
   api.delete(`/users/favorites/${favoriteId}`);
