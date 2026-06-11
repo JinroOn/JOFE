@@ -81,6 +81,7 @@ const WeakCapability = () => {
   const [lastDate, setLastDate] = useState('');
   const [planItems, setPlanItems] = useState<MajorWeeklyPlanItem[]>([]);
   const [completing, setCompleting] = useState<number | null>(null);
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -142,6 +143,7 @@ const WeakCapability = () => {
   const handleComplete = async (item: MajorWeeklyPlanItem) => {
     if (item.isCompleted || completing !== null) return;
     setCompleting(item.id);
+    setConfirmingId(null);
     try {
       await completePlanItem(item.id);
       setPlanItems((prev) =>
@@ -354,23 +356,52 @@ const WeakCapability = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {planItems.map((item, idx) => {
                 const status = getRoadmapStatus(idx, item);
+                const isConfirming = confirmingId === item.id;
                 return (
-                  <button
+                  <div
                     key={item.id}
-                    onClick={() => handleComplete(item)}
-                    disabled={status !== 'current' || completing !== null}
-                    className={`rounded-[14px] border px-4 py-3.5 flex items-start gap-3 text-left w-full transition-all ${statusStyle[status]} ${
-                      status === 'current' ? 'hover:scale-[1.02]' : 'cursor-default'
-                    }`}
+                    className={`rounded-[14px] border px-4 py-3.5 flex flex-col gap-3 w-full transition-all ${statusStyle[status]}`}
                   >
-                    <span className="material-symbols-outlined text-[20px] mt-0.5 shrink-0">
-                      {completing === item.id ? 'hourglass_empty' : statusIcon[status]}
-                    </span>
-                    <div>
-                      <p className="text-xs font-bold opacity-60">WEEK {item.weekNo}</p>
-                      <p className="text-sm font-semibold mt-0.5 leading-snug">{item.goal}</p>
+                    <div className="flex items-start gap-3">
+                      <span className="material-symbols-outlined text-[20px] mt-0.5 shrink-0">
+                        {completing === item.id ? 'hourglass_empty' : statusIcon[status]}
+                      </span>
+                      <div className="flex-1">
+                        <p className="text-xs font-bold opacity-60">WEEK {item.weekNo}</p>
+                        <p className="text-sm font-semibold mt-0.5 leading-snug">{item.goal}</p>
+                      </div>
+                      {status === 'current' && !isConfirming && (
+                        <button
+                          onClick={() => setConfirmingId(item.id)}
+                          disabled={completing !== null}
+                          className="shrink-0 text-xs font-bold bg-white/20 hover:bg-white/30 rounded-lg px-2.5 py-1 transition-colors"
+                        >
+                          완료
+                        </button>
+                      )}
                     </div>
-                  </button>
+                    {isConfirming && (
+                      <div className="flex flex-col gap-2 pt-1 border-t border-white/20">
+                        <p className="text-xs font-bold opacity-80">이번 주 학습을 완료했나요?</p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleComplete(item)}
+                            disabled={completing !== null}
+                            className="flex-1 text-xs font-bold bg-white text-primary-container rounded-lg py-1.5 hover:bg-white/90 transition-colors disabled:opacity-50"
+                          >
+                            {completing === item.id ? '처리 중…' : '완료하기'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmingId(null)}
+                            disabled={completing !== null}
+                            className="flex-1 text-xs font-bold bg-white/20 rounded-lg py-1.5 hover:bg-white/30 transition-colors disabled:opacity-50"
+                          >
+                            취소
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>

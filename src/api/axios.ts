@@ -17,7 +17,7 @@ instance.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401 && useAuthStore.getState().isLoggedIn) {
       useAuthStore.getState().logout();
-      window.location.href = '/auth/login';
+      useAuthStore.getState().setSessionExpired(true);
     }
     return Promise.reject(error);
   }

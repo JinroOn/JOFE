@@ -60,18 +60,22 @@ const DiagnosisLoading = () => {
 
     const process = async () => {
       const { sessionId, competencyResult } = state ?? {};
-      if (!sessionId || !competencyResult) return;
+      if (!sessionId) return;
 
       // 1. 세션 완료 처리
       await updateSession(sessionId, {
         status: 'completed',
         completedAt: new Date().toISOString(),
-      }).catch(() => {});
+      }).catch((e) => console.warn('[Loading] updateSession 실패:', e));
 
       // 2. 진단 결과 생성
+      // tendencyVector: DB nullable=false 제약으로 반드시 전달 필요 (성향 평가 미구현으로 0값 플레이스홀더)
       const diagnosisResult = await createDiagnosisResult({
         diagnosisSessionId: sessionId,
-        competencyVector: JSON.stringify(competencyResult),
+        competencyVector: competencyResult
+          ? JSON.stringify(competencyResult)
+          : JSON.stringify({ mathLogic: 0, problemSolving: 0, infoTech: 0, implementation: 0, systemUnderstanding: 0, dataAnalysis: 0, communication: 0, collaboration: 0, selfManagement: 0 }),
+        tendencyVector: JSON.stringify({ tendLogicalInquiry: 0, tendPracticalTech: 0, tendArtCreative: 0, tendSocialCooperation: 0, tendLifeHealth: 0, tendEducationGuide: 0, tendTheoryAcademic: 0, tendDataAnalytics: 0, tendSystemOperation: 0 }),
       });
 
       // 3. 전공 목록 조회 + 역량 적합도 계산
@@ -80,9 +84,9 @@ const DiagnosisLoading = () => {
       const scoreData = majors
         .map((major) => ({
           major,
-          competencyScore: computeCompetencyScore(competencyResult, major),
+          competencyScore: competencyResult ? computeCompetencyScore(competencyResult, major) : 50,
           tendencyScore: 50,
-          failed: checkFailed(competencyResult, major),
+          failed: competencyResult ? checkFailed(competencyResult, major) : false,
         }))
         .map((item) => ({
           ...item,
@@ -124,7 +128,7 @@ const DiagnosisLoading = () => {
 
     // API 처리와 최소 표시 시간(4초)을 병렬 실행
     Promise.all([
-      process().catch(() => {}),
+      process().catch((e) => console.error('[Loading] 진단 결과 생성 실패:', e)),
       new Promise<void>((resolve) => setTimeout(resolve, 4000)),
     ]).then(() => {
       navigate('/analysis/dashboard', { replace: true });

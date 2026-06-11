@@ -25,6 +25,7 @@ import AdminDashboard from './pages/Admin/Dashboard';
 import AdminMajorManage from './pages/Admin/MajorManage';
 import AdminNoticeManage from './pages/Admin/NoticeManage';
 import ErrorPage from './pages/Error';
+import SessionModal from './pages/Auth/components/SessionModal';
 
 const Placeholder = ({ name }: { name: string }) => (
   <div className="flex items-center justify-center min-h-[60vh] text-on-surface-variant text-lg">
@@ -47,6 +48,8 @@ const AdminOnlyRoute = ({ children }: { children: ReactNode }) => {
 
 const AppLayout = () => {
   const location = useLocation();
+  const sessionExpired = useAuthStore((s) => s.sessionExpired);
+  const setSessionExpired = useAuthStore((s) => s.setSessionExpired);
   const isAuthPage = location.pathname.startsWith('/auth');
   const isMainPage = location.pathname === '/';
   const isLoadingPage = location.pathname === '/diagnosis/loading';
@@ -85,6 +88,7 @@ const AppLayout = () => {
         </Routes>
       </div>
       {!isAuthPage && !isMainPage && !isLoadingPage && !isChatPage && !isAdminPage && <FooterSimple />}
+      {sessionExpired && <SessionModal onClose={() => setSessionExpired(false)} />}
     </div>
   );
 };
