@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import logo from '../../../assets/logo-auth.svg';
 
 const TICKER_LINES = [
@@ -10,6 +12,15 @@ const TICKER_LINES = [
 ];
 
 const DiagnosisLoading = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      navigate('/analysis/dashboard', { replace: true });
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [navigate]);
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-surface">
       {/* 배경 */}
