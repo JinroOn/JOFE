@@ -50,11 +50,19 @@ function getGrade(score: number): string {
   return 'A+';
 }
 
+const COMPETENCY_KEYS = [
+  'mathLogic', 'problemSolving', 'infoTech', 'implementation',
+  'systemUnderstanding', 'dataAnalysis', 'communication', 'collaboration', 'selfManagement',
+] as const;
+
 function parseVector(s: string | null): number[] | null {
   if (!s) return null;
   try {
-    const p = JSON.parse(s);
-    if (Array.isArray(p)) return p.map(Number);
+    const p = JSON.parse(s) as unknown;
+    if (Array.isArray(p)) return (p as unknown[]).map(Number);
+    if (p && typeof p === 'object') {
+      return COMPETENCY_KEYS.map((k) => Number((p as Record<string, unknown>)[k] ?? 0));
+    }
   } catch { /* fallthrough to comma-split */ }
   const parts = s.split(',').map(Number);
   return parts.some(isNaN) ? null : parts;
