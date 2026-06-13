@@ -34,9 +34,14 @@ src/
  │   │   ├─ components/       # AuthLayout, SessionModal
  │   │   └─ constants.ts      # 공통 입력 스타일, 유효성 검사 함수
  │   ├─ Home/                 # 메인 페이지
- │   ├─ Diagnosis/            # 역량진단 섹션 (전공진단, 퀴즈, 로딩)
+ │   ├─ Diagnosis/            # 역량진단 섹션 (전공진단, 성향평가, 퀴즈, 로딩)
+ │   │   ├─ Major/            # 1단계: 전공 진단
+ │   │   ├─ Tendency/         # 2단계: 성향 평가 (12문항 A/B)
+ │   │   ├─ Quiz/             # 3단계: 역량 평가 퀴즈
+ │   │   └─ Loading/          # 분석 로딩
  │   ├─ Analysis/             # 진로분석 결과 섹션
  │   │   ├─ Dashboard/
+ │   │   ├─ SharedResult/     # 공유 결과 페이지
  │   │   ├─ WeakCapability/   # components/RadarChart.tsx (9축 듀얼 차트)
  │   │   ├─ MajorExplore/     # types.ts + components/ (RadarChart, MajorCard, DetailPanel, FilterContent)
  │   │   └─ MajorCompare/
@@ -111,9 +116,10 @@ VITE_API_BASE_URL=http://52.79.202.196:8080/api
 | 로그인 (`/auth/login`) | API 연동 완료 |
 | 회원가입 (`/auth/signup`) | API 연동 완료 (약관 동의 모달 + 이메일 인증 2단계) |
 | 비밀번호 찾기 (`/auth/find-password`) | API 연동 완료 (Gmail SMTP 설정 필요) |
-| 마이페이지 (`/mypage`) | API 연동 완료 (관심전공·프로필편집·비밀번호변경·회원탈퇴·누적진단횟수·마지막진단일) |
-| 전공 진단 (`/diagnosis`) | 구현됨 |
-| 역량 평가 퀴즈 (`/diagnosis/quiz`) | API 연동 완료 |
+| 마이페이지 (`/mypage`) | API 연동 완료 (관심전공·프로필편집·비밀번호변경·회원탈퇴·누적진단횟수·마지막진단일, 즐겨찾기 404 자동 삭제) |
+| 전공 진단 (`/diagnosis`) | API 연동 완료 (이어하기·새 진단, 스냅샷 자동저장) |
+| 성향 평가 (`/diagnosis/tendency`) | API 연동 완료 (12문항 A/B, 9축 벡터 계산·저장) |
+| 역량 평가 퀴즈 (`/diagnosis/quiz`) | API 연동 완료 (문항 그리드, 진행 바, 이전 단계 초기화 확인) |
 | 분석 로딩 (`/diagnosis/loading`) | API 연동 완료 (세션 완료·진단결과·전공점수·플랜 생성 전체 흐름) |
 | 공지사항·자료실 (`/library`) | API 연동 완료 |
 | 학습 콘텐츠 (`/library/content`) | API 연동 완료 |
@@ -122,6 +128,7 @@ VITE_API_BASE_URL=http://52.79.202.196:8080/api
 | 취약 역량 분석 (`/analysis/weak`) | API 연동 완료 (역량벡터·TOP3·레이더차트·12주 로드맵) |
 | 전공 시뮬레이션 (`/analysis/compare`) | API 연동 완료 |
 | 결과 대시보드 (`/analysis/dashboard`) | API 연동 완료 (진단결과·전공점수·AI 코멘트 생성) |
+| 공유 결과 (`/analysis/shared/:id`) | 구현됨 |
 | 관리자 (`/admin`) | API 연동 완료 (전공 관리 CRUD, 대시보드 통계는 목업) |
 
 ## 🔐 API 연동 현황
@@ -178,9 +185,12 @@ VITE_API_BASE_URL=http://52.79.202.196:8080/api
 |------|--------|------------|
 | 세션 생성 | POST | `/diagnoses/sessions` |
 | 세션 업데이트 | PATCH | `/diagnoses/sessions/{id}` |
+| 세션 삭제 | DELETE | `/diagnoses/sessions/{id}` |
 | 진행 중 세션 조회 | GET | `/diagnoses/sessions/me/in-progress` |
+| 내 세션 목록 | GET | `/diagnoses/sessions/me` |
 | 문제 목록 조회 | GET | `/diagnoses/questions` |
-| 답변 저장 | POST | `/diagnoses/responses` |
+| 객관식 답변 저장 | POST | `/diagnoses/exam-answers` |
+| 서술형 답변 저장 | POST | `/diagnoses/essay-answers` |
 | 역량 점수 계산 | POST | `/diagnoses/sessions/{id}/score` |
 
 ### Results (`src/api/results.ts`)
