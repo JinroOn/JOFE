@@ -2,6 +2,8 @@ import type { UserFavoriteResponse, UserUpdateRequest } from '../types/user';
 import type { UserResponse } from '../types/auth';
 import api from './axios';
 
+export const getUsers = () => api.get<UserResponse[]>('/users').then((r) => r.data);
+
 export const getMe = () => api.get<UserResponse>('/users/me').then((r) => r.data);
 
 export const updateMe = (data: UserUpdateRequest) =>
