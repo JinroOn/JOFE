@@ -4,8 +4,10 @@ import type { ConsultationSession, ConsultationLog } from '../types/consultation
 export const getSessions = () =>
   api.get<ConsultationSession[]>('/consultations/sessions/me').then((r) => r.data);
 
+const nowLocalIso = () => new Date().toISOString().split('.')[0];
+
 export const createSession = (data?: { title?: string; diagnosisResultId?: number }) =>
-  api.post<ConsultationSession>('/consultations/sessions', data ?? {}).then((r) => r.data);
+  api.post<ConsultationSession>('/consultations/sessions', { startedAt: nowLocalIso(), ...data }).then((r) => r.data);
 
 export const getSessionLogs = (sessionId: number) =>
   api.get<ConsultationLog[]>(`/consultations/sessions/${sessionId}/logs`).then((r) => r.data);

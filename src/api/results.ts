@@ -1,4 +1,4 @@
-import api from './axios';
+import api, { publicApi } from './axios';
 import type {
   DiagnosisResult,
   DiagnosisResultRequest,
@@ -45,8 +45,8 @@ export const getResultMajorScores = (resultId: number) =>
     .get<ResultMajorScore[]>(`/results/${resultId}/major-scores`)
     .then((response) => response.data);
 
-// GET /api/results/share/{shareToken} - 공유 토큰으로 진단 결과 조회
+// GET /api/results/share/{shareToken} - 공유 토큰으로 진단 결과 조회 (인증 불필요)
 export const getSharedDiagnosisResult = (shareToken: string) =>
-  api
+  publicApi
     .get<DiagnosisResult>(`/results/share/${shareToken}`)
     .then((response) => response.data);

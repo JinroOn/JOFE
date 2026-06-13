@@ -6,7 +6,9 @@ import PasswordChangeModal from './components/PasswordChangeModal';
 import { getFavorites, deleteFavorite, deleteMe } from '../../api/user';
 import { getMajor } from '../../api/major';
 import { getDiagnosisResults } from '../../api/results';
+import { getDiagnosisSessions, deleteSession } from '../../api/diagnosis';
 import type { Major } from '../../types/major';
+import type { DiagnosisSession } from '../../types/diagnosis';
 
 interface FavoriteItem {
   id: number;
@@ -27,7 +29,11 @@ const MyPage = () => {
   const [diagnosisCount, setDiagnosisCount] = useState<number | null>(null);
   const [lastDiagnosisDate, setLastDiagnosisDate] = useState<string | null>(null);
 
+  const [sessions, setSessions] = useState<DiagnosisSession[]>([]);
+
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [sessionToDelete, setSessionToDelete] = useState<DiagnosisSession | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawError, setWithdrawError] = useState(false);
 
@@ -38,20 +44,29 @@ const MyPage = () => {
 
   useEffect(() => {
     const load = async () => {
-      const [list, results] = await Promise.allSettled([getFavorites(), getDiagnosisResults()]);
+      const [list, results, sessionList] = await Promise.allSettled([
+        getFavorites(),
+        getDiagnosisResults(),
+        getDiagnosisSessions(),
+      ]);
 
       if (list.status === 'fulfilled') {
-        const items = await Promise.all(
+        const results = await Promise.all(
           list.value.map(async (f) => {
             try {
               const major = await getMajor(f.majorId);
               return { id: f.id, majorId: f.majorId, createdAt: f.createdAt, major };
-            } catch {
+            } catch (err: unknown) {
+              const status = (err as { response?: { status?: number } })?.response?.status;
+              if (status === 404) {
+                deleteFavorite(f.id).catch(() => {});
+                return null;
+              }
               return { id: f.id, majorId: f.majorId, createdAt: f.createdAt, major: null };
             }
           })
         );
-        setFavorites(items);
+        setFavorites(results.filter((item) => item !== null));
       }
       setFavoritesLoading(false);
 
@@ -68,6 +83,14 @@ const MyPage = () => {
       } else {
         setDiagnosisCount(0);
       }
+
+      if (sessionList.status === 'fulfilled') {
+        setSessions(
+          [...sessionList.value].sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
+        );
+      }
     };
     load();
   }, []);
@@ -79,6 +102,18 @@ const MyPage = () => {
       setFavorites((prev) => prev.filter((f) => f.id !== favoriteId));
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleDeleteSession = async () => {
+    if (!sessionToDelete) return;
+    setDeletingSessionId(sessionToDelete.id);
+    try {
+      await deleteSession(sessionToDelete.id);
+      setSessions((prev) => prev.filter((s) => s.id !== sessionToDelete.id));
+      setSessionToDelete(null);
+    } finally {
+      setDeletingSessionId(null);
     }
   };
 
@@ -237,6 +272,83 @@ const MyPage = () => {
                 ))}
               </div>
             )}
+            </section>
+
+          {/* 진단 이력 */}
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-primary-container">진단 이력</h2>
+            </div>
+
+            {sessions.length === 0 ? (
+              <div className="bg-white rounded-2xl p-12 text-center text-on-surface-variant">
+                <span className="material-symbols-outlined text-4xl mb-3 block text-outline">assignment</span>
+                <p className="font-medium">진단 기록이 없습니다.</p>
+                <button
+                  onClick={() => navigate('/diagnosis')}
+                  className="mt-4 text-sm font-bold text-secondary"
+                >
+                  진단 시작하기 →
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sessions.map((s) => {
+                  const statusMap = {
+                    in_progress: { label: '진행 중', cls: 'bg-yellow-100 text-yellow-700' },
+                    completed:   { label: '완료',    cls: 'bg-green-100 text-green-700' },
+                    abandoned:   { label: '중단',    cls: 'bg-surface-container text-on-surface-variant' },
+                  } as const;
+                  const { label, cls } = statusMap[s.status] ?? statusMap.abandoned;
+                  const date = new Date(s.createdAt).toLocaleDateString('ko-KR', {
+                    year: 'numeric', month: 'long', day: 'numeric',
+                  });
+                  return (
+                    <div
+                      key={s.id}
+                      className="bg-white rounded-2xl px-5 py-4 shadow-sm flex items-center justify-between gap-4"
+                    >
+                      <div className="flex items-center gap-4 min-w-0">
+                        <span className="material-symbols-outlined text-on-surface-variant shrink-0">assignment</span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-on-surface truncate">진단 #{s.id}</p>
+                          <p className="text-xs text-on-surface-variant mt-0.5">{date}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${cls}`}>{label}</span>
+                        {s.status === 'in_progress' && (
+                          <button
+                            onClick={() => navigate('/diagnosis')}
+                            className="px-3 py-1.5 bg-primary-container text-white text-xs font-bold rounded-lg hover:opacity-90 transition-opacity"
+                          >
+                            이어하기
+                          </button>
+                        )}
+                        {s.status === 'completed' && (
+                          <button
+                            onClick={() => navigate('/analysis/dashboard')}
+                            className="px-3 py-1.5 bg-surface-container text-on-surface text-xs font-bold rounded-lg hover:bg-surface-container-high transition-colors"
+                          >
+                            결과 보기
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setSessionToDelete(s)}
+                          disabled={deletingSessionId === s.id}
+                          className="p-1.5 rounded-lg text-on-surface-variant/40 hover:text-error hover:bg-error-container/20 transition-colors disabled:opacity-40"
+                          title="진단 삭제"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            {deletingSessionId === s.id ? 'hourglass_empty' : 'delete'}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
         </div>
 
@@ -284,6 +396,36 @@ const MyPage = () => {
       )}
       {showPasswordModal && (
         <PasswordChangeModal onClose={() => setShowPasswordModal(false)} />
+      )}
+
+      {sessionToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <div className="w-14 h-14 rounded-full bg-error-container flex items-center justify-center mx-auto mb-4">
+              <span className="material-symbols-outlined text-error text-2xl">delete</span>
+            </div>
+            <h3 className="text-lg font-bold text-on-surface mb-2">진단 삭제</h3>
+            <p className="text-sm text-on-surface-variant mb-6">
+              진단 #{sessionToDelete.id}의 모든 답변과 결과가 삭제됩니다. 복구할 수 없습니다.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setSessionToDelete(null)}
+                disabled={deletingSessionId !== null}
+                className="flex-1 py-3 rounded-lg border border-outline-variant/30 font-bold hover:bg-surface-container-low transition-all disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleDeleteSession}
+                disabled={deletingSessionId !== null}
+                className="flex-1 py-3 rounded-lg bg-error text-white font-bold hover:bg-error/90 transition-all disabled:opacity-50"
+              >
+                {deletingSessionId !== null ? '삭제 중...' : '삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showDeleteConfirm && (

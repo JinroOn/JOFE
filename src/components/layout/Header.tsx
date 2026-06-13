@@ -10,7 +10,6 @@ const NAV_LINKS = [
     to: '/diagnosis',
     sub: [
       { label: '전공 진단', to: '/diagnosis' },
-      { label: '역량 평가 퀴즈', to: '/diagnosis/quiz' },
     ],
   },
   {

@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import useAuthStore from '../../../store/useAuthStore';
 import {
   getInProgressSession,
   createSession,
   updateSession,
+  deleteSession,
   createEssayAnswer,
 } from '../../../api/diagnosis';
 import type { DiagnosisSession } from '../../../types/diagnosis';
@@ -40,20 +41,78 @@ const DiagnosisMajor = () => {
   );
 
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useAuthStore((s) => s.user);
 
   const [sessionId, setSessionId] = useState<number | null>(null);
-  const [resumeSession, setResumeSession] = useState<DiagnosisSession | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [snapshotBase, setSnapshotBase] = useState<Record<string, unknown>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [pageState, setPageState] = useState<'loading' | 'choice' | 'form'>('loading');
+  const [foundSession, setFoundSession] = useState<DiagnosisSession | null>(null);
 
-  // 마운트 시 진행 중인 진단 세션이 있으면 이어하기 배너 노출
+  const sessionIdRef = useRef<number | null>(null);
+  useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const applySnapshot = (snap: Record<string, unknown>) => {
+    if (snap.grade) setGrade(snap.grade as typeof grade);
+    if (snap.dreamJob != null) setDreamJob(snap.dreamJob as string);
+    if (Array.isArray(snap.selectedSubjects)) setSelectedSubjects(snap.selectedSubjects as string[]);
+    if (snap.studyHours != null) setStudyHours(snap.studyHours as number);
+    if (snap.learningStyle) setLearningStyle(snap.learningStyle as 'theory' | 'practice');
+    if (snap.exploreSpectrum != null) setExploreSpectrum(snap.exploreSpectrum as number);
+    if (snap.scores) setScores(snap.scores as Record<string, number>);
+    if (snap.aspiration != null) setAspiration(snap.aspiration as string);
+  };
+
+  // 마운트: 진행 중 세션 유무에 따라 선택 화면 or 폼으로 바로 진입
   useEffect(() => {
-    getInProgressSession().then((data) => {
-      if (data?.session) setResumeSession(data.session);
-    });
+    const skipChoice = (location.state as { skipChoice?: boolean } | null)?.skipChoice;
+    (async () => {
+      try {
+        const data = await getInProgressSession();
+        if (data?.session) {
+          const base = (() => { try { return JSON.parse(data.session.inputSnapshot || '{}'); } catch { return {}; } })();
+          if (skipChoice) {
+            setSessionId(data.session.id);
+            setSnapshotBase(base);
+            applySnapshot(base);
+            setPageState('form');
+          } else {
+            setFoundSession(data.session);
+            setPageState('choice');
+          }
+        } else {
+          setPageState('form');
+        }
+      } catch {
+        setPageState('form');
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleContinue = () => {
+    if (!foundSession) return;
+    setSessionId(foundSession.id);
+    try {
+      const base = JSON.parse(foundSession.inputSnapshot || '{}');
+      setSnapshotBase(base);
+      applySnapshot(base);
+    } catch { /* 파싱 실패 무시 */ }
+    setFoundSession(null);
+    setPageState('form');
+  };
+
+  const handleNewDiagnosis = async () => {
+    if (foundSession) {
+      await deleteSession(foundSession.id).catch(() => {});
+    }
+    setFoundSession(null);
+    setPageState('form');
+  };
 
   const toggleSubject = (subject: string) => {
     setSelectedSubjects((prev) =>
@@ -61,9 +120,10 @@ const DiagnosisMajor = () => {
     );
   };
 
-  // 현재 폼 입력값을 스냅샷 JSON 으로 직렬화
+  // 현재 폼 입력값을 기존 스냅샷에 머지해 직렬화 (tendencyAnswers 등 유지)
   const buildSnapshot = () =>
     JSON.stringify({
+      ...snapshotBase,
       grade,
       dreamJob,
       selectedSubjects,
@@ -92,41 +152,41 @@ const DiagnosisMajor = () => {
     return created.id;
   };
 
+  // 폼 변경 시 2초 debounce 자동저장 (폼 화면일 때만)
+  useEffect(() => {
+    if (pageState !== 'form') return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(async () => {
+      const snapshot = buildSnapshot();
+      const sid = sessionIdRef.current;
+      try {
+        setAutoSaveStatus('saving');
+        if (sid) {
+          await updateSession(sid, { status: 'in_progress', currentStep: 1, inputSnapshot: snapshot });
+        } else {
+          const created = await createSession({
+            userId: user?.id,
+            status: 'in_progress',
+            currentStep: 1,
+            startedAt: new Date().toISOString(),
+            inputSnapshot: snapshot,
+          });
+          sessionIdRef.current = created.id;
+          setSessionId(created.id);
+        }
+        setAutoSaveStatus('saved');
+      } catch {
+        setAutoSaveStatus('idle');
+      }
+    }, 2000);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageState, grade, dreamJob, selectedSubjects, studyHours, learningStyle, exploreSpectrum, scores, aspiration]);
+
   // 이전에 저장된 스냅샷을 폼에 복원
-  const handleResume = () => {
-    if (!resumeSession) return;
-    try {
-      const snap = JSON.parse(resumeSession.inputSnapshot || '{}');
-      if (snap.grade) setGrade(snap.grade);
-      if (snap.dreamJob != null) setDreamJob(snap.dreamJob);
-      if (Array.isArray(snap.selectedSubjects)) setSelectedSubjects(snap.selectedSubjects);
-      if (snap.studyHours != null) setStudyHours(snap.studyHours);
-      if (snap.learningStyle) setLearningStyle(snap.learningStyle);
-      if (snap.exploreSpectrum != null) setExploreSpectrum(snap.exploreSpectrum);
-      if (snap.scores) setScores(snap.scores);
-      if (snap.aspiration != null) setAspiration(snap.aspiration);
-    } catch {
-      /* 스냅샷 파싱 실패 시 무시 */
-    }
-    setSessionId(resumeSession.id);
-    setResumeSession(null);
-  };
-
-  // 임시 저장
-  const handleTempSave = async () => {
-    setError(null);
-    setSaving(true);
-    try {
-      await persistSession('in_progress');
-    } catch {
-      setError('임시 저장에 실패했습니다. 다시 시도해 주세요.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   // 다음 단계로: 세션 저장 + 포부(서술형) 등록 후 퀴즈 단계로 이동
   const handleNext = async () => {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     setError(null);
     setSubmitting(true);
     try {
@@ -134,60 +194,76 @@ const DiagnosisMajor = () => {
       if (aspiration.trim()) {
         await createEssayAnswer({ diagnosisSessionId: id, questionNo: 1, answerText: aspiration });
       }
-      navigate('/diagnosis/quiz');
+      navigate('/diagnosis/tendency');
     } catch {
       setError('저장에 실패했습니다. 다시 시도해 주세요.');
       setSubmitting(false);
     }
   };
 
-  const savedAtLabel = resumeSession
-    ? new Date(resumeSession.updatedAt).toLocaleString('ko-KR', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      })
-    : '';
+  if (pageState === 'loading') {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <p className="text-on-surface-variant text-sm">불러오는 중...</p>
+      </div>
+    );
+  }
+
+  if (pageState === 'choice' && foundSession) {
+    const savedAt = new Date(foundSession.updatedAt).toLocaleString('ko-KR', {
+      month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    });
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center px-4">
+        <div className="w-full max-w-[600px]">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold bg-secondary-container/20 text-secondary mb-4">
+              <span className="material-symbols-outlined text-[14px]">manage_search</span>
+              진단 시작
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-primary-container mb-2">
+              진행 중인 진단이 있습니다
+            </h1>
+            <p className="text-sm text-on-surface-variant">마지막 저장: {savedAt}</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button
+              onClick={handleContinue}
+              className="group flex flex-col items-center text-center p-8 rounded-2xl border-2 border-secondary bg-secondary/5 hover:scale-[1.01] transition-all"
+            >
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 bg-secondary text-white">
+                <span className="material-symbols-outlined text-[28px]">play_arrow</span>
+              </div>
+              <p className="text-base font-bold text-secondary mb-1">이어서 진단하기</p>
+              <p className="text-sm text-on-surface-variant">이전에 입력한 내용을 불러와 계속합니다</p>
+            </button>
+            <button
+              onClick={() => void handleNewDiagnosis()}
+              className="group flex flex-col items-center text-center p-8 rounded-2xl border-2 border-outline-variant/30 bg-surface-container-lowest hover:border-secondary/50 hover:bg-surface-container-low hover:scale-[1.01] transition-all"
+            >
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 bg-surface-container-high text-on-surface-variant group-hover:bg-secondary/10 group-hover:text-secondary transition-colors">
+                <span className="material-symbols-outlined text-[28px]">add</span>
+              </div>
+              <p className="text-base font-bold text-primary-container mb-1">새 진단 시작하기</p>
+              <p className="text-sm text-on-surface-variant">기존 진단을 종료하고 처음부터 다시 시작합니다</p>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-surface">
-      <div className="max-w-[900px] mx-auto px-4 sm:px-8 pt-6 pb-16">
-        {resumeSession && (
-          <div className="flex items-center justify-between gap-4 bg-primary-container text-white rounded-2xl px-5 py-3.5 mb-8 shadow-[0_8px_20px_rgba(13,28,50,0.12)]">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="material-symbols-outlined text-secondary-container shrink-0">history</span>
-              <div className="min-w-0">
-                <p className="font-semibold text-sm sm:text-base truncate">이전에 중단된 진단이 있습니다.</p>
-                <p className="text-xs text-white/60 mt-0.5">최근 저장: {savedAtLabel}</p>
-              </div>
-            </div>
-            <button
-              onClick={handleResume}
-              className="shrink-0 px-4 py-1.5 bg-secondary-container text-on-secondary-fixed text-sm font-bold rounded-lg hover:opacity-90 transition-opacity"
-            >
-              이어하기
-            </button>
-          </div>
-        )}
-
+      <div className="max-w-[900px] mx-auto px-4 sm:px-8 pt-6 pb-28">
         <div className="mb-8">
-          <div className="flex items-end justify-between mb-2">
-            <div>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-primary-container">
-                전공 적성 정밀 진단
-              </h1>
-              <p className="text-on-surface-variant text-sm mt-2">
-                AI가 당신의 답변을 분석하여 최적의 진로를 설계합니다.
-              </p>
-            </div>
-            <p className="text-2xl font-extrabold text-primary-container shrink-0">
-              01<span className="text-base font-bold text-on-surface-variant">/ 03</span>
+          <div className="mb-2">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-primary-container">
+              전공 적성 정밀 진단
+            </h1>
+            <p className="text-on-surface-variant text-sm mt-2">
+              AI가 당신의 답변을 분석하여 최적의 진로를 설계합니다.
             </p>
-          </div>
-          <div className="h-1.5 w-full bg-surface-container-high rounded-full overflow-hidden">
-            <div className="h-full w-1/3 bg-secondary rounded-full" />
           </div>
         </div>
 
@@ -397,25 +473,31 @@ const DiagnosisMajor = () => {
         </section>
 
         {error && <p className="mb-3 text-sm text-error text-right">{error}</p>}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary-container transition-colors"
-          >
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            이전 단계
-          </button>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleTempSave}
-              disabled={saving || submitting}
-              className="px-5 py-2.5 text-sm font-bold text-on-surface-variant border border-outline-variant/40 bg-surface-container-lowest rounded-xl hover:bg-surface-container-low transition-colors disabled:opacity-60"
-            >
-              {saving ? '저장 중...' : '임시 저장'}
-            </button>
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 bg-surface-container-lowest border-t border-outline-variant/30 shadow-[0_-4px_12px_rgba(10,25,47,0.04)]">
+        <div className="max-w-[900px] mx-auto px-4 sm:px-8 py-4 flex items-center justify-between">
+          <div className="w-24" />
+          <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+            <span className="material-symbols-outlined text-[18px]">edit_note</span>
+            <span>1단계 <span className="font-bold text-primary-container">/ 3단계</span></span>
+          </div>
+          <div className="flex items-center gap-3">
+            {autoSaveStatus === 'saving' && (
+              <span className="flex items-center gap-1 text-xs text-on-surface-variant">
+                <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+                저장 중...
+              </span>
+            )}
+            {autoSaveStatus === 'saved' && (
+              <span className="flex items-center gap-1 text-xs text-secondary">
+                <span className="material-symbols-outlined text-[14px]">cloud_done</span>
+                자동 저장됨
+              </span>
+            )}
             <button
               onClick={handleNext}
-              disabled={submitting || saving}
+              disabled={submitting}
               className="flex items-center gap-1 px-5 py-2.5 text-sm font-bold text-white bg-primary-container rounded-xl shadow-[0_8px_20px_rgba(13,28,50,0.18)] hover:opacity-90 transition-opacity disabled:opacity-60"
             >
               {submitting ? '처리 중...' : '다음 단계로'}
