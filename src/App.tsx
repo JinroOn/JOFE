@@ -12,6 +12,7 @@ import MyPage from './pages/MyPage';
 import DiagnosisMajor from './pages/Diagnosis/Major';
 import DiagnosisLoading from './pages/Diagnosis/Loading';
 import DiagnosisQuiz from './pages/Diagnosis/Quiz';
+import DiagnosisTendency from './pages/Diagnosis/Tendency';
 import LibraryNotice from './pages/Library/Notice';
 import LibraryContent from './pages/Library/Content';
 import LibraryContentDetail from './pages/Library/Content/Detail';
@@ -24,6 +25,7 @@ import AdminLayout from './pages/Admin';
 import AdminDashboard from './pages/Admin/Dashboard';
 import AdminMajorManage from './pages/Admin/MajorManage';
 import AdminNoticeManage from './pages/Admin/NoticeManage';
+import SharedResult from './pages/Analysis/SharedResult';
 import ErrorPage from './pages/Error';
 import SessionModal from './pages/Auth/components/SessionModal';
 
@@ -66,6 +68,7 @@ const AppLayout = () => {
           <Route path="/auth/signup" element={<Signup />} />
           <Route path="/auth/find-password" element={<FindPassword />} />
           <Route path="/diagnosis" element={<UserOnlyRoute><DiagnosisMajor /></UserOnlyRoute>} />
+          <Route path="/diagnosis/tendency" element={<UserOnlyRoute><DiagnosisTendency /></UserOnlyRoute>} />
           <Route path="/diagnosis/loading" element={<UserOnlyRoute><DiagnosisLoading /></UserOnlyRoute>} />
           <Route path="/diagnosis/quiz" element={<UserOnlyRoute><DiagnosisQuiz /></UserOnlyRoute>} />
           <Route path="/diagnosis/explore" element={<UserOnlyRoute><MajorExplore /></UserOnlyRoute>} />
@@ -83,6 +86,7 @@ const AppLayout = () => {
             <Route path="majors" element={<AdminMajorManage />} />
             <Route path="notices" element={<AdminNoticeManage />} />
           </Route>
+          <Route path="/results/share/:token" element={<SharedResult />} />
           <Route path="/error" element={<ErrorPage />} />
           <Route path="*" element={<Placeholder name="404 - 찾을 수 없는" />} />
         </Routes>

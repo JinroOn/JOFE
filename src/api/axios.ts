@@ -1,8 +1,15 @@
 import axios from 'axios';
 import useAuthStore from '../store/useAuthStore';
 
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://52.79.202.196:8080/api';
+
 const instance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://52.79.202.196:8080/api',
+  baseURL: BASE_URL,
+  timeout: 5000,
+});
+
+export const publicApi = axios.create({
+  baseURL: BASE_URL,
   timeout: 5000,
 });
 

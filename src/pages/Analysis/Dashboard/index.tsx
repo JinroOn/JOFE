@@ -570,7 +570,7 @@ const Dashboard = () => {
           />
         </div>
 
-        <ShareSection userName={displayName} topMajor={topRecommendedMajor} />
+        <ShareSection userName={displayName} topMajor={topRecommendedMajor} shareToken={selectedResult?.shareToken} />
 
         <footer className="mt-8 flex flex-wrap justify-center gap-4">
           <button className="flex items-center gap-2 px-6 py-4 bg-primary-container text-white rounded-[14px] font-bold hover:shadow-lg transition-shadow">

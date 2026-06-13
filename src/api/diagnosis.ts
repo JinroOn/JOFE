@@ -43,3 +43,11 @@ export const createExamAnswer = (data: ExamAnswerPayload) =>
 // 역량 점수 자동 산출
 export const scoreSession = (sessionId: number) =>
   api.post<CompetencyResult>(`/diagnoses/sessions/${sessionId}/score`).then((r) => r.data);
+
+// 진단 세션 삭제 (관련 답변/결과 포함)
+export const deleteSession = (sessionId: number) =>
+  api.delete(`/diagnoses/sessions/${sessionId}`);
+
+// 내 진단 세션 목록 조회
+export const getDiagnosisSessions = () =>
+  api.get<DiagnosisSession[]>('/diagnoses/sessions/me').then((r) => r.data);

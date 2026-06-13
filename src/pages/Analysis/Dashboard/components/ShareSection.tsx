@@ -4,6 +4,7 @@ import type { RecommendedMajor } from '../types';
 interface ShareSectionProps {
   userName: string;
   topMajor?: RecommendedMajor;
+  shareToken?: string | null;
 }
 
 const DOT_COORDS: [number, number][] = [
@@ -28,13 +29,17 @@ const AXIS_LABELS = [
   { label: 'Vision', cls: 'top-[20%] left-0' },
 ];
 
-const ShareSection = ({ userName, topMajor }: ShareSectionProps) => {
+const ShareSection = ({ userName, topMajor, shareToken }: ShareSectionProps) => {
   const [copied, setCopied] = useState(false);
 
   const suitability = topMajor?.suitability ?? 0;
 
+  const shareUrl = shareToken
+    ? `${window.location.origin}/results/share/${shareToken}`
+    : window.location.href;
+
   const handleCopy = () => {
-    navigator.clipboard.writeText(window.location.href);
+    navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
