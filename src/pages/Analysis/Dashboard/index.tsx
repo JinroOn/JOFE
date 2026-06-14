@@ -549,11 +549,30 @@ const Dashboard = () => {
               />
             </div>
 
-            <div className="mt-6 flex items-center gap-2">
+            <div className="mt-6 flex items-center gap-2 mb-5">
               <span className="w-3 h-3 rounded-full bg-[#00D2FF] shrink-0" />
               <span className="text-xs font-bold text-on-surface-variant">
                 현재 역량 점수
               </span>
+            </div>
+
+            <div className="w-full">
+              <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-3">
+                역량 순위
+              </p>
+              <div className="space-y-2">
+                {[...AXES.map((axis, i) => ({ axis, score: Math.round(userScores[i] ?? 0) }))]
+                  .sort((a, b) => b.score - a.score)
+                  .map(({ axis, score }, rank) => (
+                    <div key={axis} className="flex items-center gap-3 bg-surface-container rounded-[10px] px-4 py-2">
+                      <span className={`text-xs font-black w-4 shrink-0 ${rank === 0 ? 'text-[#FFAB00]' : rank === 1 ? 'text-on-surface-variant' : rank === 2 ? 'text-[#CD7F32]' : 'text-on-surface-variant/40'}`}>
+                        {rank + 1}
+                      </span>
+                      <span className="flex-1 text-xs font-semibold text-primary-container">{axis}</span>
+                      <span className="text-xs font-black text-secondary">{score}점</span>
+                    </div>
+                  ))}
+              </div>
             </div>
           </section>
 
