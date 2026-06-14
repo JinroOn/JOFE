@@ -116,13 +116,12 @@ const WeakCapability = () => {
     const selected = results.find((r) => r.id === selectedResultId);
     if (!selected) return;
 
-    setLoading(true);
-    setConfirmingId(null);
-    setConfirmingRegenerate(false);
-    setGeneratingPlan(false);
-    setPlanGenerateError(false);
-
     const load = async () => {
+      setLoading(true);
+      setConfirmingId(null);
+      setConfirmingRegenerate(false);
+      setGeneratingPlan(false);
+      setPlanGenerateError(false);
       try {
         const rawVec = parseVector(selected.competencyVector);
         setCurrentScores(rawVec?.length === 9 ? normalizeScores(rawVec) : Array(9).fill(0));
