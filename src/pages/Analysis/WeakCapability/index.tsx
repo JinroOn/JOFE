@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import RadarChart from './components/RadarChart';
 import { getDiagnosisResults, getResultMajorScores } from '../../../api/results';
 import { getMajor } from '../../../api/major';
-import { getPlansByResult, getPlanItems, completePlanItem } from '../../../api/plan';
+import { getPlansByResult, getPlanItems, getPlanRiskNotes, completePlanItem, createPlan } from '../../../api/plan';
+import type { DiagnosisResult } from '../../../types/results';
 import type { MajorWeeklyPlanItem } from '../../../types/plan';
 
 const AXES = [
@@ -73,45 +74,67 @@ function normalizeScores(raw: number[]): number[] {
   return raw.map((v) => (max > 1 ? v / 100 : v));
 }
 
+function formatDate(iso: string): string {
+  return new Date(iso)
+    .toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
+    .replace(/\. /g, '.')
+    .replace(/\.$/, '');
+}
+
 const WeakCapability = () => {
+  const [results, setResults] = useState<DiagnosisResult[]>([]);
+  const [selectedResultId, setSelectedResultId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentScores, setCurrentScores] = useState<number[]>(Array(9).fill(0));
   const [targetScores, setTargetScores] = useState<number[]>(Array(9).fill(0));
   const [topMajorName, setTopMajorName] = useState('');
-  const [lastDate, setLastDate] = useState('');
+  const [topMajorScoreId, setTopMajorScoreId] = useState<number | null>(null);
   const [planItems, setPlanItems] = useState<MajorWeeklyPlanItem[]>([]);
+  const [riskNotes, setRiskNotes] = useState<string[]>([]);
   const [completing, setCompleting] = useState<number | null>(null);
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [generatingPlan, setGeneratingPlan] = useState(false);
+  const [planGenerateError, setPlanGenerateError] = useState(false);
+  const [confirmingRegenerate, setConfirmingRegenerate] = useState(false);
 
   useEffect(() => {
+    getDiagnosisResults()
+      .then((data) => {
+        const sorted = [...data].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        setResults(sorted);
+        if (sorted.length > 0) setSelectedResultId(sorted[0].id);
+        else setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedResultId || results.length === 0) return;
+
+    const selected = results.find((r) => r.id === selectedResultId);
+    if (!selected) return;
+
+    setLoading(true);
+    setConfirmingId(null);
+    setConfirmingRegenerate(false);
+    setGeneratingPlan(false);
+    setPlanGenerateError(false);
+
     const load = async () => {
       try {
-        const results = await getDiagnosisResults();
-        if (results.length === 0) return;
-
-        const latest = results.reduce((a, b) =>
-          new Date(a.createdAt) > new Date(b.createdAt) ? a : b
-        );
-
-        setLastDate(
-          new Date(latest.createdAt)
-            .toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
-            .replace(/\. /g, '.')
-            .replace(/\.$/, '')
-        );
-
-        const rawVec = parseVector(latest.competencyVector);
-        if (rawVec && rawVec.length === 9) {
-          setCurrentScores(normalizeScores(rawVec));
-        }
+        const rawVec = parseVector(selected.competencyVector);
+        setCurrentScores(rawVec?.length === 9 ? normalizeScores(rawVec) : Array(9).fill(0));
 
         const [scoresRes, plansRes] = await Promise.allSettled([
-          getResultMajorScores(latest.id),
-          getPlansByResult(latest.id),
+          getResultMajorScores(selected.id),
+          getPlansByResult(selected.id),
         ]);
 
         if (scoresRes.status === 'fulfilled' && scoresRes.value.length > 0) {
           const top = scoresRes.value.reduce((a, b) => (a.rank < b.rank ? a : b));
+          setTopMajorScoreId(top.id);
           const major = await getMajor(top.majorId).catch(() => null);
           if (major) {
             setTopMajorName(major.name);
@@ -126,19 +149,71 @@ const WeakCapability = () => {
               (major.reqCollaboration ?? 0) / 100,
               (major.reqSelfManagement ?? 0) / 100,
             ]);
+          } else {
+            setTopMajorName('');
+            setTargetScores(Array(9).fill(0));
           }
+        } else {
+          setTopMajorScoreId(null);
+          setTopMajorName('');
+          setTargetScores(Array(9).fill(0));
         }
 
         if (plansRes.status === 'fulfilled' && plansRes.value.length > 0) {
-          const activePlan = plansRes.value.find((p) => p.activeVersion) ?? plansRes.value[0];
-          const items = await getPlanItems(activePlan.id).catch(() => []);
-          setPlanItems(items.sort((a, b) => a.weekNo - b.weekNo));
+          const succeeded = plansRes.value.filter((p) => p.aiPlanStatus === 'SUCCEEDED');
+          const activePlan =
+            succeeded.find((p) => p.activeVersion) ??
+            succeeded[succeeded.length - 1] ??
+            null;
+          if (activePlan) {
+            const [items, notes] = await Promise.all([
+              getPlanItems(activePlan.id).catch(() => []),
+              getPlanRiskNotes(activePlan.id).catch(() => []),
+            ]);
+            setPlanItems(items.sort((a, b) => a.weekNo - b.weekNo));
+            setRiskNotes(notes.map((n) => n.note));
+          } else {
+            setPlanItems([]);
+            setRiskNotes([]);
+          }
+        } else {
+          setPlanItems([]);
         }
       } catch { /* silent — partial data is acceptable */ }
       finally { setLoading(false); }
     };
-    load();
-  }, []);
+
+    void load();
+  }, [selectedResultId, results]);
+
+  const handleCreatePlan = async () => {
+    if (!selectedResultId || !topMajorScoreId || generatingPlan) return;
+    setGeneratingPlan(true);
+    setPlanGenerateError(false);
+
+    try {
+      const plan = await createPlan({
+        diagnosisResultId: selectedResultId,
+        resultMajorScoreId: topMajorScoreId,
+        activeVersion: true,
+      });
+
+      if (plan.aiPlanStatus === 'SUCCEEDED') {
+        const [items, notes] = await Promise.all([
+          getPlanItems(plan.id).catch(() => []),
+          getPlanRiskNotes(plan.id).catch(() => []),
+        ]);
+        setPlanItems(items.sort((a, b) => a.weekNo - b.weekNo));
+        setRiskNotes(notes.map((n) => n.note));
+      } else {
+        setPlanGenerateError(true);
+      }
+    } catch {
+      setPlanGenerateError(true);
+    } finally {
+      setGeneratingPlan(false);
+    }
+  };
 
   const handleComplete = async (item: MajorWeeklyPlanItem) => {
     if (item.isCompleted || completing !== null) return;
@@ -184,6 +259,8 @@ const WeakCapability = () => {
   const progressPct =
     planItems.length > 0 ? Math.round((completedCount / planItems.length) * 100) : 0;
 
+  const selectedResult = results.find((r) => r.id === selectedResultId) ?? null;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
@@ -220,13 +297,51 @@ const WeakCapability = () => {
               주차별 학습 계획을 통해 역량 갭을 메워보세요.
             </p>
           </div>
-          {lastDate && (
+          {selectedResult && (
             <div className="flex items-center gap-2 text-sm text-on-surface-variant shrink-0">
               <span className="material-symbols-outlined text-[16px]">schedule</span>
-              마지막 분석: {lastDate}
+              {formatDate(selectedResult.createdAt)}
             </div>
           )}
         </header>
+
+        {results.length > 1 && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-on-surface-variant shrink-0">진단 회차</span>
+            {results.length <= 5 ? (
+              <div className="flex gap-2">
+                {results.map((result, idx) => (
+                  <button
+                    key={result.id}
+                    onClick={() => setSelectedResultId(result.id)}
+                    className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${
+                      result.id === selectedResultId
+                        ? 'bg-primary-container text-white shadow-md'
+                        : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                    }`}
+                  >
+                    <span>{results.length - idx}회차</span>
+                    <span className={`text-xs font-normal ${result.id === selectedResultId ? 'text-white/70' : 'text-on-surface-variant/60'}`}>
+                      {formatDate(result.createdAt)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <select
+                value={selectedResultId ?? ''}
+                onChange={(e) => setSelectedResultId(Number(e.target.value))}
+                className="rounded-[12px] border border-outline-variant/30 bg-white px-4 py-2.5 text-sm font-bold text-primary-container outline-none cursor-pointer"
+              >
+                {results.map((result, idx) => (
+                  <option key={result.id} value={result.id}>
+                    {results.length - idx}회차 · {formatDate(result.createdAt)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
@@ -349,9 +464,39 @@ const WeakCapability = () => {
               <h2 className="font-black text-xl text-primary-container">
                 {planItems.length}주 학습 로드맵
               </h2>
-              <span className="text-sm text-on-surface-variant bg-surface-container px-3 py-1 rounded-full">
-                진행률 <span className="font-bold text-secondary">{progressPct}%</span>
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-on-surface-variant bg-surface-container px-3 py-1 rounded-full">
+                  진행률 <span className="font-bold text-secondary">{progressPct}%</span>
+                </span>
+                {confirmingRegenerate ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-on-surface-variant">재생성할까요?</span>
+                    <button
+                      onClick={() => { setConfirmingRegenerate(false); void handleCreatePlan(); }}
+                      disabled={generatingPlan}
+                      className="text-xs font-bold bg-primary-container text-white px-2.5 py-1 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                    >
+                      {generatingPlan ? '생성 중…' : '확인'}
+                    </button>
+                    <button
+                      onClick={() => setConfirmingRegenerate(false)}
+                      disabled={generatingPlan}
+                      className="text-xs font-bold bg-surface-container text-on-surface-variant px-2.5 py-1 rounded-lg hover:bg-surface-container-high transition-colors"
+                    >
+                      취소
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmingRegenerate(true)}
+                    disabled={generatingPlan}
+                    className="flex items-center gap-1 text-xs font-bold text-on-surface-variant bg-surface-container px-3 py-1 rounded-full hover:bg-surface-container-high transition-colors disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">refresh</span>
+                    재생성
+                  </button>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {planItems.map((item, idx) => {
@@ -405,6 +550,23 @@ const WeakCapability = () => {
                 );
               })}
             </div>
+
+            {riskNotes.length > 0 && (
+              <div className="mt-6 bg-[#FFAB00]/5 border border-[#FFAB00]/20 rounded-[14px] p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="material-symbols-outlined text-[#FFAB00] text-[18px]">warning</span>
+                  <span className="text-sm font-bold text-primary-container">학습 주의사항</span>
+                </div>
+                <ul className="space-y-2">
+                  {riskNotes.map((note, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-on-surface-variant">
+                      <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#FFAB00]/60 shrink-0" />
+                      {note}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         ) : (
           <div className="bg-surface-container-lowest rounded-[14px] p-8 text-center border border-outline-variant/10">
@@ -412,9 +574,37 @@ const WeakCapability = () => {
               route
             </span>
             <p className="font-medium text-on-surface-variant mb-2">아직 학습 로드맵이 없습니다.</p>
-            <p className="text-sm text-on-surface-variant/70">
-              역량 진단을 완료하면 맞춤형 학습 계획이 생성됩니다.
-            </p>
+            {generatingPlan ? (
+              <div className="mt-4 flex flex-col items-center gap-2">
+                <span className="material-symbols-outlined animate-spin text-2xl text-secondary">progress_activity</span>
+                <p className="text-sm text-secondary font-medium">AI가 맞춤형 로드맵을 생성하고 있어요...</p>
+              </div>
+            ) : planGenerateError ? (
+              <div className="mt-4 space-y-3">
+                <p className="text-sm text-error font-medium">로드맵 생성에 실패했습니다.</p>
+                {topMajorScoreId && (
+                  <button
+                    onClick={handleCreatePlan}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-container text-white text-sm font-bold rounded-[12px] hover:opacity-90 transition-opacity"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">refresh</span>
+                    다시 시도
+                  </button>
+                )}
+              </div>
+            ) : topMajorScoreId ? (
+              <button
+                onClick={handleCreatePlan}
+                className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-primary-container text-white text-sm font-bold rounded-[12px] hover:opacity-90 transition-opacity"
+              >
+                <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+                학습 로드맵 생성하기
+              </button>
+            ) : (
+              <p className="text-sm text-on-surface-variant/70 mt-1">
+                역량 진단을 완료하면 맞춤형 학습 계획이 생성됩니다.
+              </p>
+            )}
           </div>
         )}
 

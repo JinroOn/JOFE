@@ -1,4 +1,4 @@
-type AiGenerationStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+type AiGenerationStatus = 'PENDING' | 'IN_PROGRESS' | 'SUCCEEDED' | 'FAILED' | 'SKIPPED';
 
 export interface MajorWeeklyPlan {
   id: number;
