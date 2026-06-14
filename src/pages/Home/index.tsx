@@ -1,4 +1,16 @@
+import { useNavigate } from 'react-router-dom';
+import useAuthStore from '../../store/useAuthStore';
+
 const Home = () => {
+  const navigate = useNavigate();
+  const { isLoggedIn } = useAuthStore();
+
+  const handleStartDiagnosis = () => navigate('/diagnosis');
+  const handleBrowse = () =>
+    document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+  const handleStartFree = () =>
+    isLoggedIn ? navigate('/diagnosis') : navigate('/auth/signup');
+
   return (
     <main>
       {/* Hero Section */}
@@ -18,10 +30,16 @@ const Home = () => {
               당신의 잠재력을 극대화할 최적의 학문적 경로를 제안합니다.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              <button className="px-10 py-5 bg-[#FFAB00] text-primary-container text-lg font-extrabold rounded-brand cloud-shadow hover:-translate-y-1 transition-all active:scale-95">
+              <button
+                onClick={handleStartDiagnosis}
+                className="px-10 py-5 bg-[#FFAB00] text-primary-container text-lg font-extrabold rounded-brand cloud-shadow hover:-translate-y-1 transition-all active:scale-95"
+              >
                 전공 진단 시작하기
               </button>
-              <button className="px-10 py-5 border border-outline-variant/30 text-primary font-bold text-lg rounded-brand hover:bg-white transition-all">
+              <button
+                onClick={handleBrowse}
+                className="px-10 py-5 border border-outline-variant/30 text-primary font-bold text-lg rounded-brand hover:bg-white transition-all"
+              >
                 서비스 둘러보기
               </button>
             </div>
@@ -41,8 +59,8 @@ const Home = () => {
           <div className="flex-1 relative">
             <div className="absolute -top-20 -right-20 w-96 h-96 bg-secondary-container/30 rounded-full blur-[100px]"></div>
             <div className="relative bg-white p-6 rounded-[24px] cloud-shadow border border-white/40 overflow-hidden group">
-              <img 
-                alt="Students exploring majors" 
+              <img
+                alt="Students exploring majors"
                 className="rounded-[18px] w-full h-[220px] sm:h-[320px] md:h-[400px] object-cover group-hover:scale-105 transition-transform duration-700"
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuDNC0Ol2ezLTqYgIHw1atlSxPw9_nJkOLjkTtQPGE1CD27Pd70Nn-DUkUUcSKxcD1ZTEuTI3iOpV8FGbT6h69r-DrVblDdSr4-RuATUTLUOh79wO49X2tr00TIXukLJUInKjtH0tv1VPA99IyXdTTtfMRZoWcJtF9K34rRqq2kaUAsDkQSSAIs5gYhO1ZHOLmMThf7iXDZ7Zn1lpmti3u1k5AOSP0Ni9HCPdzn1IRanacHzcabB42pXLmeAOwKyV57M-rYmv40WK8k"
               />
@@ -65,7 +83,7 @@ const Home = () => {
       </section>
 
       {/* Features Bento Grid */}
-      <section className="py-24 px-4 sm:px-8 bg-surface-container-low">
+      <section id="features" className="py-24 px-4 sm:px-8 bg-surface-container-low">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-extrabold text-primary mb-4 font-headline tracking-tight">당신을 위한 스마트한 도구</h2>
@@ -80,10 +98,13 @@ const Home = () => {
               <p className="text-on-surface-variant leading-relaxed">
                 나의 흥미, 성격, 성적 데이터를 결합하여 가장 어울리는 상위 5개 전공을 매칭합니다.
               </p>
-              <div className="mt-8 flex items-center gap-2 text-secondary font-bold group cursor-pointer">
+              <button
+                onClick={handleStartDiagnosis}
+                className="mt-8 flex items-center gap-2 text-secondary font-bold group cursor-pointer"
+              >
                 <span>진단하기</span>
                 <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_right_alt</span>
-              </div>
+              </button>
             </div>
             <div className="bg-surface-container-lowest p-6 md:p-10 rounded-brand cloud-shadow hover:-translate-y-2 transition-all duration-300">
               <div className="w-16 h-16 bg-orange-50 text-orange-500 rounded-2xl flex items-center justify-center mb-8">
@@ -93,10 +114,13 @@ const Home = () => {
               <p className="text-on-surface-variant leading-relaxed">
                 선택한 전공에서 성공하기 위해 필요한 핵심 역량과 나의 현재 준비도를 비교 분석합니다.
               </p>
-              <div className="mt-8 flex items-center gap-2 text-orange-500 font-bold group cursor-pointer">
+              <button
+                onClick={() => navigate('/analysis/weak')}
+                className="mt-8 flex items-center gap-2 text-orange-500 font-bold group cursor-pointer"
+              >
                 <span>분석하기</span>
                 <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_right_alt</span>
-              </div>
+              </button>
             </div>
             <div className="bg-surface-container-lowest p-6 md:p-10 rounded-brand cloud-shadow hover:-translate-y-2 transition-all duration-300">
               <div className="w-16 h-16 bg-slate-100 text-primary-container rounded-2xl flex items-center justify-center mb-8">
@@ -106,10 +130,13 @@ const Home = () => {
               <p className="text-on-surface-variant leading-relaxed">
                 24시간 언제든 전공에 대한 궁금증을 AI 멘토와 상담하고 구체적인 진로 방향을 설정하세요.
               </p>
-              <div className="mt-8 flex items-center gap-2 text-primary-container font-bold group cursor-pointer">
+              <button
+                onClick={() => navigate('/ai-chat')}
+                className="mt-8 flex items-center gap-2 text-primary-container font-bold group cursor-pointer"
+              >
                 <span>상담하기</span>
                 <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_right_alt</span>
-              </div>
+              </button>
             </div>
           </div>
         </div>
@@ -190,7 +217,10 @@ const Home = () => {
             </div>
           </div>
           <div className="mt-20 text-center">
-            <button className="px-12 py-5 bg-[#FFAB00] text-primary-container font-extrabold rounded-full text-xl cloud-shadow hover:scale-105 transition-transform">
+            <button
+              onClick={handleStartFree}
+              className="px-12 py-5 bg-[#FFAB00] text-primary-container font-extrabold rounded-full text-xl cloud-shadow hover:scale-105 transition-transform"
+            >
               지금 무료로 시작하기
             </button>
           </div>

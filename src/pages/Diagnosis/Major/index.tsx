@@ -214,10 +214,10 @@ const DiagnosisMajor = () => {
       month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit',
     });
     return (
-      <div className="min-h-screen bg-surface flex items-center justify-center px-4">
-        <div className="w-full max-w-[600px]">
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold bg-secondary-container/20 text-secondary mb-4">
+      <div className="bg-surface px-4 py-16">
+        <div className="w-full max-w-[600px] mx-auto">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold bg-secondary-container/20 text-secondary mb-3">
               <span className="material-symbols-outlined text-[14px]">manage_search</span>
               진단 시작
             </div>
@@ -229,20 +229,20 @@ const DiagnosisMajor = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button
               onClick={handleContinue}
-              className="group flex flex-col items-center text-center p-8 rounded-2xl border-2 border-secondary bg-secondary/5 hover:scale-[1.01] transition-all"
+              className="group flex flex-col items-center text-center p-5 rounded-2xl border-2 border-secondary bg-secondary/5 hover:scale-[1.01] transition-all"
             >
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 bg-secondary text-white">
-                <span className="material-symbols-outlined text-[28px]">play_arrow</span>
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 bg-secondary text-white">
+                <span className="material-symbols-outlined text-[24px]">play_arrow</span>
               </div>
               <p className="text-base font-bold text-secondary mb-1">이어서 진단하기</p>
               <p className="text-sm text-on-surface-variant">이전에 입력한 내용을 불러와 계속합니다</p>
             </button>
             <button
               onClick={() => void handleNewDiagnosis()}
-              className="group flex flex-col items-center text-center p-8 rounded-2xl border-2 border-outline-variant/30 bg-surface-container-lowest hover:border-secondary/50 hover:bg-surface-container-low hover:scale-[1.01] transition-all"
+              className="group flex flex-col items-center text-center p-5 rounded-2xl border-2 border-outline-variant/30 bg-surface-container-lowest hover:border-secondary/50 hover:bg-surface-container-low hover:scale-[1.01] transition-all"
             >
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 bg-surface-container-high text-on-surface-variant group-hover:bg-secondary/10 group-hover:text-secondary transition-colors">
-                <span className="material-symbols-outlined text-[28px]">add</span>
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 bg-surface-container-high text-on-surface-variant group-hover:bg-secondary/10 group-hover:text-secondary transition-colors">
+                <span className="material-symbols-outlined text-[24px]">add</span>
               </div>
               <p className="text-base font-bold text-primary-container mb-1">새 진단 시작하기</p>
               <p className="text-sm text-on-surface-variant">기존 진단을 종료하고 처음부터 다시 시작합니다</p>
