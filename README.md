@@ -112,22 +112,22 @@ VITE_API_BASE_URL=http://52.79.202.196:8080/api
 
 | 화면 | 상태 |
 |------|------|
-| 메인 페이지 (`/`) | 구현됨 |
+| 메인 페이지 (`/`) | 구현됨 (버튼 연결 완료 — 전공진단 시작·서비스 둘러보기·무료 시작) |
 | 로그인 (`/auth/login`) | API 연동 완료 |
 | 회원가입 (`/auth/signup`) | API 연동 완료 (약관 동의 모달 + 이메일 인증 2단계) |
 | 비밀번호 찾기 (`/auth/find-password`) | API 연동 완료 (Gmail SMTP 설정 필요) |
-| 마이페이지 (`/mypage`) | API 연동 완료 (관심전공·프로필편집·비밀번호변경·회원탈퇴·누적진단횟수·마지막진단일, 즐겨찾기 404 자동 삭제) |
-| 전공 진단 (`/diagnosis`) | API 연동 완료 (이어하기·새 진단, 스냅샷 자동저장) |
+| 마이페이지 (`/mypage`) | API 연동 완료 (관심전공·프로필편집·비밀번호변경·회원탈퇴·누적진단횟수·마지막진단일, 즐겨찾기 404 자동 삭제, 진단 이력 페이지네이션) |
+| 전공 진단 (`/diagnosis`) | API 연동 완료 (이어하기·새 진단, 스냅샷 자동저장, 로그인 필요) |
 | 성향 평가 (`/diagnosis/tendency`) | API 연동 완료 (12문항 A/B, 9축 벡터 계산·저장) |
 | 역량 평가 퀴즈 (`/diagnosis/quiz`) | API 연동 완료 (문항 그리드, 진행 바, 이전 단계 초기화 확인) |
 | 분석 로딩 (`/diagnosis/loading`) | API 연동 완료 (세션 완료·진단결과·전공점수·플랜 생성 전체 흐름) |
-| 공지사항·자료실 (`/library`) | API 연동 완료 |
-| 학습 콘텐츠 (`/library/content`) | API 연동 완료 |
+| 공지사항·자료실 (`/library`) | API 연동 완료 (로그인 필요) |
+| 학습 콘텐츠 (`/library/content`) | API 연동 완료 (로그인 필요) |
 | AI 상담 채팅 (`/ai-chat`) | API 연동 완료 (세션/로그, AI 응답은 백엔드 미연동) |
 | 전공 탐색 (`/diagnosis/explore`) | API 연동 완료 |
-| 취약 역량 분석 (`/analysis/weak`) | API 연동 완료 (역량벡터·TOP3·레이더차트·12주 로드맵) |
+| 취약 역량 분석 (`/analysis/weak`) | API 연동 완료 (역량벡터·TOP3·레이더차트·12주 로드맵·로드맵 재생성·리스크 노트·진단 회차 선택) |
 | 전공 시뮬레이션 (`/analysis/compare`) | API 연동 완료 |
-| 결과 대시보드 (`/analysis/dashboard`) | API 연동 완료 (진단결과·전공점수·AI 코멘트 생성) |
+| 결과 대시보드 (`/analysis/dashboard`) | API 연동 완료 (진단결과·전공점수·AI 코멘트 생성·진단 회차 선택·역량 순위 표시) |
 | 공유 결과 (`/analysis/shared/:id`) | 구현됨 |
 | 관리자 (`/admin`) | API 연동 완료 (전공 관리 CRUD, 대시보드 통계는 목업) |
 
@@ -208,9 +208,14 @@ VITE_API_BASE_URL=http://52.79.202.196:8080/api
 | 기능 | 메서드 | 엔드포인트 |
 |------|--------|------------|
 | 플랜 생성 | POST | `/plans` |
+| 플랜 단건 조회 | GET | `/plans/{planId}` |
 | 결과별 플랜 목록 | GET | `/plans/results/{resultId}` |
+| 플랜 업데이트 | PATCH | `/plans/{planId}` |
 | 플랜 아이템 목록 | GET | `/plans/{planId}/items` |
+| 플랜 아이템 생성 | POST | `/plans/items` |
 | 플랜 아이템 완료 | PATCH | `/plans/items/{id}/complete` |
+| 리스크 노트 목록 | GET | `/plans/{planId}/risk-notes` |
+| 리스크 노트 생성 | POST | `/plans/risk-notes` |
 
 ---
 © 2026 JinroOn AI. Empowering the next generation of scholars.
