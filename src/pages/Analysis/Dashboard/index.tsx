@@ -486,39 +486,52 @@ const Dashboard = () => {
           </div>
         )}
 
-        {results.length > 0 && (
-          <section className="mb-8 bg-surface-container-lowest rounded-[14px] p-5 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-black text-primary-container mb-2">
-                진단 결과 API 응답 확인
-              </h2>
-
-              <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-bold text-on-surface-variant">
-                <span>결과 개수: {results.length}</span>
-                {selectedResult && <span>선택 결과 ID: {selectedResult.id}</span>}
-                {selectedResult && <span>진단 세션 ID: {selectedResult.diagnosisSessionId}</span>}
-                {selectedResult && <span>사용자 ID: {selectedResult.userId}</span>}
-                <span>전공 목록: {majors.length}개</span>
+        {results.length > 1 && (
+          <section className="mb-8 flex items-center gap-3">
+            <span className="text-xs font-bold text-on-surface-variant shrink-0">진단 회차</span>
+            {results.length <= 5 ? (
+              <div className="flex gap-2">
+                {results.map((result, idx) => (
+                  <button
+                    key={result.id}
+                    onClick={() => {
+                      setSelectedResultId(result.id);
+                      setAiCommentError(null);
+                    }}
+                    className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${
+                      result.id === selectedResultId
+                        ? 'bg-primary-container text-white shadow-md'
+                        : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                    }`}
+                  >
+                    <span>{results.length - idx}회차</span>
+                    <span className={`text-xs font-normal ${result.id === selectedResultId ? 'text-white/70' : 'text-on-surface-variant/60'}`}>
+                      {new Date(result.createdAt)
+                        .toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
+                        .replace(/\. /g, '.').replace(/\.$/, '')}
+                    </span>
+                  </button>
+                ))}
               </div>
-            </div>
-
-            <label className="flex items-center gap-3 text-sm font-bold text-on-surface-variant">
-              결과 선택
+            ) : (
               <select
                 value={selectedResultId ?? ''}
-                onChange={(event) => {
-                  setSelectedResultId(Number(event.target.value));
+                onChange={(e) => {
+                  setSelectedResultId(Number(e.target.value));
                   setAiCommentError(null);
                 }}
-                className="min-w-36 rounded-[12px] border border-outline-variant/30 bg-white px-4 py-3 text-primary-container font-bold outline-none"
+                className="rounded-[12px] border border-outline-variant/30 bg-white px-4 py-2.5 text-sm font-bold text-primary-container outline-none cursor-pointer"
               >
-                {results.map((result) => (
+                {results.map((result, idx) => (
                   <option key={result.id} value={result.id}>
-                    Result #{result.id}
+                    {results.length - idx}회차 ·{' '}
+                    {new Date(result.createdAt)
+                      .toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
+                      .replace(/\. /g, '.').replace(/\.$/, '')}
                   </option>
                 ))}
               </select>
-            </label>
+            )}
           </section>
         )}
 

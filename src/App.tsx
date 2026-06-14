@@ -35,8 +35,15 @@ const Placeholder = ({ name }: { name: string }) => (
   </div>
 );
 
-const UserOnlyRoute = ({ children }: { children: ReactNode }) => {
+const AdminRedirect = ({ children }: { children: ReactNode }) => {
   const { user } = useAuthStore();
+  if (user?.role === 'admin') return <Navigate to="/admin" replace />;
+  return <>{children}</>;
+};
+
+const UserOnlyRoute = ({ children }: { children: ReactNode }) => {
+  const { isLoggedIn, user } = useAuthStore();
+  if (!isLoggedIn) return <Navigate to="/auth/login" replace />;
   if (user?.role === 'admin') return <Navigate to="/admin" replace />;
   return <>{children}</>;
 };
@@ -63,7 +70,7 @@ const AppLayout = () => {
       {!isAuthPage && !isLoadingPage && !isChatPage && !isAdminPage && <Header />}
       <div className="flex-grow flex flex-col">
         <Routes>
-          <Route path="/" element={<UserOnlyRoute><><Home /><Footer /></></UserOnlyRoute>} />
+          <Route path="/" element={<AdminRedirect><Home /><Footer /></AdminRedirect>} />
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/signup" element={<Signup />} />
           <Route path="/auth/find-password" element={<FindPassword />} />

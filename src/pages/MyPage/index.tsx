@@ -30,12 +30,15 @@ const MyPage = () => {
   const [lastDiagnosisDate, setLastDiagnosisDate] = useState<string | null>(null);
 
   const [sessions, setSessions] = useState<DiagnosisSession[]>([]);
+  const [sessionPage, setSessionPage] = useState(1);
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<DiagnosisSession | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawError, setWithdrawError] = useState(false);
+
+  const SESSIONS_PER_PAGE = 5;
 
   const displayName = user?.nickname ?? '';
   const displayEmail = user?.email ?? '';
@@ -110,7 +113,12 @@ const MyPage = () => {
     setDeletingSessionId(sessionToDelete.id);
     try {
       await deleteSession(sessionToDelete.id);
-      setSessions((prev) => prev.filter((s) => s.id !== sessionToDelete.id));
+      setSessions((prev) => {
+        const next = prev.filter((s) => s.id !== sessionToDelete.id);
+        const maxPage = Math.max(1, Math.ceil(next.length / SESSIONS_PER_PAGE));
+        setSessionPage((p) => Math.min(p, maxPage));
+        return next;
+      });
       setSessionToDelete(null);
     } finally {
       setDeletingSessionId(null);
@@ -278,6 +286,11 @@ const MyPage = () => {
           <section>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-primary-container">진단 이력</h2>
+              {sessions.length > 0 && (
+                <span className="text-sm text-on-surface-variant">
+                  총 <span className="font-bold text-on-surface">{sessions.length}</span>건
+                </span>
+              )}
             </div>
 
             {sessions.length === 0 ? (
@@ -291,64 +304,102 @@ const MyPage = () => {
                   진단 시작하기 →
                 </button>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {sessions.map((s) => {
-                  const statusMap = {
-                    in_progress: { label: '진행 중', cls: 'bg-yellow-100 text-yellow-700' },
-                    completed:   { label: '완료',    cls: 'bg-green-100 text-green-700' },
-                    abandoned:   { label: '중단',    cls: 'bg-surface-container text-on-surface-variant' },
-                  } as const;
-                  const { label, cls } = statusMap[s.status] ?? statusMap.abandoned;
-                  const date = new Date(s.createdAt).toLocaleDateString('ko-KR', {
-                    year: 'numeric', month: 'long', day: 'numeric',
-                  });
-                  return (
-                    <div
-                      key={s.id}
-                      className="bg-white rounded-2xl px-5 py-4 shadow-sm flex items-center justify-between gap-4"
-                    >
-                      <div className="flex items-center gap-4 min-w-0">
-                        <span className="material-symbols-outlined text-on-surface-variant shrink-0">assignment</span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-on-surface truncate">진단 #{s.id}</p>
-                          <p className="text-xs text-on-surface-variant mt-0.5">{date}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${cls}`}>{label}</span>
-                        {s.status === 'in_progress' && (
-                          <button
-                            onClick={() => navigate('/diagnosis')}
-                            className="px-3 py-1.5 bg-primary-container text-white text-xs font-bold rounded-lg hover:opacity-90 transition-opacity"
-                          >
-                            이어하기
-                          </button>
-                        )}
-                        {s.status === 'completed' && (
-                          <button
-                            onClick={() => navigate('/analysis/dashboard')}
-                            className="px-3 py-1.5 bg-surface-container text-on-surface text-xs font-bold rounded-lg hover:bg-surface-container-high transition-colors"
-                          >
-                            결과 보기
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setSessionToDelete(s)}
-                          disabled={deletingSessionId === s.id}
-                          className="p-1.5 rounded-lg text-on-surface-variant/40 hover:text-error hover:bg-error-container/20 transition-colors disabled:opacity-40"
-                          title="진단 삭제"
+            ) : (() => {
+              const totalPages = Math.ceil(sessions.length / SESSIONS_PER_PAGE);
+              const paged = sessions.slice((sessionPage - 1) * SESSIONS_PER_PAGE, sessionPage * SESSIONS_PER_PAGE);
+              return (
+                <>
+                  <div className="space-y-3">
+                    {paged.map((s) => {
+                      const statusMap = {
+                        in_progress: { label: '진행 중', cls: 'bg-yellow-100 text-yellow-700' },
+                        completed:   { label: '완료',    cls: 'bg-green-100 text-green-700' },
+                        abandoned:   { label: '중단',    cls: 'bg-surface-container text-on-surface-variant' },
+                      } as const;
+                      const { label, cls } = statusMap[s.status] ?? statusMap.abandoned;
+                      const date = new Date(s.createdAt).toLocaleDateString('ko-KR', {
+                        year: 'numeric', month: 'long', day: 'numeric',
+                      });
+                      return (
+                        <div
+                          key={s.id}
+                          className="bg-white rounded-2xl px-5 py-4 shadow-sm flex items-center justify-between gap-4"
                         >
-                          <span className="material-symbols-outlined text-[18px]">
-                            {deletingSessionId === s.id ? 'hourglass_empty' : 'delete'}
-                          </span>
+                          <div className="flex items-center gap-4 min-w-0">
+                            <span className="material-symbols-outlined text-on-surface-variant shrink-0">assignment</span>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-on-surface truncate">진단 #{s.id}</p>
+                              <p className="text-xs text-on-surface-variant mt-0.5">{date}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${cls}`}>{label}</span>
+                            {s.status === 'in_progress' && (
+                              <button
+                                onClick={() => navigate('/diagnosis')}
+                                className="px-3 py-1.5 bg-primary-container text-white text-xs font-bold rounded-lg hover:opacity-90 transition-opacity"
+                              >
+                                이어하기
+                              </button>
+                            )}
+                            {s.status === 'completed' && (
+                              <button
+                                onClick={() => navigate('/analysis/dashboard')}
+                                className="px-3 py-1.5 bg-surface-container text-on-surface text-xs font-bold rounded-lg hover:bg-surface-container-high transition-colors"
+                              >
+                                결과 보기
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setSessionToDelete(s)}
+                              disabled={deletingSessionId === s.id}
+                              className="p-1.5 rounded-lg text-on-surface-variant/40 hover:text-error hover:bg-error-container/20 transition-colors disabled:opacity-40"
+                              title="진단 삭제"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">
+                                {deletingSessionId === s.id ? 'hourglass_empty' : 'delete'}
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-1 mt-6">
+                      <button
+                        onClick={() => setSessionPage((p) => p - 1)}
+                        disabled={sessionPage === 1}
+                        className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+                      </button>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => setSessionPage(page)}
+                          className={`w-9 h-9 rounded-lg text-sm font-bold transition-colors ${
+                            page === sessionPage
+                              ? 'bg-primary-container text-white'
+                              : 'text-on-surface-variant hover:bg-surface-container'
+                          }`}
+                        >
+                          {page}
                         </button>
-                      </div>
+                      ))}
+                      <button
+                        onClick={() => setSessionPage((p) => p + 1)}
+                        disabled={sessionPage === totalPages}
+                        className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+                      </button>
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                  )}
+                </>
+              );
+            })()}
           </section>
         </div>
 
