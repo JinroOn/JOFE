@@ -4,6 +4,7 @@ import type {
   DiagnosisResultRequest,
   ResultMajorScore,
   ResultMajorScoreRequest,
+  SharedDiagnosisResult,
 } from '../types/results';
 
 // GET /api/results - 내 진단 결과 목록 조회
@@ -48,7 +49,7 @@ export const getResultMajorScores = (resultId: number) =>
 // GET /api/results/share/{shareToken} - 공유 토큰으로 진단 결과 조회 (인증 불필요)
 export const getSharedDiagnosisResult = (shareToken: string) =>
   publicApi
-    .get<DiagnosisResult>(`/results/share/${shareToken}`)
+    .get<SharedDiagnosisResult>(`/results/share/${shareToken}`)
     .then((response) => response.data);
 
 // GET /api/results/share/{shareToken}/major-scores - 공유 토큰으로 전공별 점수 조회 (인증 불필요)
