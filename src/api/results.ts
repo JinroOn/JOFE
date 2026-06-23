@@ -50,3 +50,9 @@ export const getSharedDiagnosisResult = (shareToken: string) =>
   publicApi
     .get<DiagnosisResult>(`/results/share/${shareToken}`)
     .then((response) => response.data);
+
+// GET /api/results/share/{shareToken}/major-scores - 공유 토큰으로 전공별 점수 조회 (인증 불필요)
+export const getSharedResultMajorScores = (shareToken: string) =>
+  publicApi
+    .get<ResultMajorScore[]>(`/results/share/${shareToken}/major-scores`)
+    .then((response) => response.data);

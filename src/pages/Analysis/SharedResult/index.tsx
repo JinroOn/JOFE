@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import type { DiagnosisResult, ResultMajorScore } from '../../../types/results';
 import type { Major } from '../../../types/major';
 import type { RecommendedMajor, CapabilityRow } from '../Dashboard/types';
-import { getSharedDiagnosisResult, getResultMajorScores } from '../../../api/results';
+import { getSharedDiagnosisResult, getSharedResultMajorScores } from '../../../api/results';
 import { getMajors } from '../../../api/major';
 import DashboardRadarChart from '../Dashboard/components/DashboardRadarChart';
 import AiCommentBanner from '../Dashboard/components/AiCommentBanner';
@@ -110,7 +110,7 @@ const SharedResult = () => {
 
         const [majorList] = await Promise.all([
           getMajors().catch(() => [] as import('../../../types/major').Major[]),
-          getResultMajorScores(sharedResult.id).then((s) => { if (!ignore) setMajorScores(s); }).catch(() => undefined),
+          getSharedResultMajorScores(token).then((s) => { if (!ignore) setMajorScores(s); }).catch(() => undefined),
         ]);
         if (!ignore) setMajors(majorList);
       } catch (e) {
