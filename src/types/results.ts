@@ -35,6 +35,10 @@ export interface DiagnosisResult {
   aiCommentCompletedAt: string | null;
 }
 
+export interface SharedDiagnosisResult extends DiagnosisResult {
+  ownerNickname: string;
+}
+
 export interface ResultMajorScoreRequest {
   diagnosisResultId?: number;
   majorId?: number;

@@ -1,9 +1,9 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import type { DiagnosisResult, ResultMajorScore } from '../../../types/results';
+import type { SharedDiagnosisResult, ResultMajorScore } from '../../../types/results';
 import type { Major } from '../../../types/major';
 import type { RecommendedMajor, CapabilityRow } from '../Dashboard/types';
-import { getSharedDiagnosisResult, getResultMajorScores } from '../../../api/results';
+import { getSharedDiagnosisResult, getSharedResultMajorScores } from '../../../api/results';
 import { getMajors } from '../../../api/major';
 import DashboardRadarChart from '../Dashboard/components/DashboardRadarChart';
 import AiCommentBanner from '../Dashboard/components/AiCommentBanner';
@@ -92,7 +92,7 @@ const mapMajorScoresToRecommendedMajors = (
 const SharedResult = () => {
   const { token } = useParams<{ token: string }>();
 
-  const [result, setResult] = useState<DiagnosisResult | null>(null);
+  const [result, setResult] = useState<SharedDiagnosisResult | null>(null);
   const [majors, setMajors] = useState<Major[]>([]);
   const [majorScores, setMajorScores] = useState<ResultMajorScore[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,7 +110,7 @@ const SharedResult = () => {
 
         const [majorList] = await Promise.all([
           getMajors().catch(() => [] as import('../../../types/major').Major[]),
-          getResultMajorScores(sharedResult.id).then((s) => { if (!ignore) setMajorScores(s); }).catch(() => undefined),
+          getSharedResultMajorScores(token).then((s) => { if (!ignore) setMajorScores(s); }).catch(() => undefined),
         ]);
         if (!ignore) setMajors(majorList);
       } catch (e) {
@@ -178,7 +178,7 @@ const SharedResult = () => {
             공유된 진단 결과
           </span>
           <h1 className="text-4xl md:text-5xl font-black text-primary-container tracking-tight mb-4 leading-tight">
-            진로 역량 리포트
+            {result.ownerNickname}님의 진로 역량 리포트
           </h1>
           <p className="text-on-surface-variant max-w-2xl text-base sm:text-lg leading-relaxed">
             JinroOn AI가 9가지 핵심 역량 지표를 바탕으로 분석한 진로 역량 리포트입니다.
