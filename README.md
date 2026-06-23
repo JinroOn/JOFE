@@ -128,7 +128,7 @@ VITE_API_BASE_URL=http://52.79.202.196:8080/api
 | 취약 역량 분석 (`/analysis/weak`) | API 연동 완료 (역량벡터·TOP3·레이더차트·12주 로드맵·로드맵 재생성·리스크 노트·진단 회차 선택) |
 | 전공 시뮬레이션 (`/analysis/compare`) | API 연동 완료 |
 | 결과 대시보드 (`/analysis/dashboard`) | API 연동 완료 (진단결과·전공점수·AI 코멘트 생성·진단 회차 선택·역량 순위 표시) |
-| 공유 결과 (`/analysis/shared/:id`) | 구현됨 |
+| 공유 결과 (`/results/share/:token`) | 구현됨 (비로그인 접근 가능, 작성자 닉네임 표시) |
 | 관리자 (`/admin`) | API 연동 완료 (전공 관리 CRUD, 대시보드 통계는 목업) |
 
 ## 🔐 API 연동 현황
@@ -202,6 +202,8 @@ VITE_API_BASE_URL=http://52.79.202.196:8080/api
 | 전공별 점수 생성 | POST | `/results/major-scores` |
 | 전공별 점수 목록 | GET | `/results/{resultId}/major-scores` |
 | AI 코멘트 생성 | POST | `/results/{id}/ai-comment` |
+| 공유 토큰으로 결과 조회 (인증 불필요) | GET | `/results/share/{shareToken}` |
+| 공유 토큰으로 전공별 점수 조회 (인증 불필요) | GET | `/results/share/{shareToken}/major-scores` |
 
 ### Plan (`src/api/plan.ts`)
 
