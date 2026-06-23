@@ -3,7 +3,7 @@ import type { SyntheticEvent } from 'react';
 import Header from '../../components/layout/Header';
 import type { ChatMessage } from './types';
 import type { ConsultationSession, ConsultationLog } from '../../types/consultation';
-import { getSessions, createSession, getSessionLogs, createLog } from '../../api/consultation';
+import { getSessions, createSession, getSessionLogs, sendMessage } from '../../api/consultation';
 import Sidebar from './components/Sidebar';
 import MessageList from './components/MessageList';
 import InputArea from './components/InputArea';
@@ -16,10 +16,18 @@ const WELCOME_MESSAGE: ChatMessage = {
   tags: ['#진로상담', '#전공추천'],
 };
 
-const AI_PENDING_MESSAGE: ChatMessage = {
-  id: -1,
+const TYPING_MESSAGE_ID = -1;
+
+const TYPING_MESSAGE: ChatMessage = {
+  id: TYPING_MESSAGE_ID,
   role: 'assistant',
-  content: '메시지를 저장했습니다. AI 응답 기능이 곧 연동될 예정이에요.',
+  content: '답변을 작성하고 있어요...',
+};
+
+const AI_ERROR_MESSAGE: ChatMessage = {
+  id: -2,
+  role: 'assistant',
+  content: '답변을 생성하지 못했어요. 잠시 후 다시 시도해 주세요.',
 };
 
 const logToMessage = (log: ConsultationLog): ChatMessage => ({
@@ -108,7 +116,7 @@ const AiChat = () => {
     if (!trimmed || sending) return;
 
     const userMsg: ChatMessage = { id: Date.now(), role: 'user', content: trimmed };
-    setMessages((prev) => [...prev.filter((m) => m.id !== 0), userMsg]);
+    setMessages((prev) => [...prev.filter((m) => m.id !== 0), userMsg, TYPING_MESSAGE]);
     setMessage('');
     setSending(true);
 
@@ -122,10 +130,13 @@ const AiChat = () => {
         setActiveSessionId(session.id);
       }
 
-      await createLog({ consultationSessionId: sessionId, role: 'user', content: trimmed });
-      setMessages((prev) => [...prev, { ...AI_PENDING_MESSAGE, id: Date.now() }]);
+      const { assistantLog } = await sendMessage(sessionId, trimmed);
+      setMessages((prev) => [
+        ...prev.filter((m) => m.id !== TYPING_MESSAGE_ID),
+        logToMessage(assistantLog),
+      ]);
     } catch {
-      // 메시지는 UI에 표시되나 DB 저장 실패
+      setMessages((prev) => [...prev.filter((m) => m.id !== TYPING_MESSAGE_ID), AI_ERROR_MESSAGE]);
     } finally {
       setSending(false);
     }

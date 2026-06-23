@@ -15,3 +15,17 @@ export interface ConsultationLog {
   content: string;
   createdAt: string;
 }
+
+export interface ContextUsed {
+  diagnosisResultId: number | null;
+  usedLatestDiagnosisResult: boolean;
+  historyMessageCount: number;
+  topMajorNames: string[];
+  weaknessFocus: string[];
+}
+
+export interface ConsultationMessageResponse {
+  userLog: ConsultationLog;
+  assistantLog: ConsultationLog;
+  contextUsed: ContextUsed;
+}
