@@ -159,7 +159,9 @@ const WeakCapability = () => {
         }
 
         if (plansRes.status === 'fulfilled' && plansRes.value.length > 0) {
-          const succeeded = plansRes.value.filter((p) => p.aiPlanStatus === 'SUCCEEDED');
+          const succeeded = plansRes.value
+            .filter((p) => p.aiPlanStatus === 'SUCCEEDED')
+            .sort((a, b) => a.id - b.id);
           const activePlan =
             succeeded.find((p) => p.activeVersion) ??
             succeeded[succeeded.length - 1] ??
