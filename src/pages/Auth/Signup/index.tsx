@@ -51,21 +51,13 @@ const Signup = () => {
     setSubmitError('');
     setLoading(true);
     try {
-      await signupApi({
-        email: form.email,
-        password: form.password,
-        nickname: form.nickname.trim(),
-        termsAgreed: form.agreeTerms,
-        privacyAgreed: form.agreePrivacy,
-        marketingAgreed: form.agreeMarketing,
-      });
       await sendEmailVerification(form.email);
       setStep('verify');
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 409) {
         setSubmitError('이미 사용 중인 이메일입니다.');
       } else {
-        setSubmitError('회원가입 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+        setSubmitError('인증 코드 발송 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
       }
     } finally {
       setLoading(false);
@@ -79,9 +71,27 @@ const Signup = () => {
     setVerifyError('');
     try {
       await confirmEmailVerification(form.email, verifyInput.trim());
-      navigate('/auth/login', { state: { signedUp: true } });
     } catch {
       setVerifyError('인증 코드가 올바르지 않거나 만료되었습니다.');
+      setVerifyLoading(false);
+      return;
+    }
+    try {
+      await signupApi({
+        email: form.email,
+        password: form.password,
+        nickname: form.nickname.trim(),
+        termsAgreed: form.agreeTerms,
+        privacyAgreed: form.agreePrivacy,
+        marketingAgreed: form.agreeMarketing,
+      });
+      navigate('/auth/login', { state: { signedUp: true } });
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        setVerifyError('이미 사용 중인 이메일입니다.');
+      } else {
+        setVerifyError('회원가입 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+      }
     } finally {
       setVerifyLoading(false);
     }
