@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getInProgressSession, updateSession } from '../../../api/diagnosis';
+import { createTendencyResult, getInProgressSession, updateSession } from '../../../api/diagnosis';
+import type { TendencyResultPayload } from '../../../types/diagnosis';
 
 type TendencyKey =
   | 'tendLogicalInquiry'
@@ -130,6 +131,29 @@ function computeTendencyVector(answers: Record<number, 'A' | 'B'>): TendencyVect
   };
 }
 
+function toTendencyPayload(sessionId: number, vector: TendencyVector): TendencyResultPayload {
+  return {
+    diagnosisSessionId: sessionId,
+    logicalInquiry: vector.tendLogicalInquiry,
+    practicalTech: vector.tendPracticalTech,
+    artCreative: vector.tendArtCreative,
+    socialCooperation: vector.tendSocialCooperation,
+    lifeHealth: vector.tendLifeHealth,
+    educationGuide: vector.tendEducationGuide,
+    theoryAcademic: vector.tendTheoryAcademic,
+    dataAnalytics: vector.tendDataAnalytics,
+    systemOperation: vector.tendSystemOperation,
+  };
+}
+
+function isComplete(answersToCheck: Record<number, 'A' | 'B'>) {
+  return QUESTIONS.every((_, i) => answersToCheck[i] !== undefined);
+}
+
+function firstUnansweredIndex(answersToCheck: Record<number, 'A' | 'B'>) {
+  return QUESTIONS.findIndex((_, i) => answersToCheck[i] === undefined);
+}
+
 const DiagnosisTendency = () => {
   const navigate = useNavigate();
 
@@ -139,6 +163,7 @@ const DiagnosisTendency = () => {
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [snapshotBase, setSnapshotBase] = useState('{}');
   const [submitting, setSubmitting] = useState(false);
+  const [completionMessage, setCompletionMessage] = useState<string | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -161,10 +186,22 @@ const DiagnosisTendency = () => {
     if (submitting) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     setIsAnimating(false);
+    setCompletionMessage(null);
     setIndex(i);
   };
 
   const saveAndNavigate = async (answersToSave: Record<number, 'A' | 'B'>) => {
+    if (!isComplete(answersToSave)) {
+      const first = firstUnansweredIndex(answersToSave);
+      if (first !== -1) {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        setIsAnimating(false);
+        setIndex(first);
+      }
+      setCompletionMessage('Please answer all tendency questions before continuing.');
+      return;
+    }
+
     setSubmitting(true);
     const tv = computeTendencyVector(answersToSave);
     try {
@@ -174,8 +211,15 @@ const DiagnosisTendency = () => {
           inputSnapshot: JSON.stringify({ ...existing, tendencyAnswers: answersToSave, tendencyVector: tv }),
           currentStep: 2,
         });
+        await createTendencyResult(toTendencyPayload(sessionId, tv)).catch((error) => {
+          console.error('[Tendency] structured tendency result save failed:', error);
+        });
       }
-    } catch { /* 저장 실패해도 이동 */ }
+    } catch (error) {
+      console.error('[Tendency] tendency snapshot save failed:', error);
+      setSubmitting(false);
+      return;
+    }
     navigate('/diagnosis/quiz');
   };
 
@@ -197,19 +241,18 @@ const DiagnosisTendency = () => {
 
     const newAnswers = { ...answers, [index]: choice };
     setAnswers(newAnswers);
+    setCompletionMessage(null);
     setIsAnimating(true);
 
     timerRef.current = setTimeout(async () => {
-      const allAnswered = QUESTIONS.every((_, i) => newAnswers[i] !== undefined);
-
-      if (allAnswered) {
+      if (isComplete(newAnswers)) {
         await saveAndNavigate(newAnswers);
         return;
       }
 
       // 현재 이후 미답 문항 → 없으면 앞에서 찾기
       let next = QUESTIONS.findIndex((_, i) => i > index && newAnswers[i] === undefined);
-      if (next === -1) next = QUESTIONS.findIndex((_, i) => newAnswers[i] === undefined);
+      if (next === -1) next = firstUnansweredIndex(newAnswers);
       setIndex(next);
       setIsAnimating(false);
     }, 400);
@@ -217,6 +260,13 @@ const DiagnosisTendency = () => {
 
   const handleNext = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    const first = firstUnansweredIndex(answers);
+    if (first !== -1) {
+      setIsAnimating(false);
+      setIndex(first);
+      setCompletionMessage('Please answer all tendency questions before continuing.');
+      return;
+    }
     void saveAndNavigate(answers);
   };
 
@@ -250,6 +300,11 @@ const DiagnosisTendency = () => {
         </div>
 
         {/* 문항 번호 네비게이션 */}
+        {completionMessage && (
+          <p className="mb-6 text-center text-sm font-semibold text-secondary">
+            {completionMessage}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2 justify-center mb-8">
           {QUESTIONS.map((_, i) => {
             const isAnswered = answers[i] !== undefined;

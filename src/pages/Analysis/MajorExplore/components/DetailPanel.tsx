@@ -105,7 +105,7 @@ const DetailPanel = ({
                     </div>
                     <div>
                       <div className="flex justify-between text-xs mb-1">
-                        <span className="text-on-surface-variant">정보통신</span>
+                        <span className="text-on-surface-variant">정보기술</span>
                         <span className="font-bold text-error">{major.thrInfoTech ?? 0}</span>
                       </div>
                       <div className="h-1.5 w-full bg-surface-container-high rounded-full overflow-hidden">
@@ -123,7 +123,7 @@ const DetailPanel = ({
 
           {careerList.length > 0 && (
             <section>
-              <h3 className="text-base font-bold text-primary-container mb-4">졸업 후 진로 (Career Paths)</h3>
+              <h3 className="text-base font-bold text-primary-container mb-4">직업 및 진로</h3>
               <div className="flex flex-wrap gap-2">
                 {careerList.map((career) => (
                   <span

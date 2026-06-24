@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Major } from './types';
 import { getMajors } from '../../../api/major';
@@ -41,6 +41,18 @@ const MajorExplore = () => {
       .finally(() => setLoading(false));
   }, []);
 
+  const categories = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          majors
+            .map((major) => major.category)
+            .filter((category): category is string => Boolean(category)),
+        ),
+      ).sort((a, b) => a.localeCompare(b, 'ko-KR')),
+    [majors],
+  );
+
   const handleAddToCompare = (major: Major) => {
     if (compareList.find((m) => m.id === major.id) || compareList.length >= 3) return;
     setCompareList((prev) => [...prev, major]);
@@ -69,6 +81,7 @@ const MajorExplore = () => {
             setSearchQuery={setSearchQuery}
             selectedCategories={selectedCategories}
             setSelectedCategories={setSelectedCategories}
+            categories={categories}
           />
         </aside>
 
@@ -106,6 +119,7 @@ const MajorExplore = () => {
                 setSearchQuery={setSearchQuery}
                 selectedCategories={selectedCategories}
                 setSelectedCategories={setSelectedCategories}
+                categories={categories}
               />
             </div>
           )}

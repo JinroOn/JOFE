@@ -6,14 +6,19 @@ export function getCategoryStyle(category: string | null) {
   switch (category) {
     case '공학계열':
       return { icon: 'code', iconBg: 'bg-secondary-container/10', iconColor: 'text-secondary', categoryColor: 'text-secondary' };
+    case '자연계열':
     case '자연과학계열':
       return { icon: 'biotech', iconBg: 'bg-[#FFAB00]/10', iconColor: 'text-[#FFAB00]', categoryColor: 'text-[#FFAB00]' };
+    case '인문계열':
+    case '사회계열':
     case '인문사회계열':
       return { icon: 'account_balance', iconBg: 'bg-purple-50', iconColor: 'text-purple-600', categoryColor: 'text-purple-600' };
     case '의약계열':
       return { icon: 'local_hospital', iconBg: 'bg-red-50', iconColor: 'text-red-500', categoryColor: 'text-red-500' };
     case '예체능계열':
       return { icon: 'palette', iconBg: 'bg-green-50', iconColor: 'text-green-600', categoryColor: 'text-green-600' };
+    case '교육계열':
+      return { icon: 'menu_book', iconBg: 'bg-blue-50', iconColor: 'text-blue-600', categoryColor: 'text-blue-600' };
     default:
       return { icon: 'school', iconBg: 'bg-surface-container', iconColor: 'text-on-surface-variant', categoryColor: 'text-on-surface-variant' };
   }

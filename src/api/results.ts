@@ -34,6 +34,12 @@ export const generateAiComment = (resultId: number) =>
     .post<DiagnosisResult>(`/results/${resultId}/ai-comment`)
     .then((response) => response.data);
 
+// POST /api/results/diagnosis-sessions/{sessionId}/complete - 백엔드 소유 진단 결과 생성/갱신
+export const completeDiagnosisResult = (sessionId: number) =>
+  api
+    .post<DiagnosisResult>(`/results/diagnosis-sessions/${sessionId}/complete`)
+    .then((response) => response.data);
+
 // POST /api/results/major-scores - 전공별 점수 생성
 export const createResultMajorScore = (data: ResultMajorScoreRequest) =>
   api

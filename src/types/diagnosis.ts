@@ -67,11 +67,12 @@ export interface ExamQuestion {
   difficulty: number;
 }
 
+export type QuizAnswerChoice = 'A' | 'B' | 'C' | 'D';
+
 export interface ExamAnswerPayload {
   diagnosisSessionId: number;
   examQuestionId: number;
-  selectedAnswer: string;
-  correct: boolean;
+  selectedAnswer: QuizAnswerChoice | null;
   responseSec: number;
 }
 
@@ -87,4 +88,23 @@ export interface CompetencyResult {
   communication: number;
   collaboration: number;
   selfManagement: number;
+}
+
+export interface TendencyResultPayload {
+  diagnosisSessionId: number;
+  logicalInquiry: number;
+  practicalTech: number;
+  artCreative: number;
+  socialCooperation: number;
+  lifeHealth: number;
+  educationGuide: number;
+  theoryAcademic: number;
+  dataAnalytics: number;
+  systemOperation: number;
+}
+
+export interface TendencyResult extends TendencyResultPayload {
+  id: number;
+  createdAt: string;
+  updatedAt: string;
 }
