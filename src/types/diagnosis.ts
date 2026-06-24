@@ -5,7 +5,7 @@ export interface DiagnosisSession {
   userId: number;
   status: DiagnosisSessionStatus;
   currentStep: number;
-  inputSnapshot: string; // 폼 입력값 JSON 문자열
+  inputSnapshot: string;
   startedAt: string;
   completedAt: string | null;
   createdAt: string;
@@ -16,7 +16,7 @@ export interface ExamAnswer {
   id: number;
   diagnosisSessionId: number;
   examQuestionId: number;
-  selectedAnswer: string;
+  selectedAnswer: string | null;
   correct: boolean;
   responseSec: number;
 }
@@ -54,25 +54,27 @@ export type CompetencyCategory =
   | 'collaboration'
   | 'self_management';
 
+export type QuestionType = 'objective' | 'situation' | 'preference' | 'essay';
+
 export interface ExamQuestion {
   id: number;
   competencyCategory: CompetencyCategory;
+  questionType?: QuestionType;
   questionText: string;
   optionA: string;
   optionB: string;
   optionC: string;
   optionD: string;
-  correctAnswer: string; // 'A' | 'B' | 'C' | 'D'
+  correctAnswer: string;
   timeLimitSec: number;
   difficulty: number;
 }
 
-export type QuizAnswerChoice = 'A' | 'B' | 'C' | 'D';
-
 export interface ExamAnswerPayload {
   diagnosisSessionId: number;
   examQuestionId: number;
-  selectedAnswer: QuizAnswerChoice | null;
+  selectedAnswer: string | null;
+  correct: boolean;
   responseSec: number;
 }
 
@@ -88,23 +90,4 @@ export interface CompetencyResult {
   communication: number;
   collaboration: number;
   selfManagement: number;
-}
-
-export interface TendencyResultPayload {
-  diagnosisSessionId: number;
-  logicalInquiry: number;
-  practicalTech: number;
-  artCreative: number;
-  socialCooperation: number;
-  lifeHealth: number;
-  educationGuide: number;
-  theoryAcademic: number;
-  dataAnalytics: number;
-  systemOperation: number;
-}
-
-export interface TendencyResult extends TendencyResultPayload {
-  id: number;
-  createdAt: string;
-  updatedAt: string;
 }
