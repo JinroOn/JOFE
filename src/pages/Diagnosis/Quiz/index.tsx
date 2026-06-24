@@ -9,7 +9,7 @@ import {
   createExamAnswer,
   scoreSession,
 } from '../../../api/diagnosis';
-import type { CompetencyCategory, ExamQuestion } from '../../../types/diagnosis';
+import type { CompetencyCategory, ExamQuestion, QuizAnswerChoice } from '../../../types/diagnosis';
 
 const CATEGORY_LABELS: Record<CompetencyCategory, { label: string; icon: string }> = {
   math_logic: { label: '수리·논리', icon: 'calculate' },
@@ -23,7 +23,7 @@ const CATEGORY_LABELS: Record<CompetencyCategory, { label: string; icon: string 
   self_management: { label: '자기관리', icon: 'self_improvement' },
 };
 
-const OPTION_IDS = ['A', 'B', 'C', 'D'] as const;
+const OPTION_IDS: QuizAnswerChoice[] = ['A', 'B', 'C', 'D'];
 
 const DiagnosisQuiz = () => {
   const navigate = useNavigate();
@@ -35,14 +35,14 @@ const DiagnosisQuiz = () => {
   const [sessionId, setSessionId] = useState<number | null>(null);
 
   const [index, setIndex] = useState(0);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<QuizAnswerChoice | null>(null);
   const [remaining, setRemaining] = useState(0);
   const [advancing, setAdvancing] = useState(false);
   const [showBackConfirm, setShowBackConfirm] = useState(false);
 
   // 콜백에서 최신 값 참조용 ref
   const remainingRef = useRef(0);
-  const selectedRef = useRef<string | null>(null);
+  const selectedRef = useRef<QuizAnswerChoice | null>(null);
   const advancingRef = useRef(false);
   useEffect(() => {
     remainingRef.current = remaining;
@@ -92,7 +92,7 @@ const DiagnosisQuiz = () => {
   }, []);
 
   // 답변 제출 후 다음 문항으로 (또는 마지막이면 점수 산출 후 로딩 화면)
-  const advance = async (answer: string | null) => {
+  const advance = async (answer: QuizAnswerChoice | null) => {
     if (advancingRef.current) return;
     advancingRef.current = true;
     setAdvancing(true);
@@ -103,12 +103,12 @@ const DiagnosisQuiz = () => {
         await createExamAnswer({
           diagnosisSessionId: sessionId,
           examQuestionId: q.id,
-          selectedAnswer: answer ?? '',
-          correct: answer === q.correctAnswer,
+          selectedAnswer: answer,
           responseSec: Math.max(0, q.timeLimitSec - remainingRef.current),
         });
       }
-    } catch {
+    } catch (error) {
+      console.error('[Quiz] exam answer save failed:', error);
       /* 답변 저장 실패해도 진단은 계속 진행 */
     }
 

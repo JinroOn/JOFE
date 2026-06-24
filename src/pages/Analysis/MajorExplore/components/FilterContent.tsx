@@ -1,15 +1,15 @@
-const CATEGORIES = ['공학계열', '자연과학계열', '인문사회계열', '의약계열', '예체능계열'];
-
 const FilterContent = ({
   searchQuery,
   setSearchQuery,
   selectedCategories,
   setSelectedCategories,
+  categories,
 }: {
   searchQuery: string;
   setSearchQuery: (v: string) => void;
   selectedCategories: string[];
   setSelectedCategories: (cats: string[]) => void;
+  categories: string[];
 }) => {
   const toggleCategory = (cat: string) => {
     setSelectedCategories(
@@ -37,7 +37,7 @@ const FilterContent = ({
       <div>
         <h4 className="font-bold text-xs text-on-surface-variant mb-3 uppercase tracking-widest">전공 계열</h4>
         <div className="space-y-2">
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <label key={cat} className="flex items-center gap-3 cursor-pointer group">
               <input
                 type="checkbox"

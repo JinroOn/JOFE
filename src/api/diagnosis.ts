@@ -8,6 +8,8 @@ import type {
   ExamQuestion,
   InProgressSession,
   SessionPayload,
+  TendencyResult,
+  TendencyResultPayload,
 } from '../types/diagnosis';
 
 // 진행 중인 내 진단 세션 조회 (없으면 null)
@@ -43,6 +45,17 @@ export const createExamAnswer = (data: ExamAnswerPayload) =>
 // 역량 점수 자동 산출
 export const scoreSession = (sessionId: number) =>
   api.post<CompetencyResult>(`/diagnoses/sessions/${sessionId}/score`).then((r) => r.data);
+
+// 성향 평가 결과 등록/갱신
+export const createTendencyResult = (data: TendencyResultPayload) =>
+  api.post<TendencyResult>('/diagnoses/tendency-results', data).then((r) => r.data);
+
+// 성향 평가 결과 조회
+export const getTendencyResult = (sessionId: number) =>
+  api
+    .get<TendencyResult>(`/diagnoses/sessions/${sessionId}/tendency-result`)
+    .then((r) => r.data)
+    .catch(() => null);
 
 // 진단 세션 삭제 (관련 답변/결과 포함)
 export const deleteSession = (sessionId: number) =>

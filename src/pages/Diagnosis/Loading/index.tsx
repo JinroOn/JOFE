@@ -1,11 +1,6 @@
-import { useEffect, useRef } from 'react';
+﻿import { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { createDiagnosisResult, createResultMajorScore } from '../../../api/results';
-import { getMajors } from '../../../api/major';
-import { createPlan } from '../../../api/plan';
-import { updateSession, getInProgressSession } from '../../../api/diagnosis';
-import type { CompetencyResult } from '../../../types/diagnosis';
-import type { Major } from '../../../types/major';
+import { completeDiagnosisResult } from '../../../api/results';
 import logo from '../../../assets/logo-auth.svg';
 
 const TICKER_LINES = [
@@ -16,105 +11,6 @@ const TICKER_LINES = [
   'CROSS-REFERENCING ADMISSION DATA...',
   'CALIBRATING PREDICTIVE MODELS...',
 ];
-
-function computeCompetencyScore(cr: CompetencyResult, major: Major): number {
-  const pairs: [number, number | null][] = [
-    [cr.mathLogic,           major.reqMathLogic],
-    [cr.problemSolving,      major.reqProblemSolving],
-    [cr.infoTech,            major.reqInfoTech],
-    [cr.implementation,      major.reqImplementation],
-    [cr.systemUnderstanding, major.reqSystemUnderstanding],
-    [cr.dataAnalysis,        major.reqDataAnalysis],
-    [cr.communication,       major.reqCommunication],
-    [cr.collaboration,       major.reqCollaboration],
-    [cr.selfManagement,      major.reqSelfManagement],
-  ];
-  const axisScores = pairs.map(([userScore, req]) => {
-    const reqScore = req ?? 0;
-    if (reqScore === 0) return 100;
-    return Math.min((userScore / reqScore) * 100, 100);
-  });
-  return Math.round(axisScores.reduce((a, b) => a + b, 0) / axisScores.length);
-}
-
-interface TendencyVector {
-  tendLogicalInquiry: number;
-  tendPracticalTech: number;
-  tendArtCreative: number;
-  tendSocialCooperation: number;
-  tendLifeHealth: number;
-  tendEducationGuide: number;
-  tendTheoryAcademic: number;
-  tendDataAnalytics: number;
-  tendSystemOperation: number;
-}
-
-interface FormSnapshot {
-  selectedSubjects?: string[];
-  learningStyle?: 'theory' | 'practice';
-  exploreSpectrum?: number;
-  scores?: Record<string, number>;
-  tendencyVector?: TendencyVector;
-}
-
-function computeTendencyVector(snap: FormSnapshot): TendencyVector {
-  if (snap.tendencyVector) return snap.tendencyVector;
-  const subjects = snap.selectedSubjects ?? [];
-  const has = (s: string) => (subjects.includes(s) ? 1 : 0);
-  // scores: 1~5 → 0~1 정규화
-  const problemSolving = ((snap.scores?.['문제 해결 능력'] ?? 3) - 1) / 4;
-  const creative       = ((snap.scores?.['창의적 사고']    ?? 3) - 1) / 4;
-  const collaboration  = ((snap.scores?.['협업 및 소통']   ?? 3) - 1) / 4;
-  const isTheory   = snap.learningStyle === 'theory'   ? 1 : 0;
-  const isPractice = snap.learningStyle === 'practice' ? 1 : 0;
-  const explore = (snap.exploreSpectrum ?? 50) / 100;
-  const clamp = (v: number) => Math.round(Math.max(0, Math.min(100, v)));
-
-  return {
-    tendLogicalInquiry:    clamp(20 + has('수학')*25     + has('과학')*15       + isTheory*15  + explore*15      + problemSolving*10),
-    tendPracticalTech:     clamp(15 + has('정보/코딩')*30 + isPractice*20        + (1-explore)*10 + problemSolving*10),
-    tendArtCreative:       clamp(10 + has('예술')*40     + creative*30          + explore*10),
-    tendSocialCooperation: clamp(15 + has('사회')*20     + has('국어')*10        + has('영어')*10  + collaboration*30),
-    tendLifeHealth:        clamp(25 + has('과학')*20     + has('사회')*10),
-    tendEducationGuide:    clamp(10 + has('국어')*25     + has('사회')*15        + has('영어')*15  + collaboration*20),
-    tendTheoryAcademic:    clamp(15 + has('수학')*20     + has('과학')*15        + isTheory*20  + explore*15),
-    tendDataAnalytics:     clamp(10 + has('수학')*30     + has('정보/코딩')*20    + problemSolving*15),
-    tendSystemOperation:   clamp(10 + has('정보/코딩')*30 + isPractice*15        + problemSolving*10 + has('수학')*10),
-  };
-}
-
-const ZERO_TENDENCY: TendencyVector = {
-  tendLogicalInquiry: 0, tendPracticalTech: 0, tendArtCreative: 0,
-  tendSocialCooperation: 0, tendLifeHealth: 0, tendEducationGuide: 0,
-  tendTheoryAcademic: 0, tendDataAnalytics: 0, tendSystemOperation: 0,
-};
-
-function computeTendencyScore(tv: TendencyVector, major: Major): number {
-  const pairs: [number, number | null][] = [
-    [tv.tendLogicalInquiry,    major.tendLogicalInquiry],
-    [tv.tendPracticalTech,     major.tendPracticalTech],
-    [tv.tendArtCreative,       major.tendArtCreative],
-    [tv.tendSocialCooperation, major.tendSocialCooperation],
-    [tv.tendLifeHealth,        major.tendLifeHealth],
-    [tv.tendEducationGuide,    major.tendEducationGuide],
-    [tv.tendTheoryAcademic,    major.tendTheoryAcademic],
-    [tv.tendDataAnalytics,     major.tendDataAnalytics],
-    [tv.tendSystemOperation,   major.tendSystemOperation],
-  ];
-  const axisScores = pairs.map(([userScore, req]) => {
-    const reqScore = req ?? 0;
-    if (reqScore === 0) return 100;
-    return Math.min((userScore / reqScore) * 100, 100);
-  });
-  return Math.round(axisScores.reduce((a, b) => a + b, 0) / axisScores.length);
-}
-
-function checkFailed(cr: CompetencyResult, major: Major): boolean {
-  return (
-    (major.thrMathLogic != null && major.thrMathLogic > 0 && cr.mathLogic < major.thrMathLogic) ||
-    (major.thrInfoTech != null && major.thrInfoTech > 0 && cr.infoTech < major.thrInfoTech)
-  );
-}
 
 const DiagnosisLoading = () => {
   const navigate = useNavigate();
@@ -127,92 +23,23 @@ const DiagnosisLoading = () => {
 
     const state = location.state as {
       sessionId?: number;
-      competencyResult?: CompetencyResult;
     } | null;
 
     const process = async () => {
-      const { sessionId, competencyResult } = state ?? {};
+      const { sessionId } = state ?? {};
       if (!sessionId) return;
 
-      // 0. 세션 완료 전에 inputSnapshot 조회 → 성향 벡터 계산
-      const sessionData = await getInProgressSession().catch(() => null);
-      const tv: TendencyVector = (() => {
-        try {
-          const snap = sessionData?.session?.inputSnapshot;
-          return snap ? computeTendencyVector(JSON.parse(snap) as FormSnapshot) : ZERO_TENDENCY;
-        } catch {
-          return ZERO_TENDENCY;
-        }
-      })();
-
-      // 1. 세션 완료 처리
-      await updateSession(sessionId, {
-        status: 'completed',
-        completedAt: new Date().toISOString(),
-      }).catch((e) => console.warn('[Loading] updateSession 실패:', e));
-
-      // 2. 진단 결과 생성
-      const diagnosisResult = await createDiagnosisResult({
-        diagnosisSessionId: sessionId,
-        competencyVector: competencyResult
-          ? JSON.stringify(competencyResult)
-          : JSON.stringify({ mathLogic: 0, problemSolving: 0, infoTech: 0, implementation: 0, systemUnderstanding: 0, dataAnalysis: 0, communication: 0, collaboration: 0, selfManagement: 0 }),
-        tendencyVector: JSON.stringify(tv),
-      });
-
-      // 3. 전공 목록 조회 + 역량/성향 적합도 계산
-      const majors = await getMajors();
-
-      const scoreData = majors
-        .map((major) => ({
-          major,
-          competencyScore: competencyResult ? computeCompetencyScore(competencyResult, major) : 50,
-          tendencyScore: computeTendencyScore(tv, major),
-          failed: competencyResult ? checkFailed(competencyResult, major) : false,
-        }))
-        .map((item) => ({
-          ...item,
-          finalScore: Math.round(item.competencyScore * 0.6 + item.tendencyScore * 0.4),
-        }))
-        .sort((a, b) => b.finalScore - a.finalScore);
-
-      // 4. 전공별 점수 등록 (병렬)
-      const scoreResponses = await Promise.allSettled(
-        scoreData.map((item, idx) =>
-          createResultMajorScore({
-            diagnosisResultId: diagnosisResult.id,
-            majorId: item.major.id,
-            competencyScore: item.competencyScore,
-            tendencyScore: item.tendencyScore,
-            finalScore: item.finalScore,
-            rank: idx + 1,
-            failed: item.failed,
-          }),
-        ),
-      );
-
-      // 5. 상위 전공(과락 제외)으로 플랜 생성 → AI 서버가 주간 계획 자동 생성
-      const candidates = scoreResponses
-        .map((r, i) =>
-          r.status === 'fulfilled' ? { score: r.value, item: scoreData[i] } : null,
-        )
-        .filter((x): x is NonNullable<typeof x> => x !== null);
-
-      const target = candidates.find((x) => !x.item.failed) ?? candidates[0];
-      if (target) {
-        await createPlan({
-          diagnosisResultId: diagnosisResult.id,
-          resultMajorScoreId: target.score.id,
-          activeVersion: true,
-        }).catch(() => {});
-      }
+      await completeDiagnosisResult(sessionId);
     };
-
     // API 처리와 최소 표시 시간(4초)을 병렬 실행
-    Promise.all([
-      process().catch((e) => console.error('[Loading] 진단 결과 생성 실패:', e)),
+    Promise.allSettled([
+      process(),
       new Promise<void>((resolve) => setTimeout(resolve, 4000)),
-    ]).then(() => {
+    ]).then(([result]) => {
+      if (result.status === 'rejected') {
+        console.error('[Loading] diagnosis result completion failed:', result.reason);
+        return;
+      }
       navigate('/analysis/dashboard', { replace: true });
     });
   }, [navigate, location.state]);
