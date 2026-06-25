@@ -38,6 +38,11 @@ const isEssayQuestion = (question?: ExamQuestion | null) => {
   return question.questionType === 'essay' || hasNoOptions;
 };
 
+const getQuestionInitialTime = (question?: ExamQuestion | null) => {
+  if (!question || isEssayQuestion(question)) return 0;
+  return question.timeLimitSec;
+};
+
 const DiagnosisQuiz = () => {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
@@ -53,11 +58,29 @@ const DiagnosisQuiz = () => {
   const [remaining, setRemaining] = useState(0);
   const [advancing, setAdvancing] = useState(false);
   const [showBackConfirm, setShowBackConfirm] = useState(false);
+  const [trackedId, setTrackedId] = useState<number | null>(null);
+
+  const [completedIndexes, setCompletedIndexes] = useState<Set<number>>(new Set());
+  const [savedObjectiveAnswers, setSavedObjectiveAnswers] = useState<Record<number, string | null>>(
+    {}
+  );
+  const [savedEssayAnswers, setSavedEssayAnswers] = useState<Record<number, string>>({});
 
   const remainingRef = useRef(0);
   const selectedRef = useRef<string | null>(null);
   const essayAnswerRef = useRef('');
   const advancingRef = useRef(false);
+
+  const current = questions[index];
+  const total = questions.length;
+  const isEssay = isEssayQuestion(current);
+  const completedCount = completedIndexes.size;
+  const currentCompleted = completedIndexes.has(index);
+
+  const savedObjectiveAnswer = savedObjectiveAnswers[index] ?? null;
+  const isObjectiveCompleted = currentCompleted && !isEssay;
+  const objectiveAnswerChanged =
+    isObjectiveCompleted && Boolean(selected) && selected !== savedObjectiveAnswer;
 
   useEffect(() => {
     remainingRef.current = remaining;
@@ -71,11 +94,47 @@ const DiagnosisQuiz = () => {
     essayAnswerRef.current = essayAnswer;
   }, [essayAnswer]);
 
-  const [trackedId, setTrackedId] = useState<number | null>(null);
+  const resetQuestionInput = (
+    question: ExamQuestion,
+    questionIndex: number,
+    objectiveAnswers = savedObjectiveAnswers,
+    essayAnswers = savedEssayAnswers
+  ) => {
+    setIndex(questionIndex);
+    setSelected(objectiveAnswers[questionIndex] ?? null);
+    setEssayAnswer(essayAnswers[questionIndex] ?? '');
+    setTrackedId(question.id);
+    setRemaining(getQuestionInitialTime(question));
+  };
 
-  const current = questions[index];
-  const total = questions.length;
-  const isEssay = isEssayQuestion(current);
+  const findNextIncompleteIndex = (
+    fromIndex: number,
+    completed: Set<number> = completedIndexes
+  ) => {
+    if (questions.length === 0) return null;
+
+    for (let offset = 1; offset <= questions.length; offset += 1) {
+      const candidateIndex = (fromIndex + offset) % questions.length;
+
+      if (!completed.has(candidateIndex)) {
+        return candidateIndex;
+      }
+    }
+
+    return null;
+  };
+
+  const finishDiagnosis = async () => {
+    let competencyResult = null;
+
+    try {
+      if (sessionId) competencyResult = await scoreSession(sessionId);
+    } catch (error) {
+      console.error('점수 산출 실패:', error);
+    }
+
+    navigate('/diagnosis/loading', { state: { sessionId, competencyResult } });
+  };
 
   useEffect(() => {
     (async () => {
@@ -96,14 +155,55 @@ const DiagnosisQuiz = () => {
           sid = created.id;
         }
 
+        const completed = new Set<number>();
+        const objectiveAnswerMap: Record<number, string | null> = {};
+        const essayAnswerMap: Record<number, string> = {};
+
+        inProgress?.examAnswers?.forEach((answer) => {
+          const questionIndex = qs.findIndex((question) => question.id === answer.examQuestionId);
+
+          if (questionIndex >= 0 && answer.selectedAnswer) {
+            completed.add(questionIndex);
+            objectiveAnswerMap[questionIndex] = answer.selectedAnswer;
+          }
+        });
+
+        inProgress?.essayAnswers?.forEach((answer) => {
+          const questionIndex = answer.questionNo - 1;
+
+          if (questionIndex >= 0 && questionIndex < qs.length && answer.answerText?.trim()) {
+            completed.add(questionIndex);
+            essayAnswerMap[questionIndex] = answer.answerText;
+          }
+        });
+
+        let initialIndex = 0;
+
+        if (completed.size > 0) {
+          const firstIncompleteIndex = qs.findIndex((_, questionIndex) => {
+            return !completed.has(questionIndex);
+          });
+
+          initialIndex = firstIncompleteIndex >= 0 ? firstIncompleteIndex : qs.length - 1;
+        } else if (sid && inProgress?.session?.currentStep && inProgress.session.currentStep > 2) {
+          initialIndex = Math.min(inProgress.session.currentStep - 2, qs.length - 1);
+        }
+
+        const initialQuestion = qs[initialIndex];
+
         setSessionId(sid);
         setQuestions(qs);
+        setCompletedIndexes(completed);
+        setSavedObjectiveAnswers(objectiveAnswerMap);
+        setSavedEssayAnswers(essayAnswerMap);
+        setIndex(initialIndex);
+        setSelected(objectiveAnswerMap[initialIndex] ?? null);
+        setEssayAnswer(essayAnswerMap[initialIndex] ?? '');
+        setTrackedId(initialQuestion?.id ?? null);
+        setRemaining(getQuestionInitialTime(initialQuestion));
 
         if (qs.length === 0) {
           setError('등록된 시험 문항이 없습니다.');
-        } else if (sid && inProgress?.session?.currentStep && inProgress.session.currentStep > 2) {
-          const resumeIdx = Math.min(inProgress.session.currentStep - 2, qs.length - 1);
-          setIndex(resumeIdx);
         }
       } catch {
         setError('문항을 불러오지 못했습니다. 다시 시도해 주세요.');
@@ -123,6 +223,10 @@ const DiagnosisQuiz = () => {
 
     const q = questions[index];
     const essay = isEssayQuestion(q);
+    let completedAfterSave = new Set(completedIndexes);
+    let objectiveAnswersAfterSave = { ...savedObjectiveAnswers };
+    let essayAnswersAfterSave = { ...savedEssayAnswers };
+    let shouldMarkCompleted = false;
 
     try {
       if (sessionId && q) {
@@ -137,6 +241,14 @@ const DiagnosisQuiz = () => {
               questionNo: index + 1,
               answerText: text,
             });
+
+            shouldMarkCompleted = true;
+            essayAnswersAfterSave = {
+              ...essayAnswersAfterSave,
+              [index]: text,
+            };
+
+            setSavedEssayAnswers(essayAnswersAfterSave);
           }
         } else {
           await createExamAnswer({
@@ -146,45 +258,75 @@ const DiagnosisQuiz = () => {
             correct: answer === q.correctAnswer,
             responseSec,
           });
+
+          if (answer) {
+            shouldMarkCompleted = true;
+            objectiveAnswersAfterSave = {
+              ...objectiveAnswersAfterSave,
+              [index]: answer,
+            };
+
+            setSavedObjectiveAnswers(objectiveAnswersAfterSave);
+          }
         }
+      }
+
+      if (shouldMarkCompleted) {
+        completedAfterSave = new Set(completedIndexes);
+        completedAfterSave.add(index);
+        setCompletedIndexes(completedAfterSave);
       }
     } catch (error) {
       console.error('답변 저장 실패:', error);
     }
 
-    if (index >= questions.length - 1) {
-      let competencyResult = null;
-
-      try {
-        if (sessionId) competencyResult = await scoreSession(sessionId);
-      } catch (error) {
-        console.error('점수 산출 실패:', error);
-      }
-
-      navigate('/diagnosis/loading', { state: { sessionId, competencyResult } });
+    if (completedAfterSave.size >= questions.length) {
+      await finishDiagnosis();
       return;
     }
 
-    const nextIndex = index + 1;
+    const nextIncompleteIndex = findNextIncompleteIndex(index, completedAfterSave);
+    const targetIndex = nextIncompleteIndex ?? index + 1;
+    const targetQuestion = questions[targetIndex];
 
-    if (sessionId) {
+    if (sessionId && targetQuestion) {
       updateSession(sessionId, {
-        currentStep: nextIndex + 2,
+        currentStep: targetIndex + 2,
         status: 'in_progress',
       }).catch(() => {});
     }
 
-    setIndex(nextIndex);
-    setSelected(null);
-    setEssayAnswer('');
+    if (targetQuestion) {
+      resetQuestionInput(targetQuestion, targetIndex, objectiveAnswersAfterSave, essayAnswersAfterSave);
+    }
+
     advancingRef.current = false;
     setAdvancing(false);
   };
 
-  if (current && current.id !== trackedId) {
-    setTrackedId(current.id);
-    setRemaining(isEssayQuestion(current) ? 0 : current.timeLimitSec);
-  }
+  const goToQuestion = (questionIndex: number) => {
+    if (advancing) return;
+
+    const targetQuestion = questions[questionIndex];
+    if (!targetQuestion) return;
+
+    resetQuestionInput(targetQuestion, questionIndex);
+  };
+
+  const moveToNextIncompleteQuestion = async () => {
+    if (completedIndexes.size >= questions.length) {
+      await finishDiagnosis();
+      return;
+    }
+
+    const nextIncompleteIndex = findNextIncompleteIndex(index);
+    if (nextIncompleteIndex === null) return;
+
+    const targetQuestion = questions[nextIncompleteIndex];
+    if (!targetQuestion) return;
+
+    resetQuestionInput(targetQuestion, nextIncompleteIndex);
+  };
 
   useEffect(() => {
     if (!current || isEssayQuestion(current)) return;
@@ -228,9 +370,25 @@ const DiagnosisQuiz = () => {
     );
   }
 
-  const isLast = index === total - 1;
-  const progress = Math.round((index / total) * 100);
+  const progress = total > 0 ? Math.round((completedCount / total) * 100) : 0;
   const timerOffset = current.timeLimitSec > 0 ? 100 - (remaining / current.timeLimitSec) * 100 : 0;
+  const canFinishAfterCurrent = !currentCompleted && completedCount === total - 1;
+  const canFinishNow = currentCompleted && completedCount === total && !objectiveAnswerChanged;
+
+  const actionButtonLabel = objectiveAnswerChanged
+    ? completedCount >= total
+      ? '답변 수정 후 결과 보기'
+      : '답변 수정 후 다음'
+    : canFinishNow || canFinishAfterCurrent
+    ? '결과 보기'
+    : currentCompleted
+    ? '다음 미완료 문항'
+    : '다음 질문';
+
+  const actionButtonDisabled =
+    advancing ||
+    (!currentCompleted && (isEssay ? !essayAnswer.trim() : !selected)) ||
+    (isObjectiveCompleted && objectiveAnswerChanged && !selected);
 
   const categoryMeta = CATEGORY_LABELS[current.competencyCategory] ?? {
     label: current.competencyCategory,
@@ -258,7 +416,7 @@ const DiagnosisQuiz = () => {
 
             <p className="text-sm text-on-surface-variant">
               {isEssay ? '시간 제한 없이 충분히 작성하세요' : '시간 안에 신중하게 선택하세요'}{' '}
-              &middot; {index + 1}/{total} 완료
+              &middot; {completedCount}/{total} 완료
             </p>
           </div>
 
@@ -291,11 +449,17 @@ const DiagnosisQuiz = () => {
                   <div className="space-y-3">
                     <textarea
                       value={essayAnswer}
-                      onChange={(event) => setEssayAnswer(event.target.value)}
+                      onChange={(event) => {
+                        if (currentCompleted) return;
+                        setEssayAnswer(event.target.value);
+                      }}
+                      readOnly={currentCompleted}
                       disabled={advancing}
                       maxLength={10000}
                       placeholder="답변을 입력해주세요."
-                      className="w-full min-h-[220px] resize-none rounded-xl border border-outline-variant/40 bg-white p-4 text-sm leading-relaxed text-on-surface outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10 disabled:opacity-60"
+                      className={`w-full min-h-[220px] resize-none rounded-xl border border-outline-variant/40 bg-white p-4 text-sm leading-relaxed text-on-surface outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10 ${
+                        currentCompleted ? 'cursor-default' : ''
+                      } disabled:opacity-60`}
                     />
 
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs text-on-surface-variant">
@@ -336,7 +500,7 @@ const DiagnosisQuiz = () => {
               </section>
 
               <div className="flex items-center justify-between mt-4 px-2">
-                {!isEssay && (
+                {!isEssay && !currentCompleted && (
                   <button
                     onClick={() => advance(null)}
                     disabled={advancing}
@@ -354,23 +518,27 @@ const DiagnosisQuiz = () => {
                 <p className="text-xs font-bold text-on-surface-variant mb-3">문항 진행 현황</p>
 
                 <div className="grid grid-cols-10 gap-1">
-                  {questions.map((_, i) => {
-                    const isDone = i < index;
+                  {questions.map((question, i) => {
+                    const isDone = completedIndexes.has(i);
                     const isCurrent = i === index;
 
                     return (
-                      <div
-                        key={i}
-                        className={`w-full aspect-square rounded text-[10px] font-bold flex items-center justify-center transition-all ${
+                      <button
+                        key={question.id ?? i}
+                        type="button"
+                        onClick={() => goToQuestion(i)}
+                        disabled={advancing}
+                        title={`${i + 1}번 문항으로 이동`}
+                        className={`w-full aspect-square rounded text-[10px] font-bold flex items-center justify-center transition-all disabled:opacity-60 ${
                           isCurrent
                             ? 'bg-primary-container text-white shadow-[0_2px_6px_rgba(13,28,50,0.2)]'
                             : isDone
-                            ? 'bg-secondary text-white'
-                            : 'bg-surface-container-high text-on-surface-variant'
+                            ? 'bg-secondary text-white hover:opacity-90'
+                            : 'bg-surface-container-high text-on-surface-variant hover:bg-secondary-container/30 hover:text-secondary'
                         }`}
                       >
                         {i + 1}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -460,11 +628,18 @@ const DiagnosisQuiz = () => {
 
             <div className="flex items-center gap-4 shrink-0">
               <button
-                onClick={() => advance(isEssay ? essayAnswer : selected)}
-                disabled={advancing || (isEssay ? !essayAnswer.trim() : !selected)}
+                onClick={() => {
+                  if (currentCompleted && !objectiveAnswerChanged) {
+                    void moveToNextIncompleteQuestion();
+                    return;
+                  }
+
+                  void advance(isEssay ? essayAnswer : selected);
+                }}
+                disabled={actionButtonDisabled}
                 className="flex items-center gap-1 px-5 py-2.5 text-sm font-bold text-white bg-primary-container rounded-xl shadow-[0_8px_20px_rgba(13,28,50,0.18)] hover:opacity-90 transition-opacity disabled:opacity-60"
               >
-                {isLast ? '결과 보기' : '다음 질문'}
+                {actionButtonLabel}
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </button>
             </div>
