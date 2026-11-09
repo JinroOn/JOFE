@@ -91,3 +91,22 @@ export interface CompetencyResult {
   collaboration: number;
   selfManagement: number;
 }
+
+export interface TendencyResultPayload {
+  diagnosisSessionId: number;
+  logicalInquiry: number;
+  practicalTech: number;
+  artCreative: number;
+  socialCooperation: number;
+  lifeHealth: number;
+  educationGuide: number;
+  theoryAcademic: number;
+  dataAnalytics: number;
+  systemOperation: number;
+}
+
+export interface TendencyResult extends TendencyResultPayload {
+  id: number;
+  createdAt: string;
+  updatedAt: string;
+}
