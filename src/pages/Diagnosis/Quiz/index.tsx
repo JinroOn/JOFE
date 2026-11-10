@@ -10,21 +10,12 @@ import {
   createEssayAnswer,
   scoreSession,
 } from '../../../api/diagnosis';
-import type { CompetencyCategory, ExamQuestion } from '../../../types/diagnosis';
-
-const CATEGORY_LABELS: Record<CompetencyCategory, { label: string; icon: string }> = {
-  math_logic: { label: '수리·논리', icon: 'calculate' },
-  problem_solving: { label: '문제 해결', icon: 'lightbulb' },
-  info_tech: { label: '정보·기술', icon: 'memory' },
-  implementation: { label: '구현', icon: 'code' },
-  system_understanding: { label: '시스템 이해', icon: 'account_tree' },
-  data_analysis: { label: '데이터 분석', icon: 'bar_chart' },
-  communication: { label: '의사소통', icon: 'forum' },
-  collaboration: { label: '협업', icon: 'groups' },
-  self_management: { label: '자기관리', icon: 'self_improvement' },
-};
+import type { ExamQuestion } from '../../../types/diagnosis';
 
 const OPTION_IDS = ['A', 'B', 'C', 'D'] as const;
+
+// 문항별 응답 시간 측정용 (렌더 중이 아닌 이벤트·effect 안에서만 호출)
+const nowMs = () => Date.now();
 
 const isEssayQuestion = (question?: ExamQuestion | null) => {
   if (!question) return false;
@@ -36,11 +27,6 @@ const isEssayQuestion = (question?: ExamQuestion | null) => {
     !question.optionD?.trim();
 
   return question.questionType === 'essay' || hasNoOptions;
-};
-
-const getQuestionInitialTime = (question?: ExamQuestion | null) => {
-  if (!question || isEssayQuestion(question)) return 0;
-  return question.timeLimitSec;
 };
 
 const DiagnosisQuiz = () => {
@@ -55,10 +41,8 @@ const DiagnosisQuiz = () => {
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [essayAnswer, setEssayAnswer] = useState('');
-  const [remaining, setRemaining] = useState(0);
   const [advancing, setAdvancing] = useState(false);
   const [showBackConfirm, setShowBackConfirm] = useState(false);
-  const [trackedId, setTrackedId] = useState<number | null>(null);
 
   const [completedIndexes, setCompletedIndexes] = useState<Set<number>>(new Set());
   const [savedObjectiveAnswers, setSavedObjectiveAnswers] = useState<Record<number, string | null>>(
@@ -66,9 +50,7 @@ const DiagnosisQuiz = () => {
   );
   const [savedEssayAnswers, setSavedEssayAnswers] = useState<Record<number, string>>({});
 
-  const remainingRef = useRef(0);
-  const selectedRef = useRef<string | null>(null);
-  const essayAnswerRef = useRef('');
+  const questionStartedAtRef = useRef(0);
   const advancingRef = useRef(false);
 
   const current = questions[index];
@@ -82,20 +64,7 @@ const DiagnosisQuiz = () => {
   const objectiveAnswerChanged =
     isObjectiveCompleted && Boolean(selected) && selected !== savedObjectiveAnswer;
 
-  useEffect(() => {
-    remainingRef.current = remaining;
-  }, [remaining]);
-
-  useEffect(() => {
-    selectedRef.current = selected;
-  }, [selected]);
-
-  useEffect(() => {
-    essayAnswerRef.current = essayAnswer;
-  }, [essayAnswer]);
-
   const resetQuestionInput = (
-    question: ExamQuestion,
     questionIndex: number,
     objectiveAnswers = savedObjectiveAnswers,
     essayAnswers = savedEssayAnswers
@@ -103,8 +72,7 @@ const DiagnosisQuiz = () => {
     setIndex(questionIndex);
     setSelected(objectiveAnswers[questionIndex] ?? null);
     setEssayAnswer(essayAnswers[questionIndex] ?? '');
-    setTrackedId(question.id);
-    setRemaining(getQuestionInitialTime(question));
+    questionStartedAtRef.current = nowMs();
   };
 
   const findNextIncompleteIndex = (
@@ -189,8 +157,6 @@ const DiagnosisQuiz = () => {
           initialIndex = Math.min(inProgress.session.currentStep - 2, qs.length - 1);
         }
 
-        const initialQuestion = qs[initialIndex];
-
         setSessionId(sid);
         setQuestions(qs);
         setCompletedIndexes(completed);
@@ -199,8 +165,7 @@ const DiagnosisQuiz = () => {
         setIndex(initialIndex);
         setSelected(objectiveAnswerMap[initialIndex] ?? null);
         setEssayAnswer(essayAnswerMap[initialIndex] ?? '');
-        setTrackedId(initialQuestion?.id ?? null);
-        setRemaining(getQuestionInitialTime(initialQuestion));
+        questionStartedAtRef.current = nowMs();
 
         if (qs.length === 0) {
           setError('등록된 시험 문항이 없습니다.');
@@ -230,7 +195,7 @@ const DiagnosisQuiz = () => {
 
     try {
       if (sessionId && q) {
-        const responseSec = essay ? 0 : Math.max(0, q.timeLimitSec - remainingRef.current);
+        const responseSec = essay ? 0 : Math.round((nowMs() - questionStartedAtRef.current) / 1000);
 
         if (essay) {
           const text = (answer ?? '').trim();
@@ -297,7 +262,7 @@ const DiagnosisQuiz = () => {
     }
 
     if (targetQuestion) {
-      resetQuestionInput(targetQuestion, targetIndex, objectiveAnswersAfterSave, essayAnswersAfterSave);
+      resetQuestionInput(targetIndex, objectiveAnswersAfterSave, essayAnswersAfterSave);
     }
 
     advancingRef.current = false;
@@ -310,7 +275,7 @@ const DiagnosisQuiz = () => {
     const targetQuestion = questions[questionIndex];
     if (!targetQuestion) return;
 
-    resetQuestionInput(targetQuestion, questionIndex);
+    resetQuestionInput(questionIndex);
   };
 
   const moveToNextIncompleteQuestion = async () => {
@@ -325,28 +290,8 @@ const DiagnosisQuiz = () => {
     const targetQuestion = questions[nextIncompleteIndex];
     if (!targetQuestion) return;
 
-    resetQuestionInput(targetQuestion, nextIncompleteIndex);
+    resetQuestionInput(nextIncompleteIndex);
   };
-
-  useEffect(() => {
-    if (!current || isEssayQuestion(current)) return;
-
-    const timer = setInterval(() => {
-      setRemaining((s) => Math.max(0, s - 1));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [current]);
-
-  useEffect(() => {
-    if (!current || isEssayQuestion(current)) return;
-
-    if (trackedId === current.id && remaining === 0) {
-      void advance(selectedRef.current);
-    }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remaining]);
 
   if (loading) {
     return (
@@ -371,7 +316,6 @@ const DiagnosisQuiz = () => {
   }
 
   const progress = total > 0 ? Math.round((completedCount / total) * 100) : 0;
-  const timerOffset = current.timeLimitSec > 0 ? 100 - (remaining / current.timeLimitSec) * 100 : 0;
   const canFinishAfterCurrent = !currentCompleted && completedCount === total - 1;
   const canFinishNow = currentCompleted && completedCount === total && !objectiveAnswerChanged;
 
@@ -390,134 +334,112 @@ const DiagnosisQuiz = () => {
     (!currentCompleted && (isEssay ? !essayAnswer.trim() : !selected)) ||
     (isObjectiveCompleted && objectiveAnswerChanged && !selected);
 
-  const categoryMeta = CATEGORY_LABELS[current.competencyCategory] ?? {
-    label: current.competencyCategory,
-    icon: 'quiz',
-  };
-
   const options = OPTION_IDS.map((id) => ({
     id,
     text: current[`option${id}` as 'optionA' | 'optionB' | 'optionC' | 'optionD'],
   }));
 
+  const handlePrev = () => {
+    if (index > 0) {
+      goToQuestion(index - 1);
+      return;
+    }
+    setShowBackConfirm(true);
+  };
+
   return (
     <>
       <div className="min-h-screen bg-surface flex flex-col">
-        <div className="max-w-[1100px] w-full mx-auto px-4 sm:px-8 pt-8 pb-32 flex-1">
-          <div className="mb-6 text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold bg-secondary-container/20 text-secondary mb-4">
-              <span className="material-symbols-outlined text-[14px]">{categoryMeta.icon}</span>
-              {categoryMeta.label}
-            </div>
+        <div className="max-w-[1090px] w-full mx-auto px-4 sm:px-6 pt-6 pb-32 flex-1">
+          <div className="mb-8 text-center">
+            <span className="inline-block px-14 py-1.5 mb-3 rounded-full bg-secondary-container/10 text-xs font-bold text-secondary">
+              공통 역량 진단
+            </span>
 
-            <h1 className="text-2xl sm:text-3xl font-bold text-primary-container mb-2">
-              {isEssay ? '답변을 작성해주세요' : '가장 적절한 답을 선택해주세요'}
+            <h1 className="break-keep text-2xl sm:text-[30px] sm:leading-tight font-bold text-primary-container mb-2">
+              {isEssay ? '질문을 읽고 답변을 작성해주세요' : '문제를 읽고 가장 적절한 답을 선택해주세요'}
             </h1>
 
-            <p className="text-sm text-on-surface-variant">
-              {isEssay ? '시간 제한 없이 충분히 작성하세요' : '시간 안에 신중하게 선택하세요'}{' '}
-              &middot; {completedCount}/{total} 완료
+            <p className="text-[13px] text-on-surface-variant">
+              천천히 읽고 답해주세요. · {completedCount} / {total} 완료
             </p>
           </div>
 
-          <div className="h-1.5 w-full bg-surface-container-high rounded-full overflow-hidden mb-4">
+          <div className="h-[5px] w-full bg-surface-container-high rounded-full overflow-hidden mb-7">
             <div
               className="h-full bg-secondary rounded-full transition-all duration-500"
               style={{ width: `${progress}%` }}
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] lg:grid-cols-[1fr_320px] gap-6 items-start">
-            <div>
-              <section className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 sm:p-8 shadow-[0_4px_12px_rgba(10,25,47,0.04)]">
-                <div className="flex items-start justify-between gap-4 mb-4">
-                  <span className="text-xs font-bold tracking-widest text-on-surface-variant">
-                    QUESTION {String(index + 1).padStart(2, '0')} / {total}
-                  </span>
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] lg:grid-cols-[1fr_320px] gap-3 items-start">
+            <section className="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-6 sm:p-[30px] md:min-h-[468px]">
+              <div className="flex items-start justify-between gap-4 mb-8">
+                <span className="text-xs font-bold text-primary-container">
+                  QUESTION {String(index + 1).padStart(2, '0')} / {total}
+                </span>
 
-                  <span className="flex items-center gap-1.5 text-xs font-bold text-secondary shrink-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
-                    AI LIVE ANALYZING
-                  </span>
-                </div>
-
-                <h2 className="text-xl sm:text-2xl font-bold text-primary-container leading-snug mb-6">
-                  {current.questionText}
-                </h2>
-
-                {isEssay ? (
-                  <div className="space-y-3">
-                    <textarea
-                      value={essayAnswer}
-                      onChange={(event) => {
-                        if (currentCompleted) return;
-                        setEssayAnswer(event.target.value);
-                      }}
-                      readOnly={currentCompleted}
-                      disabled={advancing}
-                      maxLength={10000}
-                      placeholder="답변을 입력해주세요."
-                      className={`w-full min-h-[220px] resize-none rounded-xl border border-outline-variant/40 bg-white p-4 text-sm leading-relaxed text-on-surface outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10 ${
-                        currentCompleted ? 'cursor-default' : ''
-                      } disabled:opacity-60`}
-                    />
-
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs text-on-surface-variant">
-                      <span>서술형 답변은 AI 분석 및 진로 리포트 생성에 활용됩니다.</span>
-                      <span>{essayAnswer.length}/10000</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {options.map(({ id, text }) => {
-                      const active = selected === id;
-
-                      return (
-                        <button
-                          key={id}
-                          onClick={() => setSelected(id)}
-                          disabled={advancing}
-                          className={`text-left p-4 rounded-xl border transition-all disabled:opacity-60 ${
-                            active
-                              ? 'border-secondary bg-secondary-container/10 shadow-[0_0_0_3px_rgba(0,210,255,0.12)]'
-                              : 'border-outline-variant/40 hover:bg-surface-container-low'
-                          }`}
-                        >
-                          <p
-                            className={`text-xs font-bold tracking-widest mb-1.5 ${
-                              active ? 'text-secondary' : 'text-on-surface-variant'
-                            }`}
-                          >
-                            OPTION {id}
-                          </p>
-
-                          <p className="text-sm text-on-surface leading-relaxed">{text}</p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-
-              <div className="flex items-center justify-between mt-4 px-2">
-                {!isEssay && !currentCompleted && (
-                  <button
-                    onClick={() => advance(null)}
-                    disabled={advancing}
-                    className="flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary-container transition-colors disabled:opacity-60"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">double_arrow</span>이 문제
-                    건너뛰기
-                  </button>
+                {currentCompleted && (
+                  <span className="text-[11px] font-bold text-secondary shrink-0">AUTO SAVED ✓</span>
                 )}
               </div>
-            </div>
 
-            <aside className="flex flex-col gap-4">
-              <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-4 shadow-[0_4px_12px_rgba(10,25,47,0.04)]">
-                <p className="text-xs font-bold text-on-surface-variant mb-3">문항 진행 현황</p>
+              <h2 className="break-keep text-xl sm:text-[22px] font-bold text-primary-container leading-snug whitespace-pre-line mb-8">
+                {current.questionText}
+              </h2>
 
-                <div className="grid grid-cols-10 gap-1">
+              {isEssay ? (
+                <div className="space-y-3">
+                  <textarea
+                    value={essayAnswer}
+                    onChange={(event) => {
+                      if (currentCompleted) return;
+                      setEssayAnswer(event.target.value);
+                    }}
+                    readOnly={currentCompleted}
+                    disabled={advancing}
+                    maxLength={10000}
+                    placeholder="답변을 입력해주세요."
+                    className={`w-full min-h-[220px] resize-none rounded-xl border border-outline-variant/40 bg-white p-4 text-sm leading-relaxed text-on-surface outline-none transition-all focus:border-secondary focus:ring-4 focus:ring-secondary/10 ${
+                      currentCompleted ? 'cursor-default' : ''
+                    } disabled:opacity-60`}
+                  />
+
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs text-on-surface-variant">
+                    <span>서술형 답변은 AI 분석 및 진로 리포트 생성에 활용됩니다.</span>
+                    <span>{essayAnswer.length}/10000</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-[18px] md:max-w-[690px]">
+                  {options.map(({ id, text }) => {
+                    const active = selected === id;
+
+                    return (
+                      <button
+                        key={id}
+                        onClick={() => setSelected(id)}
+                        disabled={advancing}
+                        className={`text-left min-h-[92px] px-4 py-3.5 rounded-xl border transition-all disabled:opacity-60 ${
+                          active
+                            ? 'border-2 border-secondary bg-secondary-container/10'
+                            : 'border-outline-variant/40 hover:bg-surface-container-low'
+                        }`}
+                      >
+                        <p className="text-[11px] font-bold text-primary-container mb-2">OPTION {id}</p>
+                        <p className="text-xs text-primary-container leading-relaxed whitespace-pre-line">{text}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            <aside className="flex flex-col gap-3">
+              <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-4 md:min-h-[210px]">
+                <p className="text-[13px] font-bold text-primary-container mb-4">문항 진행 현황</p>
+
+                <div className="grid grid-cols-10 gap-[5px]">
                   {questions.map((question, i) => {
                     const isDone = completedIndexes.has(i);
                     const isCurrent = i === index;
@@ -531,10 +453,10 @@ const DiagnosisQuiz = () => {
                         title={`${i + 1}번 문항으로 이동`}
                         className={`w-full aspect-square rounded text-[10px] font-bold flex items-center justify-center transition-all disabled:opacity-60 ${
                           isCurrent
-                            ? 'bg-primary-container text-white shadow-[0_2px_6px_rgba(13,28,50,0.2)]'
+                            ? 'border-2 border-primary-container bg-white text-primary-container'
                             : isDone
                             ? 'bg-secondary text-white hover:opacity-90'
-                            : 'bg-surface-container-high text-on-surface-variant hover:bg-secondary-container/30 hover:text-secondary'
+                            : 'bg-surface-container-low text-on-surface-variant hover:bg-secondary-container/20 hover:text-secondary'
                         }`}
                       >
                         {i + 1}
@@ -544,105 +466,54 @@ const DiagnosisQuiz = () => {
                 </div>
               </div>
 
-              {!isEssay && (
-                <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 shadow-[0_4px_12px_rgba(10,25,47,0.04)] flex flex-col items-center">
-                  <div className="relative w-32 h-32">
-                    <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="46"
-                        fill="none"
-                        stroke="#e0e3e6"
-                        strokeWidth="4"
-                      />
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="46"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        strokeLinecap="round"
-                        strokeDasharray="289"
-                        strokeDashoffset={(289 * timerOffset) / 100}
-                        className="text-secondary transition-all"
-                      />
-                    </svg>
-
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <p className="text-3xl font-extrabold text-primary-container leading-none">
-                        {String(remaining).padStart(2, '0')}
-                      </p>
-                      <p className="text-[10px] tracking-widest text-on-surface-variant mt-1">
-                        SECONDS
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="text-base font-bold text-primary-container mt-5">
-                    Time is running out!
-                  </p>
-                  <p className="text-xs text-on-surface-variant text-center mt-1">
-                    빠른 판단이 높은 점수로 이어집니다.
-                  </p>
-                </div>
-              )}
-
-              <div className="bg-primary-container text-white rounded-2xl p-5 shadow-[0_8px_20px_rgba(13,28,50,0.12)]">
-                <p className="text-xs font-bold tracking-widest text-secondary-container mb-2">
-                  MEMBER TIP
+              <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-6 text-center">
+                <p className="text-xs font-bold text-on-surface-variant mb-3">공통 역량 진단</p>
+                <p className="text-[30px] font-bold text-primary-container leading-none mb-3">
+                  {completedCount} / {total}
                 </p>
-                <p className="text-sm leading-relaxed text-white/90">
-                  {isEssay
-                    ? '최근 경험과 해결 과정을 구체적으로 작성하면 AI 분석에 더 도움이 됩니다.'
-                    : '시간 안에 가장 적절한 선택지를 고르세요. 정답 여부와 응답 속도가 역량 점수에 반영됩니다.'}
+                <p className="text-xs text-on-surface-variant">약 {progress}% 완료</p>
+              </div>
+
+              <div className="bg-primary-container rounded-2xl p-5">
+                <p className="text-xs font-bold text-secondary-container mb-2">TIP</p>
+                <p className="text-xs leading-relaxed text-white">
+                  한 문제만으로 결과가 결정되지 않습니다.
+                  <br />
+                  여러 문항을 종합해 해석합니다.
                 </p>
               </div>
             </aside>
           </div>
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 bg-surface-container-lowest border-t border-outline-variant/30 shadow-[0_-4px_12px_rgba(10,25,47,0.04)]">
-          <div className="max-w-[1100px] mx-auto px-4 sm:px-8 py-4 flex items-center justify-between">
+        <div className="fixed bottom-0 left-0 right-0 bg-surface-container-lowest border-t border-outline-variant/40">
+          <div className="max-w-[1250px] mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-3">
             <button
-              onClick={() => setShowBackConfirm(true)}
+              onClick={handlePrev}
               disabled={advancing}
-              className="flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary-container transition-colors disabled:opacity-60 shrink-0"
+              className="text-[13px] font-bold text-on-surface-variant hover:text-primary-container transition-colors disabled:opacity-60 shrink-0"
             >
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-              <span className="hidden sm:inline">이전 단계</span>
+              ← {index > 0 ? '이전 문항' : '이전 단계'}
             </button>
 
-            <div className="flex items-center gap-2 text-sm text-on-surface-variant">
-              <span className="material-symbols-outlined text-[18px]">quiz</span>
-              <span>
-                3단계 <span className="font-bold text-primary-container">/ 3단계</span>
-              </span>
-              <span className="text-outline-variant">·</span>
-              <span>
-                문항 {index + 1}
-                <span className="font-bold text-primary-container">/{total}</span>
-              </span>
-            </div>
+            <p className="hidden sm:block text-[13px] font-bold text-on-surface-variant">
+              3단계 / 5단계 · 공통 역량 · {index + 1} / {total}
+            </p>
 
-            <div className="flex items-center gap-4 shrink-0">
-              <button
-                onClick={() => {
-                  if (currentCompleted && !objectiveAnswerChanged) {
-                    void moveToNextIncompleteQuestion();
-                    return;
-                  }
+            <button
+              onClick={() => {
+                if (currentCompleted && !objectiveAnswerChanged) {
+                  void moveToNextIncompleteQuestion();
+                  return;
+                }
 
-                  void advance(isEssay ? essayAnswer : selected);
-                }}
-                disabled={actionButtonDisabled}
-                className="flex items-center gap-1 px-5 py-2.5 text-sm font-bold text-white bg-primary-container rounded-xl shadow-[0_8px_20px_rgba(13,28,50,0.18)] hover:opacity-90 transition-opacity disabled:opacity-60"
-              >
-                {actionButtonLabel}
-                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-              </button>
-            </div>
+                void advance(isEssay ? essayAnswer : selected);
+              }}
+              disabled={actionButtonDisabled}
+              className="shrink-0 px-8 py-2.5 rounded-lg bg-secondary text-[13px] font-bold text-white hover:opacity-90 transition-opacity disabled:bg-on-primary-container disabled:opacity-100"
+            >
+              {actionButtonLabel} →
+            </button>
           </div>
         </div>
       </div>
