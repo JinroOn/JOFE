@@ -5,6 +5,8 @@ import type {
   AdvanceResponse,
   CompleteResponse,
   ExplorationErrorCode,
+  ExplorationResult,
+  ExplorationResultResponse,
   ExplorationSession,
   ExplorationSessionDetail,
   ExplorationSessionSummary,
@@ -75,6 +77,16 @@ export const completeExplorationSession = (sessionId: number, expectedRevision: 
     : api
         .post<CompleteResponse>(`${BASE}/sessions/${sessionId}/complete`, { expectedRevision }, idem())
         .then((r) => r.data);
+
+// 결과 생성이 끝나지 않았으면 서버가 202를 준다고 가정한다
+export const getExplorationResult = (sessionId: number): Promise<ExplorationResultResponse> =>
+  isExplorationMock
+    ? mock.getResult(sessionId)
+    : api.get<ExplorationResult>(`${BASE}/sessions/${sessionId}/result`).then((r) =>
+        r.status === 202
+          ? { state: 'GENERATING', retryAfterMs: Number(r.headers['retry-after'] ?? 1) * 1000 }
+          : { state: 'READY', result: r.data },
+      );
 
 export const toExplorationErrorCode = (error: unknown): ExplorationErrorCode => {
   const e = error as { response?: { status?: number; data?: { code?: string } } };

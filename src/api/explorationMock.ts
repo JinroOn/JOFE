@@ -6,6 +6,8 @@ import type {
   CompleteResponse,
   ExplorationOption,
   ExplorationProgress,
+  ExplorationResult,
+  ExplorationResultResponse,
   ExplorationSession,
   ExplorationSessionDetail,
   ExplorationSessionSummary,
@@ -95,6 +97,7 @@ interface MockSession {
   queue: string[];
   adjustPending: boolean;
   mutations: Record<string, SaveAnswerResponse>;
+  completedAt?: number;
 }
 
 interface MockDb {
@@ -331,8 +334,201 @@ export const complete = (sessionId: number, expectedRevision: number) =>
     checkRevision(s, expectedRevision);
     if (nextActionOf(s) !== 'COMPLETE') throw fail(422, 'STAGE_INCOMPLETE');
     s.session.status = 'completed';
+    s.completedAt = Date.now();
     s.session.resultId = 9000 + sessionId;
     s.session.revision += 1;
     save(db);
     return { revision: s.session.revision, resultId: s.session.resultId, status: 'completed' };
+  });
+
+// ---- 결과 ----
+// mock 결과 상태는 1단계 응답만 보고 단순하게 고른다 (실제 추천 알고리즘이 아님)
+const GENERATING_MS = 1500;
+
+const ACTIVITIES: ExplorationResult['nextActivities'] = [
+  {
+    activityCode: 'MOCK-ACT-INFO',
+    kind: 'INFO_CHECK',
+    title: '학과 교육과정표 한 장 살펴보기',
+    description: '관심 가는 학과 한 곳의 홈페이지에서 1~2학년 교육과정표를 찾아 과목 이름을 훑어봐요.',
+    duration: '15~30분',
+    outcome: '처음 2년 동안 어떤 과목을 배우는지 감을 잡을 수 있어요.',
+  },
+  {
+    activityCode: 'MOCK-ACT-HANDS',
+    kind: 'HANDS_ON',
+    title: '공개 데이터로 표 하나 만들어보기',
+    description: '공공데이터포털에서 관심 있는 주제의 자료를 받아 표나 그래프 하나를 만들어봐요.',
+    duration: '1~2시간',
+    outcome: '자료를 정리하는 과정이 나에게 어떻게 느껴지는지 확인할 수 있어요.',
+  },
+  {
+    activityCode: 'MOCK-ACT-COMPARE',
+    kind: 'COMPARE_ASK',
+    title: '두 학과의 차이 한 가지 물어보기',
+    description: '후보 두 학과의 재학생 후기나 학과 Q&A에서 "수업에서 가장 많이 하는 활동"을 비교해봐요.',
+    duration: '30분~1시간',
+    outcome: '비슷해 보이는 두 학과의 실제 공부 방식 차이를 알 수 있어요.',
+  },
+];
+
+const RECHECK: ExplorationResult['recheckAxes'] = [
+  { metricCode: 'INT_DAT', name: '데이터·정보' },
+  { metricCode: 'INT_BIO', name: '생명·바이오' },
+  { metricCode: 'INT_EDU', name: '교육' },
+];
+
+const READY_GROUPS: ExplorationResult['groups'] = [
+  {
+    groupCode: 'MOCK-GRP-DATA',
+    name: '데이터·통계 전공군',
+    summary: '응답에서 숫자나 자료에서 규칙을 찾는 일에 대한 관심이 나타났어요.',
+    evidenceLevel: 'CONFIRMED',
+    reasonCodes: ['INT_DAT', 'ACT_ANALYZE'],
+    majors: [
+      {
+        majorCode: 'MOCK-M-DS',
+        majorId: null,
+        name: '데이터사이언스학과',
+        evidenceLevel: 'CONFIRMED',
+        collapsed: false,
+        reasons: [
+          { kind: 'INTEREST', reasonCode: 'INT_DAT', text: '자료에서 규칙을 찾는 일에 관심이 있다고 답했어요.' },
+          { kind: 'ACTIVITY', reasonCode: 'ACT_ANALYZE', text: '자료를 모아 정리하는 활동을 더 해보고 싶다고 답했어요.' },
+          { kind: 'LEARNING', reasonCode: 'DIR_APPLICATION', text: '실제 데이터로 문제를 풀어보는 공부 방식을 골랐어요.' },
+        ],
+      },
+      {
+        majorCode: 'MOCK-M-STAT',
+        majorId: null,
+        name: '통계학과',
+        evidenceLevel: 'CONFIRMED',
+        collapsed: false,
+        reasons: [
+          { kind: 'INTEREST', reasonCode: 'INT_DAT', text: '자료에서 규칙을 찾는 일에 관심이 있다고 답했어요.' },
+          { kind: 'ACTIVITY', reasonCode: 'ACT_ANALYZE', text: '자료를 모아 정리하는 활동을 더 해보고 싶다고 답했어요.' },
+        ],
+      },
+      {
+        majorCode: 'MOCK-M-MATH',
+        majorId: null,
+        name: '수학과',
+        evidenceLevel: 'LOW_EVIDENCE',
+        collapsed: false,
+        reasons: [{ kind: 'INTEREST', reasonCode: 'INT_DAT', text: '숫자에서 규칙을 찾는 일에 관심이 있다고 답했어요.' }],
+      },
+    ],
+  },
+  {
+    groupCode: 'MOCK-GRP-BIO',
+    name: '생명·바이오 전공군',
+    summary: '응답에서 생물이 자라고 변하는 과정에 대한 관심이 나타났어요.',
+    evidenceLevel: 'CONFIRMED',
+    reasonCodes: ['INT_BIO'],
+    majors: [
+      {
+        majorCode: 'MOCK-M-BIO',
+        majorId: null,
+        name: '생명과학과',
+        evidenceLevel: 'CONFIRMED',
+        collapsed: false,
+        reasons: [{ kind: 'INTEREST', reasonCode: 'INT_BIO', text: '생물이 변하는 과정을 알아보는 일에 관심이 있다고 답했어요.' }],
+      },
+      {
+        majorCode: 'MOCK-M-BIOMED',
+        majorId: null,
+        name: '바이오의약학과',
+        evidenceLevel: 'LOW_EVIDENCE',
+        collapsed: false,
+        reasons: [{ kind: 'INTEREST', reasonCode: 'INT_BIO', text: '생물이 변하는 과정을 알아보는 일에 관심이 있다고 답했어요.' }],
+      },
+    ],
+  },
+  {
+    groupCode: 'MOCK-GRP-EDU',
+    name: '교육 전공군',
+    summary: '응답에서 다른 사람에게 설명하고 가르치는 일에 대한 관심이 나타났어요.',
+    evidenceLevel: 'LOW_EVIDENCE',
+    reasonCodes: ['INT_EDU'],
+    majors: [
+      {
+        majorCode: 'MOCK-M-EDU',
+        majorId: null,
+        name: '교육학과',
+        evidenceLevel: 'LOW_EVIDENCE',
+        collapsed: false,
+        reasons: [{ kind: 'INTEREST', reasonCode: 'INT_EDU', text: '무언가를 설명하고 가르친 시간이 즐거웠다고 답했어요.' }],
+      },
+      {
+        majorCode: 'MOCK-M-MATHEDU',
+        majorId: null,
+        name: '수학교육과',
+        evidenceLevel: 'LOW_EVIDENCE',
+        collapsed: true,
+        reasons: [{ kind: 'INTEREST', reasonCode: 'INT_EDU', text: '무언가를 설명하고 가르친 시간이 즐거웠다고 답했어요.' }],
+      },
+    ],
+  },
+];
+
+const CAUTIONS: ExplorationResult['cautions'] = [
+  {
+    tagCode: 'MOCK-TAG-LAB',
+    majorCode: 'MOCK-M-BIO',
+    text: '생명과학과는 실험·실습 수업 비중이 높은 편이에요.',
+    checkAction: '학과 교육과정표에서 실험 과목이 몇 개인지, 한 학기에 몇 시간인지 확인해보세요.',
+  },
+  {
+    tagCode: 'MOCK-TAG-MATH',
+    majorCode: 'MOCK-M-STAT',
+    text: '통계학과는 1학년부터 수학 과목을 함께 배워요.',
+    checkAction: '1학년 필수 과목 중 수학 과목 이름을 찾아보고, 고등학교 때 배운 내용과 어떻게 이어지는지 살펴보세요.',
+  },
+];
+
+const buildResult = (s: MockSession): ExplorationResult => {
+  const stage1 = s.issued.filter((i) => i.stage === 'STAGE_1' && i.effective);
+  const positive = stage1.filter((i) => i.answerCode === 'AGREE' || i.answerCode === 'STRONGLY_AGREE').length;
+  const abstain = stage1.filter((i) => i.answerCode === 'UNKNOWN' || i.answerCode === 'NO_EXPERIENCE').length;
+  const base = {
+    resultId: s.session.resultId!,
+    sessionId: s.session.sessionId,
+    resultVersion: 'MOCK_RESULT_V0',
+    createdAt: new Date(s.completedAt ?? Date.now()).toISOString(),
+    nextActivities: ACTIVITIES,
+  };
+  if (positive === 0) {
+    return {
+      ...base,
+      status: 'NO_SUPPORTED_CANDIDATE',
+      groups: [],
+      cautions: [],
+      recheckAxes: RECHECK,
+      notes: ['응답에서 뚜렷하게 나타난 관심 분야를 아직 찾지 못했어요. 작은 활동을 해본 뒤 다시 검사해보면 달라질 수 있어요.'],
+    };
+  }
+  if (abstain >= 3) {
+    return {
+      ...base,
+      status: 'LOW_EVIDENCE',
+      groups: READY_GROUPS.slice(0, 2).map((g) => ({
+        ...g,
+        evidenceLevel: 'LOW_EVIDENCE',
+        majors: g.majors.slice(0, 2).map((m) => ({ ...m, evidenceLevel: 'LOW_EVIDENCE' })),
+      })),
+      cautions: CAUTIONS.slice(0, 1),
+      recheckAxes: RECHECK.slice(0, 2),
+      notes: ['"잘 모르겠음"으로 답한 질문이 많아서 아직 판단할 정보가 충분하지 않은 부분이 있어요.'],
+    };
+  }
+  return { ...base, status: 'READY', groups: READY_GROUPS, cautions: CAUTIONS, recheckAxes: [], notes: [] };
+};
+
+export const getResult = (sessionId: number) =>
+  delay((): ExplorationResultResponse => {
+    const s = getMock(load(), sessionId);
+    if (s.session.status !== 'completed' || !s.session.resultId) throw fail(404, 'RESOURCE_NOT_FOUND');
+    const elapsed = Date.now() - (s.completedAt ?? 0);
+    if (elapsed < GENERATING_MS) return { state: 'GENERATING', retryAfterMs: 500 };
+    return { state: 'READY', result: buildResult(s) };
   });

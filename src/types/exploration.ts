@@ -130,6 +130,84 @@ export interface CompleteResponse {
   status: 'completed';
 }
 
+// ---- 결과 (GET /sessions/{id}/result) ----
+// 04 문서: 결과 DTO는 groups, majors, reasonCodes, evidenceLevel, cautions, nextActivities, resultVersion 포함.
+// 화면 DTO에는 숫자 점수를 두지 않고 근거 수준과 설명을 우선한다.
+// 세부 필드 구성은 백엔드 계약 확정 전 프런트 가정이다.
+
+export type ExplorationResultStatus = 'READY' | 'LOW_EVIDENCE' | 'NO_SUPPORTED_CANDIDATE';
+
+// 03 문서 흥미축 근거 수준: 0개 NO_EVIDENCE, 1개 LOW_EVIDENCE, 2개 CONFIRMED
+export type EvidenceLevel = 'CONFIRMED' | 'LOW_EVIDENCE' | 'NO_EVIDENCE';
+
+export type ReasonKind = 'INTEREST' | 'ACTIVITY' | 'LEARNING';
+
+export interface ExplorationReason {
+  kind: ReasonKind;
+  reasonCode: string;
+  text: string;
+}
+
+export interface ExplorationMajorCard {
+  majorCode: string;
+  majorId: number | null;
+  name: string;
+  evidenceLevel: EvidenceLevel;
+  reasons: ExplorationReason[];
+  // 추천 수용 폭에 따라 접어서 보여줄 낯선 후보
+  collapsed: boolean;
+}
+
+export interface ExplorationGroupCard {
+  groupCode: string;
+  name: string;
+  summary: string;
+  evidenceLevel: EvidenceLevel;
+  reasonCodes: string[];
+  majors: ExplorationMajorCard[];
+}
+
+export interface ExplorationCaution {
+  tagCode: string;
+  majorCode: string | null;
+  text: string;
+  checkAction: string;
+}
+
+export type ActivityKind = 'INFO_CHECK' | 'HANDS_ON' | 'COMPARE_ASK';
+
+export interface ExplorationActivity {
+  activityCode: string;
+  kind: ActivityKind;
+  title: string;
+  description: string;
+  duration: string;
+  outcome: string;
+}
+
+export interface RecheckAxis {
+  metricCode: string;
+  name: string;
+}
+
+export interface ExplorationResult {
+  resultId: number;
+  sessionId: number;
+  status: ExplorationResultStatus;
+  resultVersion: string;
+  createdAt: string;
+  groups: ExplorationGroupCard[];
+  cautions: ExplorationCaution[];
+  nextActivities: ExplorationActivity[];
+  // 정보 부족·후보 없음일 때 다시 확인해볼 관심 분야
+  recheckAxes: RecheckAxis[];
+  notes: string[];
+}
+
+export type ExplorationResultResponse =
+  | { state: 'GENERATING'; retryAfterMs: number }
+  | { state: 'READY'; result: ExplorationResult };
+
 export type ExplorationErrorCode =
   | 'INVALID_REQUEST'
   | 'RESOURCE_NOT_FOUND'
