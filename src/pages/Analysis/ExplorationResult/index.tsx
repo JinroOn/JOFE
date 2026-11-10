@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { isExplorationMock } from '../../../config/features';
@@ -39,8 +40,32 @@ const StatusPanel = ({ title, body, children }: { title: string; body?: string; 
   </div>
 );
 
-const ResultView = ({ result, onExit }: { result: ExplorationResult; onExit: () => void }) => {
+const COMPARE_MAX = 3;
+
+interface ResultViewProps {
+  result: ExplorationResult;
+  onExit: () => void;
+  onCompare: (majorCodes: string[]) => void;
+}
+
+const ResultView = ({ result, onExit, onCompare }: ResultViewProps) => {
   const noCandidate = result.status === 'NO_SUPPORTED_CANDIDATE';
+  const [selected, setSelected] = useState<string[]>([]);
+  const [compareHint, setCompareHint] = useState(false);
+  const toggle = (code: string) => {
+    setCompareHint(false);
+    setSelected((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : prev.length >= COMPARE_MAX ? prev : [...prev, code],
+    );
+  };
+  const startCompare = () => {
+    if (selected.length >= 2) onCompare(selected);
+    else {
+      setCompareHint(true);
+      document.getElementById('groups-title')?.parentElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+  const compare = { selected, max: COMPARE_MAX, onToggle: toggle };
   return (
     <>
       <header className="mb-8">
@@ -69,9 +94,14 @@ const ResultView = ({ result, onExit }: { result: ExplorationResult; onExit: () 
       {result.groups.length > 0 && (
         <section aria-labelledby="groups-title" className="mb-10">
           <h2 id="groups-title" className="sr-only">탐색 후보 전공군</h2>
+          {compareHint && (
+            <p role="status" className="rounded-brand bg-secondary-container/15 px-4 py-3 mb-4 text-sm text-secondary">
+              비교할 전공을 2개 이상 &quot;비교에 담기&quot; 해주세요. (최대 {COMPARE_MAX}개)
+            </p>
+          )}
           <div className="space-y-4">
             {result.groups.map((g, i) => (
-              <GroupCard key={g.groupCode} group={g} index={i} />
+              <GroupCard key={g.groupCode} group={g} index={i} compare={compare} />
             ))}
           </div>
         </section>
@@ -138,9 +168,11 @@ const ResultView = ({ result, onExit }: { result: ExplorationResult; onExit: () 
       <section aria-labelledby="next-title" className="rounded-brand bg-surface-container-low p-5 sm:p-6 mb-8">
         <h2 id="next-title" className="font-bold text-primary-container mb-3">다음으로 할 수 있는 것</h2>
         <div className="flex flex-wrap gap-2">
-          <button type="button" disabled className={`${secondaryBtn} opacity-60 cursor-not-allowed`}>
-            후보 전공 비교하기 (준비 중)
-          </button>
+          {!noCandidate && (
+            <button type="button" onClick={startCompare} className={secondaryBtn}>
+              후보 전공 비교하기{selected.length > 0 ? ` (${selected.length}개 담음)` : ''}
+            </button>
+          )}
           <button type="button" disabled className={`${secondaryBtn} opacity-60 cursor-not-allowed`}>
             결과에 대해 AI에게 묻기 (준비 중)
           </button>
@@ -155,6 +187,25 @@ const ResultView = ({ result, onExit }: { result: ExplorationResult; onExit: () 
         방향을 제안한 것이며, 탐색하면서 생각이 바뀌면 다시 검사할 수 있어요. 완료된 결과는 바뀌지 않고 그대로
         보관돼요. (결과 버전 {result.resultVersion})
       </p>
+
+      {selected.length > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-outline-variant/30 bg-surface-container-lowest/95 backdrop-blur px-4 py-3">
+          <div className="max-w-[880px] mx-auto flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-primary-container" aria-live="polite">
+              비교에 담은 전공 {selected.length}/{COMPARE_MAX}
+              {selected.length < 2 && <span className="text-on-surface-variant"> · 1개 더 담으면 비교할 수 있어요</span>}
+            </p>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setSelected([])} className="min-h-[44px] px-4 text-sm font-semibold text-on-surface-variant">
+                비우기
+              </button>
+              <button type="button" onClick={startCompare} disabled={selected.length < 2} className={`${primaryBtn} disabled:opacity-50 disabled:hover:scale-100`}>
+                비교하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
@@ -215,7 +266,11 @@ const ExplorationResultPage = () => {
 
   return (
     <Shell>
-      <ResultView result={state.result} onExit={exit} />
+      <ResultView
+        result={state.result}
+        onExit={exit}
+        onCompare={(codes) => navigate(`/analysis/exploration/${id}/compare?majors=${codes.map(encodeURIComponent).join(',')}`)}
+      />
     </Shell>
   );
 };

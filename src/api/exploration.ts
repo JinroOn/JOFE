@@ -4,6 +4,7 @@ import * as mock from './explorationMock';
 import type {
   AdvanceResponse,
   CompleteResponse,
+  ExplorationComparison,
   ExplorationErrorCode,
   ExplorationResult,
   ExplorationResultResponse,
@@ -87,6 +88,15 @@ export const getExplorationResult = (sessionId: number): Promise<ExplorationResu
           ? { state: 'GENERATING', retryAfterMs: Number(r.headers['retry-after'] ?? 1) * 1000 }
           : { state: 'READY', result: r.data },
       );
+
+export const getExplorationComparison = (resultId: number, majorCodes: string[]) =>
+  isExplorationMock
+    ? mock.getComparison(resultId, majorCodes)
+    : api
+        .get<ExplorationComparison>(`${BASE}/results/${resultId}/comparison`, {
+          params: { majorCodes: majorCodes.join(',') },
+        })
+        .then((r) => r.data);
 
 export const toExplorationErrorCode = (error: unknown): ExplorationErrorCode => {
   const e = error as { response?: { status?: number; data?: { code?: string } } };

@@ -208,6 +208,28 @@ export type ExplorationResultResponse =
   | { state: 'GENERATING'; retryAfterMs: number }
   | { state: 'READY'; result: ExplorationResult };
 
+// ---- 후보 전공 비교 (GET /results/{resultId}/comparison) ----
+// 04 문서 엔드포인트 목록에 없는 API다. 백엔드와 합의 전 프런트 가정.
+// 승자·순위·점수를 담지 않는다.
+
+export interface ComparisonMajorProfile {
+  majorCode: string;
+  name: string;
+  groupName: string;
+  learning: string[];
+  activities: string[];
+  careerDirections: string[];
+  checkPoints: string[];
+}
+
+export interface ExplorationComparison {
+  resultId: number;
+  majors: ComparisonMajorProfile[];
+  commonPoints: string[];
+  differences: string[];
+  sourceNote: string;
+}
+
 export type ExplorationErrorCode =
   | 'INVALID_REQUEST'
   | 'RESOURCE_NOT_FOUND'
