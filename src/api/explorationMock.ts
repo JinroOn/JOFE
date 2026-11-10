@@ -5,6 +5,8 @@ import type {
   AdvanceResponse,
   CompleteResponse,
   ExplorationOption,
+  ExplorationComparison,
+  ComparisonMajorProfile,
   ExplorationProgress,
   ExplorationResult,
   ExplorationResultResponse,
@@ -531,4 +533,77 @@ export const getResult = (sessionId: number) =>
     const elapsed = Date.now() - (s.completedAt ?? 0);
     if (elapsed < GENERATING_MS) return { state: 'GENERATING', retryAfterMs: 500 };
     return { state: 'READY', result: buildResult(s) };
+  });
+
+// ---- 후보 전공 비교 ----
+// 전공 프로필 문구는 임시 샘플이다 (실제 승인된 전공 프로필 아님)
+const PROFILES: Record<string, Omit<ComparisonMajorProfile, 'majorCode' | 'name' | 'groupName'>> = {
+  'MOCK-M-DS': {
+    learning: ['프로그래밍 기초와 데이터 처리', '통계와 머신러닝 입문', '데이터베이스'],
+    activities: ['실제 데이터를 모아 정리하는 프로젝트', '분석 결과를 시각화해 발표하기'],
+    careerDirections: ['데이터 분석', '서비스 기획·운영 데이터 업무', '대학원 진학(데이터·AI)'],
+    checkPoints: ['코딩 과제 비중이 어느 정도인지 교육과정표로 확인해보세요.'],
+  },
+  'MOCK-M-STAT': {
+    learning: ['확률과 통계 이론', '회귀분석·실험계획', '통계 소프트웨어 활용'],
+    activities: ['조사 자료를 분석해 결론의 신뢰도 따져보기', '수식으로 모형 세우기'],
+    careerDirections: ['조사·연구 기관 통계 업무', '데이터 분석', '대학원 진학(통계)'],
+    checkPoints: ['1학년 수학 과목이 몇 개인지 확인해보세요.'],
+  },
+  'MOCK-M-MATH': {
+    learning: ['해석학·대수학 등 수학 이론', '증명 중심 수업'],
+    activities: ['개념을 증명하며 원리 이해하기', '문제를 오래 붙잡고 풀어보기'],
+    careerDirections: ['수학 교육', '금융·보험 수리 업무', '대학원 진학(수학)'],
+    checkPoints: ['증명 위주의 수업 방식이 어떤지 강의 자료를 찾아 살펴보세요.'],
+  },
+  'MOCK-M-BIO': {
+    learning: ['세포·분자생물학', '유전학', '생화학'],
+    activities: ['실험 설계와 결과 기록', '논문 읽고 정리하기'],
+    careerDirections: ['생명과학 연구', '바이오 기업 연구·품질 업무', '대학원 진학(생명과학)'],
+    checkPoints: ['실험 과목 수와 실험 시간이 어느 정도인지 확인해보세요.'],
+  },
+  'MOCK-M-BIOMED': {
+    learning: ['의약품 개발 기초', '생화학·약리학 입문', '바이오 공정'],
+    activities: ['실험실 실습', '신약 개발 과정 사례 조사'],
+    careerDirections: ['제약·바이오 기업', '임상·품질 관리 업무', '대학원 진학'],
+    checkPoints: ['화학 과목 비중이 어느 정도인지 확인해보세요.'],
+  },
+  'MOCK-M-EDU': {
+    learning: ['교육학 이론', '교육 심리·평가', '교육 프로그램 설계'],
+    activities: ['수업이나 프로그램을 직접 설계해보기', '현장 관찰과 토론'],
+    careerDirections: ['교육 기관 운영·기획', '교육 콘텐츠 개발', '대학원 진학(교육학)'],
+    checkPoints: ['교원 자격과 관련된 과정이 있는지 학과 안내를 확인해보세요.'],
+  },
+  'MOCK-M-MATHEDU': {
+    learning: ['수학 내용학', '수학 교수법', '교육 실습'],
+    activities: ['수학 개념을 설명하는 수업 시연', '학교 현장 실습'],
+    careerDirections: ['중등 수학 교사', '수학 교육 콘텐츠 개발'],
+    checkPoints: ['교육 실습 시기와 기간을 확인해보세요.'],
+  },
+};
+
+export const getComparison = (resultId: number, majorCodes: string[]) =>
+  delay((): ExplorationComparison => {
+    const s = Object.values(load().sessions).find((x) => x.session.resultId === resultId);
+    if (!s) throw fail(404, 'RESOURCE_NOT_FOUND');
+    const result = buildResult(s);
+    const cards = result.groups.flatMap((g) => g.majors.map((m) => ({ ...m, groupName: g.name })));
+    const unique = [...new Set(majorCodes)];
+    if (unique.length < 2 || unique.length > 3) throw fail(400, 'INVALID_REQUEST');
+    const majors = unique.map((code) => {
+      const card = cards.find((c) => c.majorCode === code);
+      const profile = PROFILES[code];
+      if (!card || !profile) throw fail(422, 'INVALID_REQUEST');
+      return { majorCode: code, name: card.name, groupName: card.groupName, ...profile };
+    });
+    const sameGroup = new Set(majors.map((m) => m.groupName)).size === 1;
+    return {
+      resultId,
+      majors,
+      commonPoints: sameGroup
+        ? [`모두 ${majors[0].groupName}에 속해서, 기초 과목이 겹치는 부분이 있어요.`]
+        : ['모두 이번 응답에서 먼저 탐색해볼 후보로 나온 전공이에요.'],
+      differences: majors.map((m) => `${m.name} · 주로 배우는 것: ${m.learning[0]} / 자주 하는 활동: ${m.activities[0]}`),
+      sourceNote: '전공 프로필은 mock 샘플 문구예요. 실제 서비스에서는 검토를 거친 전공 프로필 자료를 사용해요.',
+    };
   });
