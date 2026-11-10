@@ -1,0 +1,148 @@
+// 탐색형 진단(EXPLORATION_V1) 타입
+// 기준: 진행할 작업 문서 04_DB_API_화면_구현계약 — Backend API 3절(핵심 DTO), Frontend 2~5절
+// 주의: 04 문서에 예시가 없는 응답 필드(이어하기·답변 저장·단계 전환 응답)는
+//       백엔드 계약 확정 전 프런트 가정이다. 백엔드 구현 시 맞춰 수정한다.
+
+export type ExplorationStage = 'STAGE_1' | 'STAGE_2' | 'STAGE_3';
+
+export type ExplorationSessionStatus = 'in_progress' | 'completed';
+
+export interface ExplorationVersions {
+  questionCatalog: string;
+  optionCatalog: string;
+  majorMapping: string;
+  ruleset: string;
+}
+
+// POST /sessions, GET /sessions/{id} 의 session 부분
+export interface ExplorationSession {
+  sessionId: number;
+  diagnosisType: 'EXPLORATION_V1';
+  status: ExplorationSessionStatus;
+  stage: ExplorationStage;
+  revision: number;
+  versions: ExplorationVersions;
+  startedAt: string;
+  resultId: number | null;
+}
+
+export interface ExplorationOption {
+  code: string;
+  text: string;
+  order: number;
+}
+
+// 서버가 회차에 고정해 내려준 문항 스냅샷. 프런트는 문구를 그대로 표시한다.
+export interface IssuedQuestion {
+  issuedId: number;
+  questionId: string;
+  questionVersion: string;
+  comparisonSet: string | null;
+  optionVariantVersion: string | null;
+  text: string;
+  options: ExplorationOption[];
+  required: boolean;
+}
+
+export interface ExplorationProgress {
+  stage: 1 | 2 | 3;
+  answered: number;
+  issued: number;
+  stageMax: number;
+  remainingMax: number;
+}
+
+// 다음 행동: 서버가 결정한다. 프런트는 활성 조건을 계산하지 않는다.
+export type ExplorationNextAction = 'ANSWER' | 'NEXT' | 'ADVANCE' | 'COMPLETE';
+
+// POST /sessions/{id}/next
+export interface NextQuestionsResponse {
+  revision: number;
+  issuedQuestions: IssuedQuestion[];
+  progress: ExplorationProgress;
+  nextAction: ExplorationNextAction;
+  // 앞선 답변으로 조건부 문항이 추가·제거됐으면 true (화면에서 한 번 안내)
+  adjusted: boolean;
+}
+
+export interface IssuedQuestionState {
+  question: IssuedQuestion;
+  stage: ExplorationStage;
+  answerCode: string | null;
+  // 분기에서 제외된 답변은 false (현재 결과에 미사용)
+  effective: boolean;
+}
+
+// GET /sessions/{id} — 이어하기
+export interface ExplorationSessionDetail {
+  session: ExplorationSession;
+  issued: IssuedQuestionState[];
+  progress: ExplorationProgress;
+  nextAction: ExplorationNextAction;
+}
+
+export interface ExplorationSessionSummary {
+  sessionId: number;
+  diagnosisType: 'EXPLORATION_V1' | 'LEGACY';
+  status: ExplorationSessionStatus;
+  stage: ExplorationStage | null;
+  startedAt: string;
+}
+
+// PUT /sessions/{id}/answers/{issuedId}
+export interface SaveAnswerRequest {
+  optionCode: string;
+  expectedRevision: number;
+  clientMutationId: string;
+}
+
+export interface SaveAnswerResponse {
+  revision: number;
+  issuedId: number;
+  optionCode: string;
+  // 이전 답변 수정으로 영향받는 이후 문항 수 (없으면 0)
+  affectedCount: number;
+  // 분기 재평가로 현재 결과에 미사용이 된 issuedId 목록
+  excludedIssuedIds: number[];
+  progress: ExplorationProgress;
+  nextAction: ExplorationNextAction;
+}
+
+// 단계 사이 안내 문구. 서버 문구를 그대로 표시한다.
+export interface StageNotice {
+  title: string;
+  description: string;
+  expectedMaxQuestions: number;
+}
+
+// POST /sessions/{id}/advance
+export interface AdvanceResponse {
+  revision: number;
+  stage: ExplorationStage;
+  nextAction: ExplorationNextAction;
+  notice: StageNotice | null;
+}
+
+// POST /sessions/{id}/complete
+export interface CompleteResponse {
+  revision: number;
+  resultId: number;
+  status: 'completed';
+}
+
+export type ExplorationErrorCode =
+  | 'INVALID_REQUEST'
+  | 'RESOURCE_NOT_FOUND'
+  | 'STALE_REVISION'
+  | 'IDEMPOTENCY_CONFLICT'
+  | 'SESSION_ALREADY_COMPLETED'
+  | 'OPTION_NOT_ISSUED'
+  | 'QUESTION_NOT_EFFECTIVE'
+  | 'STAGE_INCOMPLETE'
+  | 'NO_SUPPORTED_CANDIDATE'
+  | 'NO_ACTIVE_CATALOG'
+  | 'NETWORK'
+  | 'UNKNOWN';
+
+// 저장·응답 없이 선택지로만 쓰이는 코드 (점수 null, 평균 분모 제외)
+export const ABSTAIN_OPTION_CODES = ['UNKNOWN', 'NO_EXPERIENCE'] as const;

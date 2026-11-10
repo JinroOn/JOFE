@@ -13,6 +13,9 @@ import DiagnosisMajor from './pages/Diagnosis/Major';
 import DiagnosisLoading from './pages/Diagnosis/Loading';
 import DiagnosisQuiz from './pages/Diagnosis/Quiz';
 import DiagnosisTendency from './pages/Diagnosis/Tendency';
+import ExplorationIntro from './pages/Diagnosis/Exploration/Intro';
+import ExplorationQuestion from './pages/Diagnosis/Exploration/Question';
+import { isExplorationEnabled } from './config/features';
 import LibraryNotice from './pages/Library/Notice';
 import LibraryContent from './pages/Library/Content';
 import LibraryContentDetail from './pages/Library/Content/Detail';
@@ -78,6 +81,14 @@ const AppLayout = () => {
           <Route path="/diagnosis/tendency" element={<UserOnlyRoute><DiagnosisTendency /></UserOnlyRoute>} />
           <Route path="/diagnosis/loading" element={<UserOnlyRoute><DiagnosisLoading /></UserOnlyRoute>} />
           <Route path="/diagnosis/quiz" element={<UserOnlyRoute><DiagnosisQuiz /></UserOnlyRoute>} />
+          <Route
+            path="/diagnosis/exploration"
+            element={isExplorationEnabled ? <UserOnlyRoute><ExplorationIntro /></UserOnlyRoute> : <Navigate to="/diagnosis" replace />}
+          />
+          <Route
+            path="/diagnosis/exploration/session/:sessionId"
+            element={isExplorationEnabled ? <UserOnlyRoute><ExplorationQuestion /></UserOnlyRoute> : <Navigate to="/diagnosis" replace />}
+          />
           <Route path="/diagnosis/explore" element={<UserOnlyRoute><MajorExplore /></UserOnlyRoute>} />
           <Route path="/analysis/weak" element={<UserOnlyRoute><WeakCapability /></UserOnlyRoute>} />
           <Route path="/analysis/dashboard" element={<UserOnlyRoute><Dashboard /></UserOnlyRoute>} />
