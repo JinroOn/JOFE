@@ -42,6 +42,7 @@ const DiagnosisQuiz = () => {
   const [selected, setSelected] = useState<string | null>(null);
   const [essayAnswer, setEssayAnswer] = useState('');
   const [advancing, setAdvancing] = useState(false);
+  const [savingAnswer, setSavingAnswer] = useState(false);
   const [showBackConfirm, setShowBackConfirm] = useState(false);
 
   const [completedIndexes, setCompletedIndexes] = useState<Set<number>>(new Set());
@@ -269,6 +270,34 @@ const DiagnosisQuiz = () => {
     setAdvancing(false);
   };
 
+  // 객관식은 보기를 고르는 즉시 저장 (다음 질문은 이동만)
+  const selectOption = async (answer: string) => {
+    const q = questions[index];
+    if (!sessionId || !q || savingAnswer) return;
+
+    const previous = selected;
+    setSelected(answer);
+    if (answer === savedObjectiveAnswers[index]) return;
+
+    setSavingAnswer(true);
+    try {
+      await createExamAnswer({
+        diagnosisSessionId: sessionId,
+        examQuestionId: q.id,
+        selectedAnswer: answer,
+        correct: answer === q.correctAnswer,
+        responseSec: Math.round((nowMs() - questionStartedAtRef.current) / 1000),
+      });
+      setSavedObjectiveAnswers((prev) => ({ ...prev, [index]: answer }));
+      setCompletedIndexes((prev) => new Set(prev).add(index));
+    } catch (error) {
+      console.error('답변 저장 실패:', error);
+      setSelected(previous);
+    } finally {
+      setSavingAnswer(false);
+    }
+  };
+
   const goToQuestion = (questionIndex: number) => {
     if (advancing) return;
 
@@ -289,6 +318,13 @@ const DiagnosisQuiz = () => {
 
     const targetQuestion = questions[nextIncompleteIndex];
     if (!targetQuestion) return;
+
+    if (sessionId) {
+      updateSession(sessionId, {
+        currentStep: nextIncompleteIndex + 2,
+        status: 'in_progress',
+      }).catch(() => {});
+    }
 
     resetQuestionInput(nextIncompleteIndex);
   };
@@ -315,22 +351,16 @@ const DiagnosisQuiz = () => {
     );
   }
 
-  const progress = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+  const currentNo = index + 1;
+  const progress = total > 0 ? Math.round((currentNo / total) * 100) : 0;
   const canFinishAfterCurrent = !currentCompleted && completedCount === total - 1;
   const canFinishNow = currentCompleted && completedCount === total && !objectiveAnswerChanged;
 
-  const actionButtonLabel = objectiveAnswerChanged
-    ? completedCount >= total
-      ? '답변 수정 후 결과 보기'
-      : '답변 수정 후 다음'
-    : canFinishNow || canFinishAfterCurrent
-    ? '결과 보기'
-    : currentCompleted
-    ? '다음 미완료 문항'
-    : '다음 질문';
+  const actionButtonLabel = canFinishNow || canFinishAfterCurrent ? '결과 보기' : '다음 질문';
 
   const actionButtonDisabled =
     advancing ||
+    savingAnswer ||
     (!currentCompleted && (isEssay ? !essayAnswer.trim() : !selected)) ||
     (isObjectiveCompleted && objectiveAnswerChanged && !selected);
 
@@ -361,7 +391,7 @@ const DiagnosisQuiz = () => {
             </h1>
 
             <p className="text-[13px] text-on-surface-variant">
-              천천히 읽고 답해주세요. · {completedCount} / {total} 완료
+              천천히 읽고 답해주세요. · {currentNo} / {total} 완료
             </p>
           </div>
 
@@ -379,8 +409,10 @@ const DiagnosisQuiz = () => {
                   QUESTION {String(index + 1).padStart(2, '0')} / {total}
                 </span>
 
-                {currentCompleted && (
-                  <span className="text-[11px] font-bold text-secondary shrink-0">AUTO SAVED ✓</span>
+                {savingAnswer ? (
+                  <span className="text-[11px] font-bold text-on-surface-variant shrink-0">SAVING...</span>
+                ) : (
+                  currentCompleted && <span className="text-[11px] font-bold text-secondary shrink-0">AUTO SAVED ✓</span>
                 )}
               </div>
 
@@ -418,8 +450,8 @@ const DiagnosisQuiz = () => {
                     return (
                       <button
                         key={id}
-                        onClick={() => setSelected(id)}
-                        disabled={advancing}
+                        onClick={() => void selectOption(id)}
+                        disabled={advancing || savingAnswer}
                         className={`text-left min-h-[92px] px-4 py-3.5 rounded-xl border transition-all disabled:opacity-60 ${
                           active
                             ? 'border-2 border-secondary bg-secondary-container/10'
@@ -469,7 +501,7 @@ const DiagnosisQuiz = () => {
               <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-2xl p-6 text-center">
                 <p className="text-xs font-bold text-on-surface-variant mb-3">공통 역량 진단</p>
                 <p className="text-[30px] font-bold text-primary-container leading-none mb-3">
-                  {completedCount} / {total}
+                  {currentNo} / {total}
                 </p>
                 <p className="text-xs text-on-surface-variant">약 {progress}% 완료</p>
               </div>
