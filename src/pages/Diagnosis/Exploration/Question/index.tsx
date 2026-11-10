@@ -252,14 +252,13 @@ const ExplorationQuestion = () => {
         <SaveStatus saveState={s.saveState} onRetry={() => void s.retry()} onReload={() => void s.reloadLatest()} onExit={exit} />
       </div>
 
-      <div className="mt-6 flex items-center justify-between gap-2">
+      {/* 답을 고르면 저장 후 바로 다음 질문으로 넘어가므로 '다음' 버튼은 두지 않는다 */}
+      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2">
         <button type="button" className={secondaryBtn} onClick={s.goPrev} disabled={!hasPrev || saving}>
           ← 이전 질문
         </button>
         {current.answerCode && !s.pending && (
-          <button type="button" className={primaryBtn} onClick={s.goNextAnswered} disabled={saving}>
-            다음 →
-          </button>
+          <p className="text-xs text-on-surface-variant">답을 바꾸거나, 같은 답을 다시 누르면 다음 질문으로 넘어가요.</p>
         )}
       </div>
 
