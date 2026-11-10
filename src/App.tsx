@@ -15,6 +15,7 @@ import DiagnosisQuiz from './pages/Diagnosis/Quiz';
 import DiagnosisTendency from './pages/Diagnosis/Tendency';
 import ExplorationIntro from './pages/Diagnosis/Exploration/Intro';
 import ExplorationQuestion from './pages/Diagnosis/Exploration/Question';
+import ExplorationResult from './pages/Analysis/ExplorationResult';
 import { isExplorationEnabled } from './config/features';
 import LibraryNotice from './pages/Library/Notice';
 import LibraryContent from './pages/Library/Content';
@@ -93,6 +94,10 @@ const AppLayout = () => {
           <Route path="/analysis/weak" element={<UserOnlyRoute><WeakCapability /></UserOnlyRoute>} />
           <Route path="/analysis/dashboard" element={<UserOnlyRoute><Dashboard /></UserOnlyRoute>} />
           <Route path="/analysis/compare" element={<UserOnlyRoute><MajorCompare /></UserOnlyRoute>} />
+          <Route
+            path="/analysis/exploration/:sessionId"
+            element={isExplorationEnabled ? <UserOnlyRoute><ExplorationResult /></UserOnlyRoute> : <Navigate to="/analysis/dashboard" replace />}
+          />
           <Route path="/analysis/*" element={<UserOnlyRoute><Placeholder name="진로분석" /></UserOnlyRoute>} />
           <Route path="/library" element={<UserOnlyRoute><LibraryNotice /></UserOnlyRoute>} />
           <Route path="/library/content" element={<UserOnlyRoute><LibraryContent /></UserOnlyRoute>} />

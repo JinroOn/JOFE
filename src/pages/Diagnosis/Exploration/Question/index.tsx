@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { isExplorationMock } from '../../../../config/features';
 import useExplorationStore from '../../../../store/useExplorationStore';
 import { ABSTAIN_OPTION_CODES } from '../../../../types/exploration';
@@ -129,16 +129,9 @@ const ExplorationQuestion = () => {
     );
   }
 
+  // 완료된 회차는 결과 화면에서 보여준다 (결과 생성 대기 포함)
   if (s.phase === 'RESULT_READY') {
-    return wrap(
-      <Panel>
-        <h1 className="text-xl sm:text-2xl font-bold text-primary-container mb-3">결과가 준비됐어요</h1>
-        <p className="text-sm text-on-surface-variant mb-8 leading-relaxed">
-          결과 화면은 다음 작업에서 연결할 예정이에요. (결과 번호 {s.resultId})
-        </p>
-        <button type="button" className={secondaryBtn} onClick={exit}>검사 안내로</button>
-      </Panel>,
-    );
+    return <Navigate to={`/analysis/exploration/${id}`} replace />;
   }
 
   if (!current || !s.session || !s.progress) {
