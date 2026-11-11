@@ -18,6 +18,7 @@ import type {
   ExplorationResult,
   ExplorationResultResponse,
   ExplorationSession,
+  ExplorationShareState,
   ExplorationSessionDetail,
   ExplorationSessionSummary,
   ExplorationStage,
@@ -28,6 +29,8 @@ import type {
   NextQuestionsResponse,
   SaveAnswerRequest,
   SaveAnswerResponse,
+  SharedExplorationResult,
+  ShareStatus,
   StageNotice,
   SupportAnswerResponse,
   SupportPurpose,
@@ -124,6 +127,7 @@ interface MockSession {
     mutations: Record<string, ExplorationAskResponse>;
   };
   plans?: (ExplorationPlan & { requestedAt: number; willFail: boolean })[];
+  share?: { token: string; createdAtMs: number; expiresAtMs: number; disabled: boolean };
 }
 
 interface MockDb {
@@ -1166,4 +1170,85 @@ export const getPlan = (planId: number) =>
       .find((p) => p.planId === planId);
     if (!plan) throw fail(404, 'RESOURCE_NOT_FOUND');
     return publicPlan(plan);
+  });
+
+// ---- 결과 공유 ----
+// localStorage 'jinroon.exploration.mock.shareTtlMs'로 만료 시간을 줄여 만료 상태를 재현할 수 있다.
+const SHARE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+const shareTtl = () => {
+  try {
+    const v = Number(localStorage.getItem('jinroon.exploration.mock.shareTtlMs'));
+    return Number.isFinite(v) && v > 0 ? v : SHARE_TTL_MS;
+  } catch {
+    return SHARE_TTL_MS;
+  }
+};
+
+const newToken = () => `mock-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+const shareStatusOf = (share: NonNullable<MockSession['share']>): ShareStatus => {
+  if (share.disabled) return 'DISABLED';
+  if (Date.now() > share.expiresAtMs) return 'EXPIRED';
+  return 'ACTIVE';
+};
+
+const shareState = (resultId: number, share: MockSession['share']): ExplorationShareState =>
+  share
+    ? {
+        resultId,
+        status: shareStatusOf(share),
+        token: share.token,
+        createdAt: new Date(share.createdAtMs).toISOString(),
+        expiresAt: new Date(share.expiresAtMs).toISOString(),
+      }
+    : { resultId, status: 'NONE', token: null, createdAt: null, expiresAt: null };
+
+export const getShare = (resultId: number) =>
+  delay((): ExplorationShareState => shareState(resultId, findByResult(load(), resultId).share));
+
+export const createShare = (resultId: number) =>
+  delay((): ExplorationShareState => {
+    const db = load();
+    const s = findByResult(db, resultId);
+    if (s.share && shareStatusOf(s.share) === 'ACTIVE') return shareState(resultId, s.share);
+    // 만료·끈 링크는 같은 주소로 되살리지 않고 새 토큰을 만든다
+    const now = Date.now();
+    s.share = { token: newToken(), createdAtMs: now, expiresAtMs: now + shareTtl(), disabled: false };
+    save(db);
+    return shareState(resultId, s.share);
+  });
+
+export const disableShare = (resultId: number) =>
+  delay((): ExplorationShareState => {
+    const db = load();
+    const s = findByResult(db, resultId);
+    if (s.share) {
+      s.share.disabled = true;
+      save(db);
+    }
+    return shareState(resultId, s.share);
+  });
+
+export const getSharedResult = (token: string) =>
+  delay((): SharedExplorationResult => {
+    const s = Object.values(load().sessions).find((x) => x.share?.token === token);
+    // 없음·만료·꺼짐은 구분하지 않고 같은 404로 응답한다
+    if (!s?.share || shareStatusOf(s.share) !== 'ACTIVE') throw fail(404, 'RESOURCE_NOT_FOUND');
+    const result = buildResult(s);
+    return {
+      nickname: '탐색하는 학생',
+      completedAt: result.createdAt,
+      status: result.status,
+      groups: result.groups.map((g) => ({
+        name: g.name,
+        summary: g.summary,
+        majors: g.majors
+          .filter((m) => !m.collapsed)
+          .map((m) => ({ name: m.name, reason: m.reasons[0]?.text ?? '' })),
+      })),
+      activities: result.nextActivities.map((a) => ({ title: a.title, duration: a.duration })),
+      notes: result.notes,
+      expiresAt: new Date(s.share.expiresAtMs).toISOString(),
+    };
   });

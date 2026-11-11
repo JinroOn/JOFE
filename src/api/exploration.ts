@@ -1,4 +1,4 @@
-import api from './axios';
+import api, { publicApi } from './axios';
 import { isExplorationMock } from '../config/features';
 import * as mock from './explorationMock';
 import type {
@@ -14,11 +14,13 @@ import type {
   ExplorationResult,
   ExplorationResultResponse,
   ExplorationSession,
+  ExplorationShareState,
   ExplorationSessionDetail,
   ExplorationSessionSummary,
   NextQuestionsResponse,
   SaveAnswerRequest,
   SaveAnswerResponse,
+  SharedExplorationResult,
   SupportAnswerResponse,
   SupportPurpose,
   SupportSession,
@@ -168,6 +170,28 @@ export const getExplorationPlan = (planId: number) =>
   isExplorationMock
     ? mock.getPlan(planId)
     : api.get<ExplorationPlan>(`${BASE}/plans/${planId}`).then((r) => r.data);
+
+export const getExplorationShare = (resultId: number) =>
+  isExplorationMock
+    ? mock.getShare(resultId)
+    : api.get<ExplorationShareState>(`${BASE}/results/${resultId}/share`).then((r) => r.data);
+
+// 켜진 링크가 있으면 그대로 돌려받고, 만료·꺼진 링크는 새 토큰으로 만든다고 가정한다
+export const createExplorationShare = (resultId: number) =>
+  isExplorationMock
+    ? mock.createShare(resultId)
+    : api.post<ExplorationShareState>(`${BASE}/results/${resultId}/share`, {}, idem()).then((r) => r.data);
+
+export const disableExplorationShare = (resultId: number) =>
+  isExplorationMock
+    ? mock.disableShare(resultId)
+    : api.delete<ExplorationShareState>(`${BASE}/results/${resultId}/share`).then((r) => r.data);
+
+// 공개 결과는 로그인 없이 조회한다
+export const getSharedExplorationResult = (token: string) =>
+  isExplorationMock
+    ? mock.getSharedResult(token)
+    : publicApi.get<SharedExplorationResult>(`${BASE}/shares/${encodeURIComponent(token)}`).then((r) => r.data);
 
 export const toExplorationErrorCode = (error: unknown): ExplorationErrorCode => {
   const e = error as { response?: { status?: number; data?: { code?: string } } };

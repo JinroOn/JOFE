@@ -351,6 +351,42 @@ export interface ExplorationPlan extends ExplorationPlanSummary {
   sources: ConsultationSource[];
 }
 
+// ---- 결과 공유 (GET/POST/DELETE /results/{id}/share, GET /shares/{token}) ----
+// 04 문서에 엔드포인트가 없어 백엔드와 합의 전 프런트 가정.
+// D-28: 기본 꺼짐, 30일 만료, 즉시 끄기, 만료·끈 링크는 새 링크로만 다시 공유
+
+export type ShareStatus = 'NONE' | 'ACTIVE' | 'EXPIRED' | 'DISABLED';
+
+export interface ExplorationShareState {
+  resultId: number;
+  status: ShareStatus;
+  token: string | null;
+  createdAt: string | null;
+  expiresAt: string | null;
+}
+
+// D-29 공개 정보 allowlist만 담는다. 점수·원문 응답·주의 태그 세부·상담·계획은 없다.
+export interface SharedExplorationMajor {
+  name: string;
+  reason: string;
+}
+
+export interface SharedExplorationGroup {
+  name: string;
+  summary: string;
+  majors: SharedExplorationMajor[];
+}
+
+export interface SharedExplorationResult {
+  nickname: string;
+  completedAt: string;
+  status: ExplorationResultStatus;
+  groups: SharedExplorationGroup[];
+  activities: { title: string; duration: string }[];
+  notes: string[];
+  expiresAt: string;
+}
+
 export type ExplorationErrorCode =
   | 'INVALID_REQUEST'
   | 'RESOURCE_NOT_FOUND'

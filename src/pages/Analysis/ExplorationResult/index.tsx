@@ -6,6 +6,7 @@ import useExplorationResult from '../../../hooks/useExplorationResult';
 import type { ActivityKind, ExplorationResult } from '../../../types/exploration';
 import MockBanner from '../../Diagnosis/Exploration/components/MockBanner';
 import GroupCard from './components/GroupCard';
+import SharePanel from './components/SharePanel';
 
 const ACTIVITY_LABEL: Record<ActivityKind, { text: string; icon: string }> = {
   INFO_CHECK: { text: '정보 확인', icon: 'search' },
@@ -173,6 +174,8 @@ const ResultView = ({ result, onExit, onCompare, onActivities, onAsk, onPlan }: 
           </ol>
         </section>
       )}
+
+      <SharePanel resultId={result.resultId} />
 
       <section aria-labelledby="next-title" className="rounded-brand bg-surface-container-low p-5 sm:p-6 mb-8">
         <h2 id="next-title" className="font-bold text-primary-container mb-3">다음으로 할 수 있는 것</h2>
