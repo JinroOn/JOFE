@@ -46,9 +46,10 @@ interface ResultViewProps {
   result: ExplorationResult;
   onExit: () => void;
   onCompare: (majorCodes: string[]) => void;
+  onActivities: () => void;
 }
 
-const ResultView = ({ result, onExit, onCompare }: ResultViewProps) => {
+const ResultView = ({ result, onExit, onCompare, onActivities }: ResultViewProps) => {
   const noCandidate = result.status === 'NO_SUPPORTED_CANDIDATE';
   const [selected, setSelected] = useState<string[]>([]);
   const [compareHint, setCompareHint] = useState(false);
@@ -145,7 +146,13 @@ const ResultView = ({ result, onExit, onCompare }: ResultViewProps) => {
 
       {result.nextActivities.length > 0 && (
         <section aria-labelledby="activity-title" className="mb-10">
-          <h2 id="activity-title" className="text-lg font-bold text-primary-container mb-3">이번 주에 해볼 수 있는 탐색 활동</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <h2 id="activity-title" className="text-lg font-bold text-primary-container">이번 주에 해볼 수 있는 탐색 활동</h2>
+            <button type="button" onClick={onActivities} className="min-h-[44px] inline-flex items-center gap-1 text-sm font-semibold text-secondary">
+              활동 더 보기·내 상황에 맞게 바꾸기
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_forward</span>
+            </button>
+          </div>
           <ol className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {result.nextActivities.map((a) => (
               <li key={a.activityCode} className="flex flex-col rounded-brand bg-surface-container-lowest border border-outline-variant/20 p-5 cloud-shadow">
@@ -173,6 +180,9 @@ const ResultView = ({ result, onExit, onCompare }: ResultViewProps) => {
               후보 전공 비교하기{selected.length > 0 ? ` (${selected.length}개 담음)` : ''}
             </button>
           )}
+          <button type="button" onClick={onActivities} className={secondaryBtn}>
+            탐색 활동 보기
+          </button>
           <button type="button" disabled className={`${secondaryBtn} opacity-60 cursor-not-allowed`}>
             결과에 대해 AI에게 묻기 (준비 중)
           </button>
@@ -269,6 +279,7 @@ const ExplorationResultPage = () => {
       <ResultView
         result={state.result}
         onExit={exit}
+        onActivities={() => navigate(`/analysis/exploration/${id}/activities`)}
         onCompare={(codes) => navigate(`/analysis/exploration/${id}/compare?majors=${codes.map(encodeURIComponent).join(',')}`)}
       />
     </Shell>

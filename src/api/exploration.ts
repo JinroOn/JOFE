@@ -4,6 +4,7 @@ import * as mock from './explorationMock';
 import type {
   AdvanceResponse,
   CompleteResponse,
+  ExplorationActivities,
   ExplorationComparison,
   ExplorationErrorCode,
   ExplorationResult,
@@ -14,6 +15,9 @@ import type {
   NextQuestionsResponse,
   SaveAnswerRequest,
   SaveAnswerResponse,
+  SupportAnswerResponse,
+  SupportPurpose,
+  SupportSession,
 } from '../types/exploration';
 
 const BASE = '/exploration/v1';
@@ -96,6 +100,32 @@ export const getExplorationComparison = (resultId: number, majorCodes: string[])
         .get<ExplorationComparison>(`${BASE}/results/${resultId}/comparison`, {
           params: { majorCodes: majorCodes.join(',') },
         })
+        .then((r) => r.data);
+
+export const getExplorationActivities = (resultId: number) =>
+  isExplorationMock
+    ? mock.getActivities(resultId)
+    : api.get<ExplorationActivities>(`${BASE}/results/${resultId}/activities`).then((r) => r.data);
+
+// 이미 시작한 결과 후 질문이 있으면 같은 회차를 돌려받는다고 가정한다
+export const startExplorationSupport = (resultId: number, purpose: SupportPurpose) =>
+  isExplorationMock
+    ? mock.startSupport(resultId, purpose)
+    : api.post<SupportSession>(`${BASE}/results/${resultId}/support`, { purpose }, idem()).then((r) => r.data);
+
+export const saveExplorationSupportAnswer = (
+  resultId: number,
+  issuedId: number,
+  body: { optionCode: string; expectedRevision: number; clientMutationId: string },
+) =>
+  isExplorationMock
+    ? mock.saveSupportAnswer(resultId, issuedId, body)
+    : api
+        .put<SupportAnswerResponse>(
+          `${BASE}/results/${resultId}/support/answers/${issuedId}`,
+          body,
+          idem(body.clientMutationId),
+        )
         .then((r) => r.data);
 
 export const toExplorationErrorCode = (error: unknown): ExplorationErrorCode => {
