@@ -20,6 +20,7 @@ import ExplorationCompare from './pages/Analysis/ExplorationCompare';
 import ExplorationActivities from './pages/Analysis/ExplorationActivities';
 import ExplorationAsk from './pages/Analysis/ExplorationAsk';
 import ExplorationPlan from './pages/Analysis/ExplorationPlan';
+import ExplorationShared from './pages/Analysis/ExplorationShared';
 import { isExplorationEnabled } from './config/features';
 import LibraryNotice from './pages/Library/Notice';
 import LibraryContent from './pages/Library/Content';
@@ -130,6 +131,10 @@ const AppLayout = () => {
             <Route path="notices" element={<AdminNoticeManage />} />
           </Route>
           <Route path="/results/share/:token" element={<SharedResult />} />
+          <Route
+            path="/exploration/share/:token"
+            element={isExplorationEnabled ? <ExplorationShared /> : <Navigate to="/" replace />}
+          />
           <Route path="/error" element={<ErrorPage />} />
           <Route path="*" element={<Placeholder name="404 - 찾을 수 없는" />} />
         </Routes>
