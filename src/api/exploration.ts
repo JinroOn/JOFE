@@ -5,7 +5,9 @@ import type {
   AdvanceResponse,
   CompleteResponse,
   ExplorationActivities,
+  ExplorationAskResponse,
   ExplorationComparison,
+  ExplorationConsultation,
   ExplorationErrorCode,
   ExplorationResult,
   ExplorationResultResponse,
@@ -125,6 +127,25 @@ export const saveExplorationSupportAnswer = (
           `${BASE}/results/${resultId}/support/answers/${issuedId}`,
           body,
           idem(body.clientMutationId),
+        )
+        .then((r) => r.data);
+
+// 같은 결과의 상담이 있으면 이어서 연다고 가정한다
+export const openExplorationConsultation = (resultId: number) =>
+  isExplorationMock
+    ? mock.openConsultation(resultId)
+    : api
+        .post<ExplorationConsultation>(`${BASE}/results/${resultId}/consultations`, {}, idem())
+        .then((r) => r.data);
+
+export const askExplorationConsultation = (consultationId: number, content: string, clientMutationId: string) =>
+  isExplorationMock
+    ? mock.ask(consultationId, content, clientMutationId)
+    : api
+        .post<ExplorationAskResponse>(
+          `${BASE}/consultations/${consultationId}/messages`,
+          { content },
+          idem(clientMutationId),
         )
         .then((r) => r.data);
 

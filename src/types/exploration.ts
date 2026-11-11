@@ -278,6 +278,47 @@ export interface SupportAnswerResponse {
   remaining: number;
 }
 
+// ---- 결과에 대해 AI에게 묻기 ----
+// 04 문서 엔드포인트 목록에 없는 API다. 백엔드와 합의 전 프런트 가정.
+// D-26: 프런트는 질문 문장과 결과 ID만 보낸다. D-27: 근거와 근거 상태를 함께 받는다.
+
+// 01 문서 6.2절 근거 데이터 다섯 층
+export type ConsultationSourceKind =
+  | 'RESULT_SNAPSHOT'
+  | 'METRIC_DEFINITION'
+  | 'MAJOR_PROFILE'
+  | 'ACTIVITY_CATALOG'
+  | 'ANSWER_POLICY';
+
+export interface ConsultationSource {
+  kind: ConsultationSourceKind;
+  title: string;
+  version: string;
+}
+
+// 근거가 부족하면 AI가 추론하지 않고 추가 확인이 필요하다고 답한다
+export type EvidenceStatus = 'GROUNDED' | 'INSUFFICIENT';
+
+export interface ExplorationChatMessage {
+  id: number;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
+  sources: ConsultationSource[];
+  evidenceStatus: EvidenceStatus | null;
+}
+
+export interface ExplorationConsultation {
+  consultationId: number;
+  resultId: number;
+  messages: ExplorationChatMessage[];
+}
+
+export interface ExplorationAskResponse {
+  userMessage: ExplorationChatMessage;
+  assistantMessage: ExplorationChatMessage;
+}
+
 export type ExplorationErrorCode =
   | 'INVALID_REQUEST'
   | 'RESOURCE_NOT_FOUND'
