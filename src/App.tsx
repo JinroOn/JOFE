@@ -9,6 +9,7 @@ import Login from './pages/Auth/Login';
 import Signup from './pages/Auth/Signup';
 import FindPassword from './pages/Auth/FindPassword';
 import MyPage from './pages/MyPage';
+import DiagnosisIntro from './pages/Diagnosis/Intro';
 import DiagnosisMajor from './pages/Diagnosis/Major';
 import DiagnosisLoading from './pages/Diagnosis/Loading';
 import DiagnosisQuiz from './pages/Diagnosis/Quiz';
@@ -81,7 +82,8 @@ const AppLayout = () => {
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/signup" element={<Signup />} />
           <Route path="/auth/find-password" element={<FindPassword />} />
-          <Route path="/diagnosis" element={<UserOnlyRoute><DiagnosisMajor /></UserOnlyRoute>} />
+          <Route path="/diagnosis" element={<UserOnlyRoute><DiagnosisIntro /></UserOnlyRoute>} />
+          <Route path="/diagnosis/basic-info" element={<UserOnlyRoute><DiagnosisMajor /></UserOnlyRoute>} />
           <Route path="/diagnosis/tendency" element={<UserOnlyRoute><DiagnosisTendency /></UserOnlyRoute>} />
           <Route path="/diagnosis/loading" element={<UserOnlyRoute><DiagnosisLoading /></UserOnlyRoute>} />
           <Route path="/diagnosis/quiz" element={<UserOnlyRoute><DiagnosisQuiz /></UserOnlyRoute>} />
