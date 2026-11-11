@@ -183,7 +183,13 @@ export interface ExplorationActivity {
   description: string;
   duration: string;
   outcome: string;
+  // D-22: 활동 결과물 예시
+  exampleOutput: string;
+  tags: ActivityTag[];
 }
+
+// 시간·비용·접근 제약 대응 표시 (D-21)
+export type ActivityTag = 'FREE' | 'ONLINE' | 'SOLO' | 'WITH_OTHERS';
 
 export interface RecheckAxis {
   metricCode: string;
@@ -228,6 +234,48 @@ export interface ExplorationComparison {
   commonPoints: string[];
   differences: string[];
   sourceNote: string;
+}
+
+// ---- 탐색 활동 (GET /results/{resultId}/activities) ----
+// 04 문서 엔드포인트 목록에 없는 API다. 백엔드와 합의 전 프런트 가정.
+// D-20: 전공군 공통 3개 + 전공별 1개, D-21: 기본 3개
+
+export interface ActivityGroupSection {
+  groupCode: string;
+  groupName: string;
+  common: ExplorationActivity[];
+  majors: { majorCode: string; name: string; activity: ExplorationActivity }[];
+}
+
+export interface ExplorationActivities {
+  resultId: number;
+  supportRevision: number | null;
+  // 결과 후 활동 선호 응답이 반영됐는지
+  personalized: boolean;
+  personalizationNote: string | null;
+  base: ExplorationActivity[];
+  groups: ActivityGroupSection[];
+}
+
+// ---- 결과 후 선택 질문 (POST /results/{id}/support, PUT .../support/answers/{issuedId}) ----
+// 엔드포인트는 04 문서에 있고, 응답 본문 구조는 프런트 가정이다.
+// 결과 후 응답은 추천 전공·순서를 바꾸지 않는다.
+
+export type SupportPurpose = 'PLAN' | 'ACTIVITY' | 'BOTH';
+
+export interface SupportSession {
+  resultId: number;
+  purpose: SupportPurpose;
+  supportRevision: number;
+  issuedQuestions: IssuedQuestion[];
+  answers: { issuedId: number; optionCode: string }[];
+}
+
+export interface SupportAnswerResponse {
+  supportRevision: number;
+  issuedId: number;
+  optionCode: string;
+  remaining: number;
 }
 
 export type ExplorationErrorCode =

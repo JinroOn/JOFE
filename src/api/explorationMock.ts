@@ -5,6 +5,7 @@ import type {
   AdvanceResponse,
   CompleteResponse,
   ExplorationOption,
+  ExplorationActivities,
   ExplorationComparison,
   ComparisonMajorProfile,
   ExplorationProgress,
@@ -20,6 +21,9 @@ import type {
   SaveAnswerRequest,
   SaveAnswerResponse,
   StageNotice,
+  SupportAnswerResponse,
+  SupportPurpose,
+  SupportSession,
 } from '../types/exploration';
 
 const STORAGE_KEY = 'jinroon.exploration.mock.v1';
@@ -100,6 +104,13 @@ interface MockSession {
   adjustPending: boolean;
   mutations: Record<string, SaveAnswerResponse>;
   completedAt?: number;
+  support?: {
+    purpose: SupportPurpose;
+    revision: number;
+    issued: IssuedQuestion[];
+    answers: Record<number, string>;
+    mutations: Record<string, SupportAnswerResponse>;
+  };
 }
 
 interface MockDb {
@@ -347,32 +358,93 @@ export const complete = (sessionId: number, expectedRevision: number) =>
 // mock 결과 상태는 1단계 응답만 보고 단순하게 고른다 (실제 추천 알고리즘이 아님)
 const GENERATING_MS = 1500;
 
-const ACTIVITIES: ExplorationResult['nextActivities'] = [
-  {
+type Activity = ExplorationResult['nextActivities'][number];
+
+// D-22: 특별한 시설·유료 장비 없이 시작, 결과물 예시 제공, 홍보 영상 시청만으로 끝나지 않음
+const POOL: Record<string, Activity> = {
+  INFO_CURRICULUM: {
     activityCode: 'MOCK-ACT-INFO',
     kind: 'INFO_CHECK',
     title: '학과 교육과정표 한 장 살펴보기',
     description: '관심 가는 학과 한 곳의 홈페이지에서 1~2학년 교육과정표를 찾아 과목 이름을 훑어봐요.',
     duration: '15~30분',
     outcome: '처음 2년 동안 어떤 과목을 배우는지 감을 잡을 수 있어요.',
+    exampleOutput: '과목 이름 10개와 "궁금한 과목" 표시 2개가 담긴 메모',
+    tags: ['FREE', 'ONLINE', 'SOLO'],
   },
-  {
+  HANDS_PROJECT: {
     activityCode: 'MOCK-ACT-HANDS',
     kind: 'HANDS_ON',
     title: '공개 데이터로 표 하나 만들어보기',
     description: '공공데이터포털에서 관심 있는 주제의 자료를 받아 표나 그래프 하나를 만들어봐요.',
     duration: '1~2시간',
     outcome: '자료를 정리하는 과정이 나에게 어떻게 느껴지는지 확인할 수 있어요.',
+    exampleOutput: '그래프 1장과 "알게 된 점" 세 줄',
+    tags: ['FREE', 'ONLINE', 'SOLO'],
   },
-  {
+  HANDS_READ: {
+    activityCode: 'MOCK-ACT-HANDS-READ',
+    kind: 'HANDS_ON',
+    title: '공개 강의 한 편 듣고 요약 노트 쓰기',
+    description: '대학 공개 강의 사이트에서 관심 전공의 입문 강의 한 편을 골라 듣고 핵심 개념을 정리해요.',
+    duration: '1~2시간',
+    outcome: '실제 전공 수업의 설명 방식과 난이도를 느껴볼 수 있어요.',
+    exampleOutput: '핵심 개념 3개와 "이해가 안 된 부분" 1개를 적은 요약 노트',
+    tags: ['FREE', 'ONLINE', 'SOLO'],
+  },
+  HANDS_EXPERIMENT: {
+    activityCode: 'MOCK-ACT-HANDS-EXP',
+    kind: 'HANDS_ON',
+    title: '집에서 하는 간단한 관찰 기록',
+    description: '식물이나 날씨처럼 주변에서 바뀌는 것 하나를 정해 며칠 동안 같은 시간에 관찰하고 기록해요.',
+    duration: '하루 10분씩 1주',
+    outcome: '관찰하고 기록하는 일이 나에게 맞는지 확인할 수 있어요.',
+    exampleOutput: '날짜별 관찰 기록표와 사진 3장',
+    tags: ['FREE', 'SOLO'],
+  },
+  HANDS_REPORT: {
+    activityCode: 'MOCK-ACT-HANDS-REPORT',
+    kind: 'HANDS_ON',
+    title: '관련 기사 3개 읽고 한 쪽 정리하기',
+    description: '관심 전공과 관련된 최근 기사 3개를 찾아 공통 주제와 내 생각을 한 쪽으로 정리해요.',
+    duration: '1~2시간',
+    outcome: '그 분야에서 요즘 어떤 문제를 다루는지 알 수 있어요.',
+    exampleOutput: '기사 출처 3개와 요약·생각을 담은 한 쪽 글',
+    tags: ['FREE', 'ONLINE', 'SOLO'],
+  },
+  HANDS_SHORT: {
+    activityCode: 'MOCK-ACT-HANDS-SHORT',
+    kind: 'HANDS_ON',
+    title: '전공 용어 5개 찾아 내 말로 풀어보기',
+    description: '교육과정표에서 낯선 과목 이름이나 용어 5개를 골라 뜻을 찾아보고 내 말로 한 줄씩 적어요.',
+    duration: '30분',
+    outcome: '짧은 시간에 그 전공에서 쓰는 말과 개념에 익숙해질 수 있어요.',
+    exampleOutput: '용어 5개와 한 줄 설명',
+    tags: ['FREE', 'ONLINE', 'SOLO'],
+  },
+  COMPARE_READ: {
     activityCode: 'MOCK-ACT-COMPARE',
     kind: 'COMPARE_ASK',
-    title: '두 학과의 차이 한 가지 물어보기',
+    title: '두 학과의 차이 한 가지 찾아보기',
     description: '후보 두 학과의 재학생 후기나 학과 Q&A에서 "수업에서 가장 많이 하는 활동"을 비교해봐요.',
     duration: '30분~1시간',
     outcome: '비슷해 보이는 두 학과의 실제 공부 방식 차이를 알 수 있어요.',
+    exampleOutput: '두 학과를 나란히 적은 3줄짜리 비교표',
+    tags: ['FREE', 'ONLINE', 'SOLO'],
   },
-];
+  COMPARE_ASK: {
+    activityCode: 'MOCK-ACT-COMPARE-ASK',
+    kind: 'COMPARE_ASK',
+    title: '선배나 재학생에게 질문 하나 해보기',
+    description: '후보 학과에 다니는 선배나 학과 온라인 상담 창구에 "1학년 때 가장 힘들었던 과목"을 물어봐요.',
+    duration: '30분~1시간',
+    outcome: '자료에서 찾기 어려운 실제 경험을 들을 수 있어요.',
+    exampleOutput: '질문 1개와 받은 답을 정리한 메모',
+    tags: ['FREE', 'ONLINE', 'WITH_OTHERS'],
+  },
+};
+
+const ACTIVITIES: Activity[] = [POOL.INFO_CURRICULUM, POOL.HANDS_PROJECT, POOL.COMPARE_READ];
 
 const RECHECK: ExplorationResult['recheckAxes'] = [
   { metricCode: 'INT_DAT', name: '데이터·정보' },
@@ -605,5 +677,204 @@ export const getComparison = (resultId: number, majorCodes: string[]) =>
         : ['모두 이번 응답에서 먼저 탐색해볼 후보로 나온 전공이에요.'],
       differences: majors.map((m) => `${m.name} · 주로 배우는 것: ${m.learning[0]} / 자주 하는 활동: ${m.activities[0]}`),
       sourceNote: '전공 프로필은 mock 샘플 문구예요. 실제 서비스에서는 검토를 거친 전공 프로필 자료를 사용해요.',
+    };
+  });
+
+// ---- 결과 후 선택 질문: 탐색 활동 선호 (EXPLORATION_ACTIVITY) ----
+// 문항은 임시 샘플. 응답은 활동 목록만 바꾸고 추천 전공·순서는 바꾸지 않는다.
+const SUPPORT_QUESTIONS: SampleQuestion[] = [
+  {
+    questionId: 'MOCK-PR-TIME',
+    stage: 'STAGE_3',
+    text: '탐색 활동에 일주일에 쓸 수 있는 시간은 어느 정도인가요?',
+    options: [
+      { code: 'TIME_SHORT', text: '30분 정도', order: 1 },
+      { code: 'TIME_MID', text: '1~2시간', order: 2 },
+      { code: 'TIME_LONG', text: '3시간 이상', order: 3 },
+      { code: 'UNKNOWN', text: '잘 모르겠음', order: 4 },
+    ],
+  },
+  {
+    questionId: 'MOCK-PR-COST',
+    stage: 'STAGE_3',
+    text: '비용이 드는 활동도 괜찮나요?',
+    options: [
+      { code: 'FREE_ONLY', text: '무료 활동만 하고 싶어요', order: 1 },
+      { code: 'COST_OK', text: '조금은 괜찮아요', order: 2 },
+      { code: 'UNKNOWN', text: '잘 모르겠음', order: 3 },
+    ],
+  },
+  {
+    questionId: 'MOCK-PR-PLACE',
+    stage: 'STAGE_3',
+    text: '어디에서 하는 활동이 편한가요?',
+    options: [
+      { code: 'ONLINE_ONLY', text: '온라인으로 할 수 있는 활동', order: 1 },
+      { code: 'ANY_PLACE', text: '직접 가보는 활동도 괜찮아요', order: 2 },
+      { code: 'UNKNOWN', text: '잘 모르겠음', order: 3 },
+    ],
+  },
+  {
+    questionId: 'MOCK-PR-PEOPLE',
+    stage: 'STAGE_3',
+    text: '다른 사람에게 물어보거나 함께하는 활동도 괜찮나요?',
+    options: [
+      { code: 'SOLO', text: '혼자 하는 활동이 편해요', order: 1 },
+      { code: 'WITH_OTHERS_OK', text: '물어보거나 함께해도 좋아요', order: 2 },
+      { code: 'UNKNOWN', text: '잘 모르겠음', order: 3 },
+    ],
+  },
+  {
+    questionId: 'MOCK-PR-KIND',
+    stage: 'STAGE_3',
+    text: '어떤 방식의 활동을 해보고 싶나요?',
+    options: [
+      { code: 'READ', text: '강의나 글을 보고 정리하기', order: 1 },
+      { code: 'PROJECT', text: '직접 무언가 만들어보기', order: 2 },
+      { code: 'EXPERIMENT', text: '관찰하거나 실험해보기', order: 3 },
+      { code: 'REPORT', text: '조사해서 짧게 써보기', order: 4 },
+      { code: 'UNKNOWN', text: '잘 모르겠음', order: 5 },
+    ],
+  },
+];
+
+const findByResult = (db: MockDb, resultId: number) => {
+  const s = Object.values(db.sessions).find((x) => x.session.resultId === resultId);
+  if (!s) throw fail(404, 'RESOURCE_NOT_FOUND');
+  return s;
+};
+
+const toSupportSession = (resultId: number, sup: NonNullable<MockSession['support']>): SupportSession => ({
+  resultId,
+  purpose: sup.purpose,
+  supportRevision: sup.revision,
+  issuedQuestions: sup.issued,
+  answers: Object.entries(sup.answers).map(([issuedId, optionCode]) => ({ issuedId: Number(issuedId), optionCode })),
+});
+
+export const startSupport = (resultId: number, purpose: SupportPurpose) =>
+  delay((): SupportSession => {
+    const db = load();
+    const s = findByResult(db, resultId);
+    if (!s.support) {
+      s.support = {
+        purpose,
+        revision: 1,
+        issued: SUPPORT_QUESTIONS.map((q) => toIssued(q, ++db.issuedSeq)),
+        answers: {},
+        mutations: {},
+      };
+      save(db);
+    }
+    return toSupportSession(resultId, s.support);
+  });
+
+export const saveSupportAnswer = (
+  resultId: number,
+  issuedId: number,
+  body: { optionCode: string; expectedRevision: number; clientMutationId: string },
+) =>
+  delay((): SupportAnswerResponse => {
+    const db = load();
+    const sup = findByResult(db, resultId).support;
+    if (!sup) throw fail(404, 'RESOURCE_NOT_FOUND');
+    const replay = sup.mutations[body.clientMutationId];
+    if (replay) return replay;
+    if (sup.revision !== body.expectedRevision) throw fail(409, 'STALE_REVISION');
+    const q = sup.issued.find((i) => i.issuedId === issuedId);
+    if (!q) throw fail(404, 'RESOURCE_NOT_FOUND');
+    if (!q.options.some((o) => o.code === body.optionCode)) throw fail(422, 'OPTION_NOT_ISSUED');
+    sup.answers[issuedId] = body.optionCode;
+    sup.revision += 1;
+    const res: SupportAnswerResponse = {
+      supportRevision: sup.revision,
+      issuedId,
+      optionCode: body.optionCode,
+      remaining: sup.issued.filter((i) => !sup.answers[i.issuedId]).length,
+    };
+    sup.mutations[body.clientMutationId] = res;
+    save(db);
+    return res;
+  });
+
+// D-21: 시간·비용·접근 제약이 있으면 무료·온라인·혼자 하는 활동으로 교체
+const personalize = (sup: MockSession['support']) => {
+  const answerOf = (qid: string) => {
+    const issued = sup?.issued.find((i) => i.questionId === qid);
+    return issued ? sup?.answers[issued.issuedId] : undefined;
+  };
+  const kind = answerOf('MOCK-PR-KIND');
+  const notes: string[] = [];
+  let hands = POOL.HANDS_PROJECT;
+  if (kind === 'READ') hands = POOL.HANDS_READ;
+  else if (kind === 'EXPERIMENT') hands = POOL.HANDS_EXPERIMENT;
+  else if (kind === 'REPORT') hands = POOL.HANDS_REPORT;
+  if (kind && kind !== 'UNKNOWN') notes.push('해보고 싶은 활동 방식');
+  if (answerOf('MOCK-PR-TIME') === 'TIME_SHORT') {
+    hands = POOL.HANDS_SHORT;
+    notes.push('쓸 수 있는 시간');
+  }
+  if (answerOf('MOCK-PR-PLACE') === 'ONLINE_ONLY' && !hands.tags.includes('ONLINE')) {
+    hands = POOL.HANDS_PROJECT;
+    notes.push('온라인 활동');
+  }
+  if (answerOf('MOCK-PR-COST') === 'FREE_ONLY') notes.push('무료 활동');
+  let compare = POOL.COMPARE_READ;
+  if (answerOf('MOCK-PR-PEOPLE') === 'WITH_OTHERS_OK') {
+    compare = POOL.COMPARE_ASK;
+    notes.push('사람에게 물어보는 활동');
+  }
+  return { base: [POOL.INFO_CURRICULUM, hands, compare], notes };
+};
+
+const groupCommon = (groupCode: string, groupName: string): Activity[] => [
+  {
+    ...POOL.INFO_CURRICULUM,
+    activityCode: `${groupCode}-INFO`,
+    title: `${groupName} 학과 3곳 교육과정 나란히 보기`,
+    description: `${groupName}에 속한 학과 3곳의 1학년 과목을 표로 나란히 적어봐요.`,
+    exampleOutput: '학과 3곳 × 과목 5개 표',
+  },
+  {
+    ...POOL.HANDS_READ,
+    activityCode: `${groupCode}-READ`,
+    title: `${groupName} 입문 강의 한 편 듣고 정리하기`,
+  },
+  {
+    ...POOL.HANDS_REPORT,
+    activityCode: `${groupCode}-REPORT`,
+    title: `${groupName} 분야에서 일하는 사람 인터뷰 기사 읽기`,
+    description: '그 분야에서 일하는 사람의 인터뷰 기사 2개를 찾아 하는 일과 필요한 공부를 정리해요.',
+    exampleOutput: '인터뷰 2개에서 뽑은 "하는 일" 목록',
+  },
+];
+
+const majorActivity = (majorCode: string, name: string): Activity => ({
+  ...POOL.INFO_CURRICULUM,
+  activityCode: `${majorCode}-SYLLABUS`,
+  title: `${name} 전공기초 과목 강의계획서 읽기`,
+  description: `${name} 1학년 전공기초 과목 하나를 골라 강의계획서의 주차별 내용을 읽어봐요.`,
+  outcome: '한 학기 동안 실제로 무엇을 배우는지 구체적으로 알 수 있어요.',
+  exampleOutput: '주차별 주제 중 궁금한 3개를 표시한 메모',
+});
+
+export const getActivities = (resultId: number) =>
+  delay((): ExplorationActivities => {
+    const s = findByResult(load(), resultId);
+    const result = buildResult(s);
+    const answered = s.support ? Object.keys(s.support.answers).length > 0 : false;
+    const { base, notes } = answered ? personalize(s.support) : { base: ACTIVITIES, notes: [] as string[] };
+    return {
+      resultId,
+      supportRevision: s.support?.revision ?? null,
+      personalized: answered,
+      personalizationNote: notes.length > 0 ? `응답한 ${notes.join(', ')}에 맞춰 활동을 골랐어요.` : null,
+      base,
+      groups: result.groups.map((g) => ({
+        groupCode: g.groupCode,
+        groupName: g.name,
+        common: groupCommon(g.groupCode, g.name),
+        majors: g.majors.map((m) => ({ majorCode: m.majorCode, name: m.name, activity: majorActivity(m.majorCode, m.name) })),
+      })),
     };
   });

@@ -17,6 +17,7 @@ import ExplorationIntro from './pages/Diagnosis/Exploration/Intro';
 import ExplorationQuestion from './pages/Diagnosis/Exploration/Question';
 import ExplorationResult from './pages/Analysis/ExplorationResult';
 import ExplorationCompare from './pages/Analysis/ExplorationCompare';
+import ExplorationActivities from './pages/Analysis/ExplorationActivities';
 import { isExplorationEnabled } from './config/features';
 import LibraryNotice from './pages/Library/Notice';
 import LibraryContent from './pages/Library/Content';
@@ -102,6 +103,10 @@ const AppLayout = () => {
           <Route
             path="/analysis/exploration/:sessionId/compare"
             element={isExplorationEnabled ? <UserOnlyRoute><ExplorationCompare /></UserOnlyRoute> : <Navigate to="/analysis/dashboard" replace />}
+          />
+          <Route
+            path="/analysis/exploration/:sessionId/activities"
+            element={isExplorationEnabled ? <UserOnlyRoute><ExplorationActivities /></UserOnlyRoute> : <Navigate to="/analysis/dashboard" replace />}
           />
           <Route path="/analysis/*" element={<UserOnlyRoute><Placeholder name="진로분석" /></UserOnlyRoute>} />
           <Route path="/library" element={<UserOnlyRoute><LibraryNotice /></UserOnlyRoute>} />
