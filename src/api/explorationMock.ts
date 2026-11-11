@@ -10,6 +10,8 @@ import type {
   ExplorationAskResponse,
   ExplorationChatMessage,
   ExplorationComparison,
+  ExplorationPlan,
+  ExplorationPlanSummary,
   ExplorationConsultation,
   ComparisonMajorProfile,
   ExplorationProgress,
@@ -21,6 +23,8 @@ import type {
   ExplorationStage,
   IssuedQuestion,
   IssuedQuestionState,
+  PlanStatus,
+  PlanWeek,
   NextQuestionsResponse,
   SaveAnswerRequest,
   SaveAnswerResponse,
@@ -119,6 +123,7 @@ interface MockSession {
     messages: ExplorationChatMessage[];
     mutations: Record<string, ExplorationAskResponse>;
   };
+  plans?: (ExplorationPlan & { requestedAt: number; willFail: boolean })[];
 }
 
 interface MockDb {
@@ -1034,4 +1039,131 @@ export const ask = (consultationId: number, content: string, clientMutationId: s
         reject(e);
       }
     }, 900);
+  });
+
+// ---- 12주 탐색 계획 ----
+// 실제 AI 생성이 아니라 전공 프로필 샘플로 채운 고정 틀이다.
+// localStorage 'jinroon.exploration.mock.failPlan' = '1' 이면 생성 실패를 흉내 낸다.
+const PLAN_GENERATING_MS = 2000;
+const PLAN_BASE = 80000;
+
+const buildWeeks = (name: string, majorCode: string): PlanWeek[] => {
+  const p = PROFILES[majorCode];
+  const learn = p?.learning ?? ['전공 기초 과목'];
+  const acts = p?.activities ?? ['작은 프로젝트'];
+  const info: PlanWeek[] = [
+    { week: 1, phase: 'INFO', title: '교육과정 훑어보기', tasks: [`${name} 1~2학년 교육과정표 찾기`, '과목 이름 중 궁금한 3개 표시'], expectedOutput: '궁금한 과목 3개 메모' },
+    { week: 2, phase: 'INFO', title: '학과 소개 비교', tasks: ['같은 이름의 학과 2곳 홈페이지 비교', '학과마다 강조하는 점 한 줄씩 적기'], expectedOutput: '학과 2곳 비교 메모' },
+    { week: 3, phase: 'INFO', title: '졸업 후 진로 살펴보기', tasks: ['학과 홈페이지의 졸업생 진로 안내 읽기', '관심 가는 진로 1개 고르기'], expectedOutput: '진로 1개와 고른 이유' },
+    { week: 4, phase: 'INFO', title: '궁금한 점 정리', tasks: ['1~3주에 알게 된 점 정리', '아직 모르는 점 3개 적기'], expectedOutput: '알게 된 점·모르는 점 목록' },
+  ];
+  const basic: PlanWeek[] = [0, 1, 2, 3].map((i) => ({
+    week: 5 + i,
+    phase: 'BASIC_LEARNING' as const,
+    title: i < learn.length ? `${learn[i]} 맛보기` : '기초 개념 복습',
+    tasks: ['입문 강의나 글 한 편 보기', '핵심 개념 3개를 내 말로 정리'],
+    expectedOutput: '개념 요약 노트 1쪽',
+  }));
+  const small: PlanWeek[] = [0, 1, 2, 3].map((i) => ({
+    week: 9 + i,
+    phase: 'SMALL_ACTIVITY' as const,
+    title: i < 2 ? `${acts[i % acts.length]} 해보기` : i === 2 ? '선배나 재학생에게 질문하기' : '12주 돌아보기',
+    tasks:
+      i < 3
+        ? ['1~2시간 안에 끝낼 수 있는 크기로 정하기', '해보면서 느낀 점 기록']
+        : ['처음 궁금했던 점이 풀렸는지 확인', '계속 탐색할지, 다른 전공을 볼지 정하기'],
+    expectedOutput: i < 3 ? '활동 결과물과 느낀 점 세 줄' : '돌아보기 메모',
+  }));
+  return [...info, ...basic, ...small];
+};
+
+const planStatusOf = (plan: ExplorationPlan & { requestedAt: number; willFail: boolean }): PlanStatus => {
+  if (Date.now() - plan.requestedAt < PLAN_GENERATING_MS) return 'GENERATING';
+  return plan.willFail ? 'FAILED' : 'READY';
+};
+
+const publicPlan = (plan: ExplorationPlan & { requestedAt: number; willFail: boolean }): ExplorationPlan => {
+  const status = planStatusOf(plan);
+  return {
+    planId: plan.planId,
+    resultId: plan.resultId,
+    majorCode: plan.majorCode,
+    majorName: plan.majorName,
+    status,
+    createdAt: plan.createdAt,
+    supportRevision: plan.supportRevision,
+    weeks: status === 'READY' ? plan.weeks : [],
+    sources: status === 'READY' ? plan.sources : [],
+  };
+};
+
+const shouldFail = () => {
+  try {
+    return localStorage.getItem('jinroon.exploration.mock.failPlan') === '1';
+  } catch {
+    return false;
+  }
+};
+
+export const createPlan = (resultId: number, majorCode: string, supportRevision: number | null) =>
+  delay((): ExplorationPlan => {
+    const db = load();
+    const s = findByResult(db, resultId);
+    const card = buildResult(s).groups.flatMap((g) => g.majors).find((m) => m.majorCode === majorCode);
+    if (!card) throw fail(422, 'INVALID_REQUEST');
+    s.plans = s.plans ?? [];
+    // 같은 전공의 실패한 계획은 새로 만들지 않고 그 계획만 다시 생성한다
+    const failed = s.plans.find((p) => p.majorCode === majorCode && planStatusOf(p) === 'FAILED');
+    const now = Date.now();
+    if (failed) {
+      failed.requestedAt = now;
+      failed.willFail = shouldFail();
+      save(db);
+      return publicPlan(failed);
+    }
+    const plan = {
+      planId: PLAN_BASE + ++db.issuedSeq,
+      resultId,
+      majorCode,
+      majorName: card.name,
+      status: 'GENERATING' as PlanStatus,
+      createdAt: new Date(now).toISOString(),
+      supportRevision,
+      weeks: buildWeeks(card.name, majorCode),
+      sources: [
+        { kind: 'RESULT_SNAPSHOT' as const, title: `검사 결과 스냅샷 (결과 ${resultId})`, version: 'MOCK_RESULT_V0' },
+        { kind: 'MAJOR_PROFILE' as const, title: `${card.name} 전공 프로필 (mock 샘플)`, version: 'MOCK_PROFILE_V0' },
+        { kind: 'ACTIVITY_CATALOG' as const, title: '탐색 활동 카탈로그 (mock 샘플)', version: 'MOCK_ACTIVITY_V0' },
+      ],
+      requestedAt: now,
+      willFail: shouldFail(),
+    };
+    s.plans.push(plan);
+    save(db);
+    return publicPlan(plan);
+  });
+
+export const listPlans = (resultId: number) =>
+  delay((): ExplorationPlanSummary[] => {
+    const s = findByResult(load(), resultId);
+    return (s.plans ?? [])
+      .map((p) => publicPlan(p))
+      .map(({ planId, resultId: rid, majorCode, majorName, status, createdAt }) => ({
+        planId,
+        resultId: rid,
+        majorCode,
+        majorName,
+        status,
+        createdAt,
+      }))
+      .sort((a, b) => b.planId - a.planId);
+  });
+
+export const getPlan = (planId: number) =>
+  delay((): ExplorationPlan => {
+    const plan = Object.values(load().sessions)
+      .flatMap((s) => s.plans ?? [])
+      .find((p) => p.planId === planId);
+    if (!plan) throw fail(404, 'RESOURCE_NOT_FOUND');
+    return publicPlan(plan);
   });

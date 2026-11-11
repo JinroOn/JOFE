@@ -319,6 +319,38 @@ export interface ExplorationAskResponse {
   assistantMessage: ExplorationChatMessage;
 }
 
+// ---- 12주 탐색 계획 (POST /results/{id}/plans, GET /results/{id}/plans, GET /plans/{planId}) ----
+// POST 엔드포인트는 04 문서에 있고, majorCode 필드와 GET 두 개는 백엔드와 합의 전 프런트 가정.
+// D-24: 합격 준비가 아닌 정보 확인·기초 학습·작은 활동 중심 탐색 계획
+
+export type PlanStatus = 'GENERATING' | 'READY' | 'FAILED';
+
+export type PlanPhase = 'INFO' | 'BASIC_LEARNING' | 'SMALL_ACTIVITY';
+
+export interface PlanWeek {
+  week: number;
+  phase: PlanPhase;
+  title: string;
+  tasks: string[];
+  expectedOutput: string;
+}
+
+export interface ExplorationPlanSummary {
+  planId: number;
+  resultId: number;
+  majorCode: string;
+  majorName: string;
+  status: PlanStatus;
+  createdAt: string;
+}
+
+export interface ExplorationPlan extends ExplorationPlanSummary {
+  supportRevision: number | null;
+  weeks: PlanWeek[];
+  // AI가 계획을 만들 때 사용한 근거 (D-27)
+  sources: ConsultationSource[];
+}
+
 export type ExplorationErrorCode =
   | 'INVALID_REQUEST'
   | 'RESOURCE_NOT_FOUND'

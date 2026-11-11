@@ -48,9 +48,10 @@ interface ResultViewProps {
   onCompare: (majorCodes: string[]) => void;
   onActivities: () => void;
   onAsk: () => void;
+  onPlan: () => void;
 }
 
-const ResultView = ({ result, onExit, onCompare, onActivities, onAsk }: ResultViewProps) => {
+const ResultView = ({ result, onExit, onCompare, onActivities, onAsk, onPlan }: ResultViewProps) => {
   const noCandidate = result.status === 'NO_SUPPORTED_CANDIDATE';
   const [selected, setSelected] = useState<string[]>([]);
   const [compareHint, setCompareHint] = useState(false);
@@ -187,6 +188,11 @@ const ResultView = ({ result, onExit, onCompare, onActivities, onAsk }: ResultVi
           <button type="button" onClick={onAsk} className={secondaryBtn}>
             결과에 대해 AI에게 묻기
           </button>
+          {!noCandidate && (
+            <button type="button" onClick={onPlan} className={secondaryBtn}>
+              12주 탐색 계획 만들기
+            </button>
+          )}
           <button type="button" onClick={onExit} className={primaryBtn}>
             검사 안내로
           </button>
@@ -282,6 +288,7 @@ const ExplorationResultPage = () => {
         onExit={exit}
         onActivities={() => navigate(`/analysis/exploration/${id}/activities`)}
         onAsk={() => navigate(`/analysis/exploration/${id}/ask`)}
+        onPlan={() => navigate(`/analysis/exploration/${id}/plan`)}
         onCompare={(codes) => navigate(`/analysis/exploration/${id}/compare?majors=${codes.map(encodeURIComponent).join(',')}`)}
       />
     </Shell>
