@@ -9,6 +9,8 @@ import type {
   ExplorationComparison,
   ExplorationConsultation,
   ExplorationErrorCode,
+  ExplorationPlan,
+  ExplorationPlanSummary,
   ExplorationResult,
   ExplorationResultResponse,
   ExplorationSession,
@@ -148,6 +150,24 @@ export const askExplorationConsultation = (consultationId: number, content: stri
           idem(clientMutationId),
         )
         .then((r) => r.data);
+
+// 04 문서 요청은 supportRevision만 있어 선택 전공을 담을 majorCode를 가정해 추가했다
+export const createExplorationPlan = (resultId: number, majorCode: string, supportRevision: number | null) =>
+  isExplorationMock
+    ? mock.createPlan(resultId, majorCode, supportRevision)
+    : api
+        .post<ExplorationPlan>(`${BASE}/results/${resultId}/plans`, { majorCode, supportRevision }, idem())
+        .then((r) => r.data);
+
+export const listExplorationPlans = (resultId: number) =>
+  isExplorationMock
+    ? mock.listPlans(resultId)
+    : api.get<ExplorationPlanSummary[]>(`${BASE}/results/${resultId}/plans`).then((r) => r.data);
+
+export const getExplorationPlan = (planId: number) =>
+  isExplorationMock
+    ? mock.getPlan(planId)
+    : api.get<ExplorationPlan>(`${BASE}/plans/${planId}`).then((r) => r.data);
 
 export const toExplorationErrorCode = (error: unknown): ExplorationErrorCode => {
   const e = error as { response?: { status?: number; data?: { code?: string } } };
