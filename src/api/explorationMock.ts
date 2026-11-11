@@ -5,8 +5,12 @@ import type {
   AdvanceResponse,
   CompleteResponse,
   ExplorationOption,
+  ConsultationSource,
   ExplorationActivities,
+  ExplorationAskResponse,
+  ExplorationChatMessage,
   ExplorationComparison,
+  ExplorationConsultation,
   ComparisonMajorProfile,
   ExplorationProgress,
   ExplorationResult,
@@ -110,6 +114,10 @@ interface MockSession {
     issued: IssuedQuestion[];
     answers: Record<number, string>;
     mutations: Record<string, SupportAnswerResponse>;
+  };
+  consultation?: {
+    messages: ExplorationChatMessage[];
+    mutations: Record<string, ExplorationAskResponse>;
   };
 }
 
@@ -877,4 +885,153 @@ export const getActivities = (resultId: number) =>
         majors: g.majors.map((m) => ({ majorCode: m.majorCode, name: m.name, activity: majorActivity(m.majorCode, m.name) })),
       })),
     };
+  });
+
+// ---- 결과에 대해 AI에게 묻기 ----
+// 실제 AI가 아니라 키워드로 고르는 고정 답변이다. 점수·순위를 새로 계산하지 않고,
+// 능력·합격 가능성 질문에는 답하지 않는 정책(D-25)만 흉내 낸다.
+const CONSULTATION_BASE = 7000;
+
+const policySource: ConsultationSource = { kind: 'ANSWER_POLICY', title: 'AI 답변 정책', version: 'MOCK_POLICY_V0' };
+const metricSource: ConsultationSource = {
+  kind: 'METRIC_DEFINITION',
+  title: '검사 지표 정의와 해석 제한',
+  version: 'MOCK_METRIC_V0',
+};
+const activitySource: ConsultationSource = {
+  kind: 'ACTIVITY_CATALOG',
+  title: '탐색 활동 카탈로그 (mock 샘플)',
+  version: 'MOCK_ACTIVITY_V0',
+};
+const profileSource = (name: string): ConsultationSource => ({
+  kind: 'MAJOR_PROFILE',
+  title: `${name} 전공 프로필 (mock 샘플)`,
+  version: 'MOCK_PROFILE_V0',
+});
+
+const answerFor = (s: MockSession, question: string): Pick<ExplorationChatMessage, 'content' | 'sources' | 'evidenceStatus'> => {
+  const result = buildResult(s);
+  const resultSource: ConsultationSource = {
+    kind: 'RESULT_SNAPSHOT',
+    title: `검사 결과 스냅샷 (결과 ${result.resultId})`,
+    version: result.resultVersion,
+  };
+  const cards = result.groups.flatMap((g) => g.majors);
+  const mentioned = cards.filter((m) => question.includes(m.name.replace(/학과$|학부$/, '')));
+
+  if (/합격|붙을|취업|연봉|잘할|재능|적성|성격|능력/.test(question)) {
+    return {
+      content:
+        '이 검사는 합격·취업 가능성이나 능력, 적성을 판단하지 않아요. 그래서 그 부분은 답할 수 없어요.\n대신 결과에 나온 관심과 활동을 바탕으로 무엇을 먼저 확인해보면 좋을지는 함께 볼 수 있어요.',
+      sources: [policySource, metricSource],
+      evidenceStatus: 'GROUNDED',
+    };
+  }
+
+  if (mentioned.length >= 2 || /비교|차이/.test(question)) {
+    const pair = mentioned.slice(0, 2).filter((m) => PROFILES[m.majorCode]);
+    if (pair.length < 2) {
+      return {
+        content: `어떤 두 전공을 비교할지 알려주시면 결과에 있는 전공 중에서 비교해드릴게요.\n결과에 있는 전공: ${cards.map((m) => m.name).join(', ') || '없음'}`,
+        sources: [resultSource],
+        evidenceStatus: 'GROUNDED',
+      };
+    }
+    const lines = pair.map((m) => {
+      const p = PROFILES[m.majorCode];
+      return `· ${m.name} — 주로 배우는 것: ${p.learning[0]} / 자주 하는 활동: ${p.activities[0]}`;
+    });
+    return {
+      content: ['두 전공의 차이를 등록된 전공 정보로 정리했어요.', ...lines, '어느 쪽이 더 낫다는 뜻은 아니에요. 직접 해보고 싶은 활동이 어느 쪽에 더 가까운지 살펴보세요.'].join('\n'),
+      sources: [resultSource, ...pair.map((m) => profileSource(m.name))],
+      evidenceStatus: 'GROUNDED',
+    };
+  }
+
+  if (/활동/.test(question)) {
+    const lines = ACTIVITIES.map((a) => `· ${a.title} (${a.duration}) — ${a.outcome}`);
+    return {
+      content: ['결과에 나온 탐색 활동은 이런 것을 알아보기 위한 거예요.', ...lines].join('\n'),
+      sources: [activitySource, resultSource],
+      evidenceStatus: 'GROUNDED',
+    };
+  }
+
+  if (/왜|이유|결과|추천|나왔/.test(question)) {
+    if (result.groups.length === 0) {
+      return {
+        content: [...result.notes, '응답에서 뚜렷하게 나타난 관심 분야가 아직 없어서 특정 전공을 고르지 않았어요.'].join('\n'),
+        sources: [resultSource, metricSource],
+        evidenceStatus: 'GROUNDED',
+      };
+    }
+    const lines = result.groups.map((g) => `· ${g.name}: ${g.summary}`);
+    return {
+      content: ['응답에서 나타난 점을 바탕으로 먼저 탐색해볼 전공군을 골랐어요.', ...lines, '이 순서는 먼저 살펴보기 좋은 차례일 뿐, 잘하거나 못하는 정도를 뜻하지 않아요.'].join('\n'),
+      sources: [resultSource, metricSource],
+      evidenceStatus: 'GROUNDED',
+    };
+  }
+
+  return {
+    content:
+      '등록된 검사 결과와 전공 정보만으로는 이 질문에 답하기 어려워요. 추가 확인이 필요해요.\n결과가 나온 이유, 두 전공의 차이, 탐색 활동에 대해서는 답할 수 있어요.',
+    sources: [],
+    evidenceStatus: 'INSUFFICIENT',
+  };
+};
+
+export const openConsultation = (resultId: number) =>
+  delay((): ExplorationConsultation => {
+    const db = load();
+    const s = findByResult(db, resultId);
+    if (!s.consultation) {
+      s.consultation = { messages: [], mutations: {} };
+      save(db);
+    }
+    return { consultationId: CONSULTATION_BASE + s.session.sessionId, resultId, messages: s.consultation.messages };
+  });
+
+export const ask = (consultationId: number, content: string, clientMutationId: string) =>
+  new Promise<ExplorationAskResponse>((resolve, reject) => {
+    setTimeout(() => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        reject(new Error('offline'));
+        return;
+      }
+      try {
+        const db = load();
+        const s = db.sessions[consultationId - CONSULTATION_BASE];
+        if (!s?.consultation) throw fail(404, 'RESOURCE_NOT_FOUND');
+        const replay = s.consultation.mutations[clientMutationId];
+        if (replay) {
+          resolve(replay);
+          return;
+        }
+        const text = content.trim();
+        if (!text) throw fail(400, 'INVALID_REQUEST');
+        const now = new Date().toISOString();
+        const userMessage: ExplorationChatMessage = {
+          id: ++db.issuedSeq,
+          role: 'user',
+          content: text,
+          createdAt: now,
+          sources: [],
+          evidenceStatus: null,
+        };
+        const assistantMessage: ExplorationChatMessage = {
+          id: ++db.issuedSeq,
+          role: 'assistant',
+          createdAt: now,
+          ...answerFor(s, text),
+        };
+        const res = { userMessage, assistantMessage };
+        s.consultation.messages.push(userMessage, assistantMessage);
+        s.consultation.mutations[clientMutationId] = res;
+        save(db);
+        resolve(res);
+      } catch (e) {
+        reject(e);
+      }
+    }, 900);
   });
