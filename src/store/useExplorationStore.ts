@@ -237,7 +237,20 @@ const useExplorationStore = create<ExplorationState>((set, get) => {
     }
   };
 
-  const load = async (sessionId: number) => {
+  // 같은 회차를 동시에 두 번 불러오면 next 요청이 같은 revision으로 겹쳐 409가 난다.
+  // (개발 모드 StrictMode의 effect 이중 실행, 빠른 재진입 등) 진행 중인 불러오기를 재사용한다.
+  let inflight: { sessionId: number; promise: Promise<void> } | null = null;
+
+  const load = (sessionId: number) => {
+    if (inflight && inflight.sessionId === sessionId) return inflight.promise;
+    const promise = doLoad(sessionId).finally(() => {
+      if (inflight?.promise === promise) inflight = null;
+    });
+    inflight = { sessionId, promise };
+    return promise;
+  };
+
+  const doLoad = async (sessionId: number) => {
     set({ ...initial, phase: 'RESUMING' });
     try {
       const detail = await getExplorationSession(sessionId);
