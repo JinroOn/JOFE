@@ -35,6 +35,8 @@ import AdminLayout from './pages/Admin';
 import AdminDashboard from './pages/Admin/Dashboard';
 import AdminMajorManage from './pages/Admin/MajorManage';
 import AdminNoticeManage from './pages/Admin/NoticeManage';
+import AdminExplorationCatalog from './pages/Admin/ExplorationCatalog';
+import AdminExplorationCatalogDetail from './pages/Admin/ExplorationCatalog/Detail';
 import SharedResult from './pages/Analysis/SharedResult';
 import ErrorPage from './pages/Error';
 import SessionModal from './pages/Auth/components/SessionModal';
@@ -131,6 +133,12 @@ const AppLayout = () => {
             <Route index element={<AdminDashboard />} />
             <Route path="majors" element={<AdminMajorManage />} />
             <Route path="notices" element={<AdminNoticeManage />} />
+            {isExplorationEnabled && (
+              <>
+                <Route path="exploration-catalogs" element={<AdminExplorationCatalog />} />
+                <Route path="exploration-catalogs/:catalogId" element={<AdminExplorationCatalogDetail />} />
+              </>
+            )}
           </Route>
           <Route path="/results/share/:token" element={<SharedResult />} />
           <Route
