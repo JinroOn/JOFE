@@ -10,7 +10,7 @@ import { getDiagnosisSessions, deleteSession } from '../../api/diagnosis';
 import type { Major } from '../../types/major';
 import type { DiagnosisSession } from '../../types/diagnosis';
 import { listExplorationSessions } from '../../api/exploration';
-import { isExplorationEnabled } from '../../config/features';
+import { diagnosisEntryPath, isExplorationEnabled } from '../../config/features';
 import type { ExplorationSessionSummary } from '../../types/exploration';
 
 // 탐색형 회차와 이전 방식 회차를 한 목록에 날짜순으로 보여준다 (D-30)
@@ -236,7 +236,7 @@ const MyPage = () => {
             </p>
           </div>
           <button
-            onClick={() => navigate('/diagnosis')}
+            onClick={() => navigate(diagnosisEntryPath)}
             className="mt-6 flex items-center gap-2 text-sm font-bold text-secondary-container group"
           >
             진단 시작하기
@@ -326,7 +326,7 @@ const MyPage = () => {
                 <span className="material-symbols-outlined text-4xl mb-3 block text-outline">assignment</span>
                 <p className="font-medium">진단 기록이 없습니다.</p>
                 <button
-                  onClick={() => navigate('/diagnosis')}
+                  onClick={() => navigate(diagnosisEntryPath)}
                   className="mt-4 text-sm font-bold text-secondary"
                 >
                   진단 시작하기 →

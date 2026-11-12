@@ -1,5 +1,6 @@
 
 import { useNavigate } from 'react-router-dom';
+import { diagnosisEntryPath } from '../../config/features';
 import useAuthStore from '../../store/useAuthStore';
 
 const Home = () => {
@@ -7,12 +8,12 @@ const Home = () => {
   const { isLoggedIn } = useAuthStore();
 
   const handleStartDiagnosis = () => {
-    navigate('/diagnosis');
+    navigate(diagnosisEntryPath);
   };
 
   const handleStartFree = () => {
     if (isLoggedIn) {
-      navigate('/diagnosis');
+      navigate(diagnosisEntryPath);
     } else {
       navigate('/auth/signup');
     }
@@ -24,7 +25,7 @@ const Home = () => {
       title: '단계별 전공 진단',
       description: '단계별 질문을 통해 정밀하게 분석합니다.',
       iconStyle: 'bg-[#EAF5FF] text-[#087D9C]',
-      path: '/diagnosis',
+      path: diagnosisEntryPath,
     },
     {
       icon: 'insights',
@@ -45,7 +46,7 @@ const Home = () => {
       title: '사용자별 맞춤 추가 진단',
       description: '부족한 데이터 보완을 위한 개인별 맞춤 질문을 제공합니다.',
       iconStyle: 'bg-[#EAF5FF] text-[#087D9C]',
-      path: '/diagnosis',
+      path: diagnosisEntryPath,
     },
     {
       icon: 'school',
