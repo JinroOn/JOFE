@@ -1,15 +1,16 @@
 import { useState, useRef } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
+import { logout as logoutApi } from '../../api/auth';
 import logo from '../../assets/logo.svg';
+import { diagnosisEntryPath, isExplorationEnabled } from '../../config/features';
 
 const NAV_LINKS = [
   {
     label: '역량진단',
-    to: '/diagnosis',
+    to: diagnosisEntryPath,
     sub: [
-      { label: '전공 진단', to: '/diagnosis' },
-      { label: '역량 평가 퀴즈', to: '/diagnosis/quiz' },
+      { label: isExplorationEnabled ? '전공 탐색 진단' : '전공 진단', to: diagnosisEntryPath },
     ],
   },
   {
@@ -19,7 +20,6 @@ const NAV_LINKS = [
       { label: '결과 리포트', to: '/analysis/dashboard' },
       { label: '취약 역량 분석', to: '/analysis/weak' },
       { label: '전공 탐색', to: '/diagnosis/explore' },
-      { label: '전공 시뮬레이션', to: '/analysis/compare' },
     ],
   },
   {
@@ -33,7 +33,15 @@ const NAV_LINKS = [
 ];
 
 const Header = () => {
-  const { isLoggedIn, user, logout } = useAuthStore();
+  const { isLoggedIn, user, logout, refreshToken } = useAuthStore();
+
+  const handleLogout = async () => {
+    if (refreshToken) {
+      await logoutApi(refreshToken).catch(() => {});
+    }
+    logout();
+    setOpenMenu(null);
+  };
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -106,7 +114,11 @@ const Header = () => {
                 onMouseLeave={handleMenuLeave}
               >
                 <button className="w-10 h-10 rounded-full bg-secondary ring-2 ring-slate-100 overflow-hidden flex items-center justify-center text-white font-bold text-sm">
-                  {user?.nickname?.[0] ?? 'U'}
+                  {user?.profileImageUrl ? (
+                    <img src={user.profileImageUrl} alt="profile" className="w-full h-full object-cover" />
+                  ) : (
+                    user?.nickname?.[0] ?? 'U'
+                  )}
                 </button>
                 {openMenu === 'profile' && (
                   <div className="absolute top-full right-0 mt-2 w-36 bg-white rounded-xl shadow-lg border border-outline-variant/20 py-1 z-50">
@@ -129,7 +141,7 @@ const Header = () => {
                       </Link>
                     )}
                     <button
-                      onClick={() => { logout(); setOpenMenu(null); }}
+                      onClick={handleLogout}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-error hover:bg-surface-container-low transition-colors"
                     >
                       <span className="material-symbols-outlined text-base">logout</span>

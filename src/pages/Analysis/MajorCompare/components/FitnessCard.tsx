@@ -19,15 +19,7 @@ const FitnessCard = ({ majors, allFitness, bestIdx }: FitnessCardProps) => (
         </span>
         <span className="text-2xl font-bold text-white/50 mb-2">%</span>
       </div>
-      <div className="flex items-center gap-2 mt-3">
-        <span
-          className="material-symbols-outlined text-[#FFAB00] text-sm"
-          style={{ fontVariationSettings: "'FILL' 1" }}
-        >
-          trending_up
-        </span>
-        <span className="text-white font-bold text-sm">지난 시뮬레이션 대비 4.2% 상승</span>
-      </div>
+      <p className="text-white/50 text-sm mt-2">슬라이더를 조정해 역량 변화를 시뮬레이션하세요</p>
     </div>
     <div className="space-y-3 pt-5 border-t border-white/10">
       {majors.map((m, i) => (

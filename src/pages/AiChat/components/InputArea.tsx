@@ -12,9 +12,10 @@ interface Props {
   onChange: (v: string) => void;
   onSubmit: (e: SyntheticEvent<HTMLFormElement>) => void;
   onQuickQuestion: (q: string) => void;
+  disabled?: boolean;
 }
 
-const InputArea = ({ message, onChange, onSubmit, onQuickQuestion }: Props) => (
+const InputArea = ({ message, onChange, onSubmit, onQuickQuestion, disabled = false }: Props) => (
   <div className="shrink-0 px-4 pb-6 md:px-8">
     <div className="mx-auto max-w-[780px]">
       <div className="mb-3 flex flex-wrap gap-2">
@@ -36,8 +37,9 @@ const InputArea = ({ message, onChange, onSubmit, onQuickQuestion }: Props) => (
         <input
           value={message}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="AI 컨설턴트에게 진로 고민을 물어보세요..."
-          className="h-10 flex-1 bg-transparent text-sm text-on-surface outline-none placeholder:text-outline"
+          placeholder={disabled ? '전송 중...' : 'AI 컨설턴트에게 진로 고민을 물어보세요...'}
+          disabled={disabled}
+          className="h-10 flex-1 bg-transparent text-sm text-on-surface outline-none placeholder:text-outline disabled:opacity-60"
         />
         <button type="button" className="hidden text-outline transition hover:text-on-surface sm:block">
           <span className="material-symbols-outlined">attach_file</span>
@@ -47,7 +49,8 @@ const InputArea = ({ message, onChange, onSubmit, onQuickQuestion }: Props) => (
         </button>
         <button
           type="submit"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-container text-white shadow-md transition hover:-translate-y-0.5 hover:opacity-90"
+          disabled={disabled}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-container text-white shadow-md transition hover:-translate-y-0.5 hover:opacity-90 disabled:opacity-50"
         >
           <span className="material-symbols-outlined">arrow_upward</span>
         </button>

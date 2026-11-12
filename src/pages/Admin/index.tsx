@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
+import { isExplorationEnabled } from '../../config/features';
 
 const sideNavClass = ({ isActive }: { isActive: boolean }) =>
   isActive
@@ -42,6 +43,16 @@ const AdminLayout = () => {
             <span className="material-symbols-outlined">school</span>
             <span>전공 관리</span>
           </NavLink>
+          <NavLink to="/admin/notices" className={sideNavClass}>
+            <span className="material-symbols-outlined">campaign</span>
+            <span>공지사항 관리</span>
+          </NavLink>
+          {isExplorationEnabled && (
+            <NavLink to="/admin/exploration-catalogs" className={sideNavClass}>
+              <span className="material-symbols-outlined">fact_check</span>
+              <span>진단 카탈로그</span>
+            </NavLink>
+          )}
         </nav>
 
         {/* 하단: 사용자 정보 + 로그아웃 */}
@@ -97,6 +108,24 @@ const AdminLayout = () => {
             >
               전공 관리
             </NavLink>
+            <NavLink
+              to="/admin/notices"
+              className={({ isActive }) =>
+                `text-sm font-bold transition-colors ${isActive ? 'text-blue-400' : 'text-slate-400'}`
+              }
+            >
+              공지사항
+            </NavLink>
+            {isExplorationEnabled && (
+              <NavLink
+                to="/admin/exploration-catalogs"
+                className={({ isActive }) =>
+                  `text-sm font-bold transition-colors ${isActive ? 'text-blue-400' : 'text-slate-400'}`
+                }
+              >
+                카탈로그
+              </NavLink>
+            )}
           </nav>
         </div>
       </header>
