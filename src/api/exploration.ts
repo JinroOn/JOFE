@@ -9,6 +9,7 @@ import type {
   ExplorationComparison,
   ExplorationConsultation,
   ExplorationErrorCode,
+  ExplorationMajorProfile,
   ExplorationPlan,
   ExplorationPlanSummary,
   ExplorationResult,
@@ -192,6 +193,13 @@ export const getSharedExplorationResult = (token: string) =>
   isExplorationMock
     ? mock.getSharedResult(token)
     : publicApi.get<SharedExplorationResult>(`${BASE}/shares/${encodeURIComponent(token)}`).then((r) => r.data);
+
+export const getExplorationMajorProfile = (majorCode: string) =>
+  isExplorationMock
+    ? mock.getMajorProfile(majorCode)
+    : api
+        .get<ExplorationMajorProfile>(`${BASE}/majors/${encodeURIComponent(majorCode)}/profile`)
+        .then((r) => r.data);
 
 export const toExplorationErrorCode = (error: unknown): ExplorationErrorCode => {
   const e = error as { response?: { status?: number; data?: { code?: string } } };
