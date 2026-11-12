@@ -9,6 +9,7 @@ import DashboardRadarChart from '../Dashboard/components/DashboardRadarChart';
 import AiCommentBanner from '../Dashboard/components/AiCommentBanner';
 import RecommendedMajors from '../Dashboard/components/RecommendedMajors';
 import CapabilityBarChart from '../Dashboard/components/CapabilityBarChart';
+import { diagnosisEntryPath } from '../../../config/features';
 
 const AXES = [
   '수리·논리', '문제해결', '정보기술', '구현력', '시스템이해',
@@ -219,7 +220,7 @@ const SharedResult = () => {
 
         <div className="mt-12 text-center">
           <Link
-            to="/diagnosis"
+            to={diagnosisEntryPath}
             className="inline-flex items-center gap-2 px-6 py-4 bg-primary-container text-white rounded-[14px] font-bold hover:shadow-lg transition-shadow"
           >
             <span className="material-symbols-outlined">psychology</span>

@@ -3,13 +3,14 @@ import { Link, NavLink } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
 import { logout as logoutApi } from '../../api/auth';
 import logo from '../../assets/logo.svg';
+import { diagnosisEntryPath, isExplorationEnabled } from '../../config/features';
 
 const NAV_LINKS = [
   {
     label: '역량진단',
-    to: '/diagnosis',
+    to: diagnosisEntryPath,
     sub: [
-      { label: '전공 진단', to: '/diagnosis' },
+      { label: isExplorationEnabled ? '전공 탐색 진단' : '전공 진단', to: diagnosisEntryPath },
     ],
   },
   {
