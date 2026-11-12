@@ -30,7 +30,7 @@ import AiChat from './pages/AiChat';
 import MajorExplore from './pages/Analysis/MajorExplore';
 import WeakCapability from './pages/Analysis/WeakCapability';
 import MajorCompare from './pages/Analysis/MajorCompare';
-import Dashboard from './pages/Analysis/Dashboard';
+import ResultHome from './pages/Analysis/ResultHome';
 import AdminLayout from './pages/Admin';
 import AdminDashboard from './pages/Admin/Dashboard';
 import AdminMajorManage from './pages/Admin/MajorManage';
@@ -99,7 +99,7 @@ const AppLayout = () => {
           />
           <Route path="/diagnosis/explore" element={<UserOnlyRoute><MajorExplore /></UserOnlyRoute>} />
           <Route path="/analysis/weak" element={<UserOnlyRoute><WeakCapability /></UserOnlyRoute>} />
-          <Route path="/analysis/dashboard" element={<UserOnlyRoute><Dashboard /></UserOnlyRoute>} />
+          <Route path="/analysis/dashboard" element={<UserOnlyRoute><ResultHome /></UserOnlyRoute>} />
           <Route path="/analysis/compare" element={<UserOnlyRoute><MajorCompare /></UserOnlyRoute>} />
           <Route
             path="/analysis/exploration/:sessionId"

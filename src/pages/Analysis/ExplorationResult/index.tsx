@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { isExplorationMock } from '../../../config/features';
 import useExplorationResult from '../../../hooks/useExplorationResult';
 import type { ActivityKind, ExplorationResult } from '../../../types/exploration';
@@ -74,7 +74,10 @@ const ResultView = ({ result, onExit, onCompare, onActivities, onAsk, onPlan }: 
     <>
       <header className="mb-8">
         <p className="text-xs text-on-surface-variant mb-2">
-          {formatDate(result.createdAt)} 완료한 전공 탐색 진단
+          {formatDate(result.createdAt)} 완료한 전공 탐색 진단 ·{' '}
+          <Link to="/mypage" className="font-semibold text-secondary underline underline-offset-2">
+            다른 회차는 진단 이력에서 보기
+          </Link>
         </p>
         <h1 className="text-2xl sm:text-3xl font-bold text-primary-container leading-snug">
           {noCandidate ? '탐색을 시작할 작은 활동부터 해볼까요?' : '먼저 탐색해볼 수 있는 전공이에요'}

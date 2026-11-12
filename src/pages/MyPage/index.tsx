@@ -9,6 +9,14 @@ import { getDiagnosisResults } from '../../api/results';
 import { getDiagnosisSessions, deleteSession } from '../../api/diagnosis';
 import type { Major } from '../../types/major';
 import type { DiagnosisSession } from '../../types/diagnosis';
+import { listExplorationSessions } from '../../api/exploration';
+import { isExplorationEnabled } from '../../config/features';
+import type { ExplorationSessionSummary } from '../../types/exploration';
+
+// 탐색형 회차와 이전 방식 회차를 한 목록에 날짜순으로 보여준다 (D-30)
+type HistoryRow =
+  | { key: string; date: string; kind: 'legacy'; legacy: DiagnosisSession }
+  | { key: string; date: string; kind: 'exploration'; exploration: ExplorationSessionSummary };
 
 interface FavoriteItem {
   id: number;
@@ -30,6 +38,7 @@ const MyPage = () => {
   const [lastDiagnosisDate, setLastDiagnosisDate] = useState<string | null>(null);
 
   const [sessions, setSessions] = useState<DiagnosisSession[]>([]);
+  const [explorations, setExplorations] = useState<ExplorationSessionSummary[]>([]);
   const [sessionPage, setSessionPage] = useState(1);
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -40,6 +49,16 @@ const MyPage = () => {
 
   const SESSIONS_PER_PAGE = 5;
 
+  const history: HistoryRow[] = [
+    ...sessions.map((legacy) => ({ key: `l-${legacy.id}`, date: legacy.createdAt, kind: 'legacy' as const, legacy })),
+    ...explorations.map((exploration) => ({
+      key: `e-${exploration.sessionId}`,
+      date: exploration.startedAt,
+      kind: 'exploration' as const,
+      exploration,
+    })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
   const displayName = user?.nickname ?? '';
   const displayEmail = user?.email ?? '';
   const initial = displayName[0] ?? '?';
@@ -47,11 +66,18 @@ const MyPage = () => {
 
   useEffect(() => {
     const load = async () => {
-      const [list, results, sessionList] = await Promise.allSettled([
+      const [list, results, sessionList, explorationList] = await Promise.allSettled([
         getFavorites(),
         getDiagnosisResults(),
         getDiagnosisSessions(),
+        isExplorationEnabled ? listExplorationSessions() : Promise.resolve([] as ExplorationSessionSummary[]),
       ]);
+      // 신규 목록 API는 레거시 회차도 함께 줄 수 있어 탐색형만 골라 중복을 막는다
+      const explorationItems =
+        explorationList.status === 'fulfilled'
+          ? explorationList.value.filter((item) => item.diagnosisType === 'EXPLORATION_V1')
+          : [];
+      setExplorations(explorationItems);
 
       if (list.status === 'fulfilled') {
         const results = await Promise.all(
@@ -73,18 +99,20 @@ const MyPage = () => {
       }
       setFavoritesLoading(false);
 
-      if (results.status === 'fulfilled' && results.value.length > 0) {
-        setDiagnosisCount(results.value.length);
-        const latest = results.value.reduce((a, b) =>
-          new Date(a.createdAt) > new Date(b.createdAt) ? a : b
-        );
+      const completedDates = [
+        ...(results.status === 'fulfilled' ? results.value.map((r) => r.createdAt) : []),
+        ...explorationItems
+          .filter((item) => item.status === 'completed')
+          .map((item) => item.completedAt ?? item.startedAt),
+      ];
+      setDiagnosisCount(completedDates.length);
+      if (completedDates.length > 0) {
+        const latest = completedDates.reduce((a, b) => (new Date(a) > new Date(b) ? a : b));
         setLastDiagnosisDate(
-          new Date(latest.createdAt).toLocaleDateString('ko-KR', {
+          new Date(latest).toLocaleDateString('ko-KR', {
             year: 'numeric', month: 'long', day: 'numeric',
           })
         );
-      } else {
-        setDiagnosisCount(0);
       }
 
       if (sessionList.status === 'fulfilled') {
@@ -286,14 +314,14 @@ const MyPage = () => {
           <section>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-primary-container">진단 이력</h2>
-              {sessions.length > 0 && (
+              {history.length > 0 && (
                 <span className="text-sm text-on-surface-variant">
-                  총 <span className="font-bold text-on-surface">{sessions.length}</span>건
+                  총 <span className="font-bold text-on-surface">{history.length}</span>건
                 </span>
               )}
             </div>
 
-            {sessions.length === 0 ? (
+            {history.length === 0 ? (
               <div className="bg-white rounded-2xl p-12 text-center text-on-surface-variant">
                 <span className="material-symbols-outlined text-4xl mb-3 block text-outline">assignment</span>
                 <p className="font-medium">진단 기록이 없습니다.</p>
@@ -305,61 +333,79 @@ const MyPage = () => {
                 </button>
               </div>
             ) : (() => {
-              const totalPages = Math.ceil(sessions.length / SESSIONS_PER_PAGE);
-              const paged = sessions.slice((sessionPage - 1) * SESSIONS_PER_PAGE, sessionPage * SESSIONS_PER_PAGE);
+              const totalPages = Math.ceil(history.length / SESSIONS_PER_PAGE);
+              const paged = history.slice((sessionPage - 1) * SESSIONS_PER_PAGE, sessionPage * SESSIONS_PER_PAGE);
               return (
                 <>
                   <div className="space-y-3">
-                    {paged.map((s) => {
+                    {paged.map((row) => {
                       const statusMap = {
                         in_progress: { label: '진행 중', cls: 'bg-yellow-100 text-yellow-700' },
                         completed:   { label: '완료',    cls: 'bg-green-100 text-green-700' },
                         abandoned:   { label: '중단',    cls: 'bg-surface-container text-on-surface-variant' },
                       } as const;
-                      const { label, cls } = statusMap[s.status] ?? statusMap.abandoned;
-                      const date = new Date(s.createdAt).toLocaleDateString('ko-KR', {
+                      const isExploration = row.kind === 'exploration';
+                      const status = isExploration ? row.exploration.status : row.legacy.status;
+                      const { label, cls } = statusMap[status] ?? statusMap.abandoned;
+                      const date = new Date(row.date).toLocaleDateString('ko-KR', {
                         year: 'numeric', month: 'long', day: 'numeric',
                       });
+                      const title = isExploration ? `전공 탐색 진단 #${row.exploration.sessionId}` : `진단 #${row.legacy.id}`;
+                      const resume = isExploration
+                        ? () => navigate(`/diagnosis/exploration/session/${row.exploration.sessionId}`)
+                        : () => navigate('/diagnosis');
+                      const openResult = isExploration
+                        ? () => navigate(`/analysis/exploration/${row.exploration.sessionId}`)
+                        : () => navigate(isExplorationEnabled ? '/analysis/dashboard?view=legacy' : '/analysis/dashboard');
                       return (
                         <div
-                          key={s.id}
+                          key={row.key}
                           className="bg-white rounded-2xl px-5 py-4 shadow-sm flex items-center justify-between gap-4"
                         >
                           <div className="flex items-center gap-4 min-w-0">
-                            <span className="material-symbols-outlined text-on-surface-variant shrink-0">assignment</span>
+                            <span className="material-symbols-outlined text-on-surface-variant shrink-0">
+                              {isExploration ? 'explore' : 'assignment'}
+                            </span>
                             <div className="min-w-0">
-                              <p className="text-sm font-semibold text-on-surface truncate">진단 #{s.id}</p>
-                              <p className="text-xs text-on-surface-variant mt-0.5">{date}</p>
+                              <p className="text-sm font-semibold text-on-surface truncate">{title}</p>
+                              <p className="text-xs text-on-surface-variant mt-0.5">
+                                {date}
+                                {isExplorationEnabled && (
+                                  <span className="ml-2 font-semibold text-secondary">{isExploration ? '탐색형' : '이전 방식'}</span>
+                                )}
+                              </p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${cls}`}>{label}</span>
-                            {s.status === 'in_progress' && (
+                            {status === 'in_progress' && (
                               <button
-                                onClick={() => navigate('/diagnosis')}
+                                onClick={resume}
                                 className="px-3 py-1.5 bg-primary-container text-white text-xs font-bold rounded-lg hover:opacity-90 transition-opacity"
                               >
                                 이어하기
                               </button>
                             )}
-                            {s.status === 'completed' && (
+                            {status === 'completed' && (
                               <button
-                                onClick={() => navigate('/analysis/dashboard')}
+                                onClick={openResult}
                                 className="px-3 py-1.5 bg-surface-container text-on-surface text-xs font-bold rounded-lg hover:bg-surface-container-high transition-colors"
                               >
                                 결과 보기
                               </button>
                             )}
-                            <button
-                              onClick={() => setSessionToDelete(s)}
-                              disabled={deletingSessionId === s.id}
-                              className="p-1.5 rounded-lg text-on-surface-variant/40 hover:text-error hover:bg-error-container/20 transition-colors disabled:opacity-40"
-                              title="진단 삭제"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">
-                                {deletingSessionId === s.id ? 'hourglass_empty' : 'delete'}
-                              </span>
-                            </button>
+                            {row.kind === 'legacy' && (
+                              <button
+                                onClick={() => setSessionToDelete(row.legacy)}
+                                disabled={deletingSessionId === row.legacy.id}
+                                className="p-1.5 rounded-lg text-on-surface-variant/40 hover:text-error hover:bg-error-container/20 transition-colors disabled:opacity-40"
+                                title="진단 삭제"
+                              >
+                                <span className="material-symbols-outlined text-[18px]">
+                                  {deletingSessionId === row.legacy.id ? 'hourglass_empty' : 'delete'}
+                                </span>
+                              </button>
+                            )}
                           </div>
                         </div>
                       );

@@ -87,6 +87,9 @@ export interface ExplorationSessionSummary {
   status: ExplorationSessionStatus;
   stage: ExplorationStage | null;
   startedAt: string;
+  // 04 문서 목록 projection에 예시가 없어 프런트 가정
+  completedAt: string | null;
+  resultId: number | null;
 }
 
 // PUT /sessions/{id}/answers/{issuedId}

@@ -129,7 +129,7 @@ const ExplorationIntro = () => {
                 <li>
                   <button
                     type="button"
-                    onClick={() => navigate('/diagnosis')}
+                    onClick={() => navigate('/diagnosis/basic-info')}
                     className="w-full min-h-[44px] flex items-center justify-between gap-3 text-left bg-surface-container-lowest border border-outline-variant/30 rounded-brand px-5 py-4 hover:border-secondary/50 motion-safe:transition-colors"
                   >
                     <span>
