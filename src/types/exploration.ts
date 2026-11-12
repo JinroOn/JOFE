@@ -390,6 +390,24 @@ export interface SharedExplorationResult {
   expiresAt: string;
 }
 
+// ---- 전공 프로필 (GET /majors/{majorCode}/profile) ----
+// 04 문서 엔드포인트 목록에 없는 API다. 01 문서 6.2절 근거 데이터의 "전공 프로필" 층.
+// 레거시 역량·성향 점수는 담지 않는다.
+
+export interface ExplorationMajorProfile {
+  majorCode: string;
+  name: string;
+  category: string | null;
+  description: string | null;
+  keywords: string[];
+  bestFor: string | null;
+  comparisonNote: string | null;
+  lessCentral: string[];
+  relatedCareers: string[];
+  profileVersion: string;
+  source: string | null;
+}
+
 export type ExplorationErrorCode =
   | 'INVALID_REQUEST'
   | 'RESOURCE_NOT_FOUND'

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ExplorationGroupCard, ExplorationMajorCard, ReasonKind } from '../../../../types/exploration';
 import EvidenceBadge from './EvidenceBadge';
+import MajorDetailDialog from './MajorDetailDialog';
 
 const REASON_LABEL: Record<ReasonKind, { text: string; icon: string }> = {
   INTEREST: { text: '관심', icon: 'favorite' },
@@ -14,7 +15,13 @@ export interface CompareSelection {
   onToggle: (majorCode: string) => void;
 }
 
-const MajorItem = ({ major, compare }: { major: ExplorationMajorCard; compare: CompareSelection }) => {
+interface MajorItemProps {
+  major: ExplorationMajorCard;
+  compare: CompareSelection;
+  onDetail: () => void;
+}
+
+const MajorItem = ({ major, compare, onDetail }: MajorItemProps) => {
   const picked = compare.selected.includes(major.majorCode);
   const full = !picked && compare.selected.length >= compare.max;
   return (
@@ -34,12 +41,22 @@ const MajorItem = ({ major, compare }: { major: ExplorationMajorCard; compare: C
           </li>
         ))}
       </ul>
+      <div className="mt-3 flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={onDetail}
+        className="min-h-[44px] inline-flex items-center gap-1 rounded-lg border border-outline-variant/40 px-3 text-sm font-semibold text-primary-container"
+      >
+        <span className="material-symbols-outlined text-[18px]" aria-hidden="true">info</span>
+        자세히 보기
+        <span className="sr-only"> — {major.name}</span>
+      </button>
       <button
         type="button"
         aria-pressed={picked}
         disabled={full}
         onClick={() => compare.onToggle(major.majorCode)}
-        className={`mt-3 min-h-[44px] inline-flex items-center gap-1 rounded-lg px-3 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed ${
+        className={`min-h-[44px] inline-flex items-center gap-1 rounded-lg px-3 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed ${
           picked ? 'bg-secondary text-white' : 'bg-surface-container-low text-secondary'
         }`}
       >
@@ -47,6 +64,7 @@ const MajorItem = ({ major, compare }: { major: ExplorationMajorCard; compare: C
         {picked ? '비교에 담음' : full ? `비교는 최대 ${compare.max}개` : '비교에 담기'}
         <span className="sr-only"> — {major.name}</span>
       </button>
+      </div>
     </li>
   );
 };
@@ -59,6 +77,7 @@ interface GroupCardProps {
 
 const GroupCard = ({ group, index, compare }: GroupCardProps) => {
   const [showCollapsed, setShowCollapsed] = useState(false);
+  const [detail, setDetail] = useState<ExplorationMajorCard | null>(null);
   const visible = group.majors.filter((m) => !m.collapsed);
   const collapsed = group.majors.filter((m) => m.collapsed);
   const headingId = `group-${group.groupCode}`;
@@ -75,9 +94,10 @@ const GroupCard = ({ group, index, compare }: GroupCardProps) => {
       <p className="text-sm text-on-surface-variant leading-relaxed mb-4">{group.summary}</p>
       <ul className="space-y-3">
         {visible.map((m) => (
-          <MajorItem key={m.majorCode} major={m} compare={compare} />
+          <MajorItem key={m.majorCode} major={m} compare={compare} onDetail={() => setDetail(m)} />
         ))}
-        {showCollapsed && collapsed.map((m) => <MajorItem key={m.majorCode} major={m} compare={compare} />)}
+        {showCollapsed &&
+          collapsed.map((m) => <MajorItem key={m.majorCode} major={m} compare={compare} onDetail={() => setDetail(m)} />)}
       </ul>
       {collapsed.length > 0 && (
         <button
@@ -91,6 +111,16 @@ const GroupCard = ({ group, index, compare }: GroupCardProps) => {
           </span>
           {showCollapsed ? '접기' : `조금 낯설 수 있는 후보 ${collapsed.length}개 더 보기`}
         </button>
+      )}
+      {detail && (
+        <MajorDetailDialog
+          major={detail}
+          groupName={group.name}
+          picked={compare.selected.includes(detail.majorCode)}
+          compareFull={!compare.selected.includes(detail.majorCode) && compare.selected.length >= compare.max}
+          onToggleCompare={() => compare.onToggle(detail.majorCode)}
+          onClose={() => setDetail(null)}
+        />
       )}
     </section>
   );

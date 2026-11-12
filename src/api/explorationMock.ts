@@ -10,6 +10,7 @@ import type {
   ExplorationAskResponse,
   ExplorationChatMessage,
   ExplorationComparison,
+  ExplorationMajorProfile,
   ExplorationPlan,
   ExplorationPlanSummary,
   ExplorationConsultation,
@@ -36,6 +37,7 @@ import type {
   SupportPurpose,
   SupportSession,
 } from '../types/exploration';
+import { MOCK_MAJOR_PROFILES } from './explorationMockMajors';
 
 const STORAGE_KEY = 'jinroon.exploration.mock.v1';
 const STAGES: ExplorationStage[] = ['STAGE_1', 'STAGE_2', 'STAGE_3'];
@@ -528,9 +530,9 @@ const READY_GROUPS: ExplorationResult['groups'] = [
         reasons: [{ kind: 'INTEREST', reasonCode: 'INT_BIO', text: '생물이 변하는 과정을 알아보는 일에 관심이 있다고 답했어요.' }],
       },
       {
-        majorCode: 'MOCK-M-BIOMED',
+        majorCode: 'MOCK-M-CHEM',
         majorId: null,
-        name: '바이오의약학과',
+        name: '화학과',
         evidenceLevel: 'LOW_EVIDENCE',
         collapsed: false,
         reasons: [{ kind: 'INTEREST', reasonCode: 'INT_BIO', text: '생물이 변하는 과정을 알아보는 일에 관심이 있다고 답했어요.' }],
@@ -653,11 +655,11 @@ const PROFILES: Record<string, Omit<ComparisonMajorProfile, 'majorCode' | 'name'
     careerDirections: ['생명과학 연구', '바이오 기업 연구·품질 업무', '대학원 진학(생명과학)'],
     checkPoints: ['실험 과목 수와 실험 시간이 어느 정도인지 확인해보세요.'],
   },
-  'MOCK-M-BIOMED': {
-    learning: ['의약품 개발 기초', '생화학·약리학 입문', '바이오 공정'],
-    activities: ['실험실 실습', '신약 개발 과정 사례 조사'],
-    careerDirections: ['제약·바이오 기업', '임상·품질 관리 업무', '대학원 진학'],
-    checkPoints: ['화학 과목 비중이 어느 정도인지 확인해보세요.'],
+  'MOCK-M-CHEM': {
+    learning: ['일반화학과 유기화학', '물리화학 입문', '분석화학'],
+    activities: ['실험 설계와 결과 기록', '물질의 성질 비교 실험'],
+    careerDirections: ['화학 연구', '시험·분석 업무', '대학원 진학(화학)'],
+    checkPoints: ['실험 과목 수와 실험 보고서 비중을 확인해보세요.'],
   },
   'MOCK-M-EDU': {
     learning: ['교육학 이론', '교육 심리·평가', '교육 프로그램 설계'],
@@ -1253,4 +1255,12 @@ export const getSharedResult = (token: string) =>
       notes: result.notes,
       expiresAt: new Date(s.share.expiresAtMs).toISOString(),
     };
+  });
+
+// ---- 전공 프로필 ----
+export const getMajorProfile = (majorCode: string) =>
+  delay((): ExplorationMajorProfile => {
+    const profile = MOCK_MAJOR_PROFILES[majorCode];
+    if (!profile) throw fail(404, 'RESOURCE_NOT_FOUND');
+    return { majorCode, ...profile };
   });
