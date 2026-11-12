@@ -253,12 +253,14 @@ export const getSession = (sessionId: number) =>
 export const listSessions = () =>
   delay((): ExplorationSessionSummary[] =>
     Object.values(load().sessions)
-      .map(({ session }) => ({
+      .map(({ session, completedAt }) => ({
         sessionId: session.sessionId,
         diagnosisType: session.diagnosisType,
         status: session.status,
         stage: session.stage,
         startedAt: session.startedAt,
+        completedAt: completedAt ? new Date(completedAt).toISOString() : null,
+        resultId: session.resultId,
       }))
       .sort((a, b) => b.sessionId - a.sessionId),
   );
