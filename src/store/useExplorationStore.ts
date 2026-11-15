@@ -15,31 +15,20 @@ import type {
   ExplorationProgress,
   ExplorationSession,
   IssuedQuestionState,
+  SaveAnswerBranchChanges,
   StageNotice,
 } from '../types/exploration';
 
-// 04 문서 상태 머신: IDLE → STARTING → ANSWERING_STAGE_1~3 → COMPLETING → RESULT_READY
-// 단계 번호는 session.stage에서 읽고, 화면 분기용으로 STAGE_NOTICE·READY_TO_COMPLETE를 둔다.
 export type ExplorationPhase =
-  | 'IDLE'
-  | 'STARTING'
-  | 'RESUMING'
-  | 'ANSWERING'
-  | 'STAGE_NOTICE'
-  | 'READY_TO_COMPLETE'
-  | 'COMPLETING'
-  | 'RESULT_READY'
-  | 'LOAD_FAILED';
+  | 'IDLE' | 'STARTING' | 'RESUMING' | 'ANSWERING'
+  | 'STAGE_NOTICE' | 'READY_TO_COMPLETE' | 'COMPLETING'
+  | 'RESULT_READY' | 'LOAD_FAILED';
 
-export type ExplorationSaveState = 'IDLE' | 'SAVING' | 'SAVE_FAILED' | 'STALE_REVISION' | 'OFFLINE';
+export type ExplorationSaveState =
+  | 'IDLE' | 'SAVING' | 'SAVE_FAILED' | 'STALE_REVISION' | 'OFFLINE';
 
+type PendingAnswer = { issuedId: number; optionCode: string; clientMutationId: string };
 type PendingOp = 'save' | 'next' | 'advance' | 'complete';
-
-interface PendingAnswer {
-  issuedId: number;
-  optionCode: string;
-  clientMutationId: string;
-}
 
 interface ExplorationState {
   phase: ExplorationPhase;
@@ -53,10 +42,12 @@ interface ExplorationState {
   notice: StageNotice | null;
   adjustedNotice: boolean;
   affectedCount: number;
+  branchChanges: SaveAnswerBranchChanges | null;
+  fixedCandidates: unknown;
   pending: PendingAnswer | null;
   failedOp: PendingOp | null;
   resultId: number | null;
-
+  
   start: () => Promise<number | null>;
   load: (sessionId: number) => Promise<void>;
   select: (optionCode: string) => Promise<void>;
@@ -82,12 +73,13 @@ const initial = {
   notice: null,
   adjustedNotice: false,
   affectedCount: 0,
+  branchChanges: null,
+  fixedCandidates: null,
   pending: null,
   failedOp: null,
   resultId: null,
 };
 
-// 이전 단계 답변은 단계 전환 후 수정하지 않는다
 const currentStageIndexes = (
   issued: IssuedQuestionState[],
   stage: ExplorationSession['stage'] | undefined,
@@ -95,19 +87,49 @@ const currentStageIndexes = (
   to: number,
 ) => {
   const result: number[] = [];
-  for (let i = from; i <= to; i += 1) if (issued[i]?.effective && issued[i].stage === stage) result.push(i);
+  for (let i = from; i <= to; i += 1) {
+    if (issued[i]?.effective && issued[i].stage === stage) result.push(i);
+  }
   return result;
+};
+
+// 이미 진행 중인 회차의 ID 추출
+const getExistingSessionId = (error: unknown): number | null => {
+  const e = error as {
+    response?: {
+      status?: number;
+      data?: {
+        code?: string;
+        existingSessionId?: number | string;
+        data?: { existingSessionId?: number | string };
+        details?: { existingSessionId?: number | string };
+      };
+    };
+  };
+
+  const responseData = e?.response?.data;
+  if (e?.response?.status !== 409 || responseData?.code !== 'EXPLORATION_IN_PROGRESS') return null;
+
+  const rawId = responseData.existingSessionId ?? responseData.data?.existingSessionId ?? responseData.details?.existingSessionId;
+  if (rawId === undefined || rawId === null) return null;
+
+  const id = Number(rawId);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
 };
 
 const useExplorationStore = create<ExplorationState>((set, get) => {
   const failWith = (op: PendingOp, error: unknown) => {
     const code = toExplorationErrorCode(error);
     const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+
     set({
       errorCode: code,
       failedOp: op,
-      saveState:
-        code === 'STALE_REVISION' ? 'STALE_REVISION' : code === 'NETWORK' && offline ? 'OFFLINE' : 'SAVE_FAILED',
+      saveState: code === 'STALE_REVISION'
+        ? 'STALE_REVISION'
+        : code === 'NETWORK' && offline
+          ? 'OFFLINE'
+          : 'SAVE_FAILED',
     });
   };
 
@@ -120,21 +142,27 @@ const useExplorationStore = create<ExplorationState>((set, get) => {
     if (action === 'NEXT') await fetchNext();
     else if (action === 'ADVANCE') await doAdvance();
     else if (action === 'COMPLETE') set({ phase: 'READY_TO_COMPLETE', saveState: 'IDLE' });
+    else if (action === 'ANSWER') set({ phase: 'ANSWERING', saveState: 'IDLE' });
   };
 
   const fetchNext = async () => {
     const { session } = get();
     if (!session) return;
+
     set({ saveState: 'SAVING', errorCode: null });
+
     try {
       const res = await requestNextQuestions(session.sessionId, session.revision);
       setRevision(res.revision);
+
       const { issued } = get();
-      const known = new Set(issued.map((i) => i.question.issuedId));
+      const known = new Set(issued.map((item) => item.question.issuedId));
       const added = res.issuedQuestions
-        .filter((q) => !known.has(q.issuedId))
+        .filter((question) => !known.has(question.issuedId))
         .map((question) => ({ question, stage: session.stage, answerCode: null, effective: true }));
+
       const merged = [...issued, ...added];
+
       set({
         issued: merged,
         progress: res.progress,
@@ -143,9 +171,10 @@ const useExplorationStore = create<ExplorationState>((set, get) => {
         saveState: 'IDLE',
         failedOp: null,
       });
+
       if (res.issuedQuestions.length > 0) {
         const firstId = res.issuedQuestions[0].issuedId;
-        set({ cursor: merged.findIndex((i) => i.question.issuedId === firstId), phase: 'ANSWERING' });
+        set({ cursor: merged.findIndex((item) => item.question.issuedId === firstId), phase: 'ANSWERING' });
       } else {
         await followNextAction(res.nextAction);
       }
@@ -154,65 +183,126 @@ const useExplorationStore = create<ExplorationState>((set, get) => {
     }
   };
 
+  // 단계 진행
   const doAdvance = async () => {
     const { session } = get();
     if (!session) return;
+
     set({ saveState: 'SAVING', errorCode: null });
+
     try {
       const res = await advanceExplorationStage(session.sessionId, session.revision);
+
+      // 실제 백엔드 응답
+      if ('session' in res) {
+        set({
+          session: { ...session, ...res.session },
+          progress: res.progress,
+          nextAction: res.nextAction,
+          fixedCandidates: res.fixedCandidates,
+          notice: null,
+          saveState: 'IDLE',
+          failedOp: null,
+        });
+        await followNextAction(res.nextAction);
+        return;
+      }
+
+      // 기존 Mock 응답
       set({
         session: { ...session, revision: res.revision, stage: res.stage },
         nextAction: res.nextAction,
         saveState: 'IDLE',
         failedOp: null,
       });
+
       if (res.notice) set({ phase: 'STAGE_NOTICE', notice: res.notice });
-      else await fetchNext();
+      else await followNextAction(res.nextAction);
     } catch (e) {
       failWith('advance', e);
     }
   };
 
+  // 답변 저장
   const doSave = async () => {
     const { session, pending } = get();
     if (!session || !pending) return;
+
     set({ saveState: 'SAVING', errorCode: null });
+
     try {
       const res = await saveExplorationAnswer(session.sessionId, pending.issuedId, {
         optionCode: pending.optionCode,
         expectedRevision: session.revision,
         clientMutationId: pending.clientMutationId,
       });
-      setRevision(res.revision);
-      const excluded = new Set(res.excludedIssuedIds);
-      const issued = get().issued.map((i) =>
-        i.question.issuedId === res.issuedId
-          ? { ...i, answerCode: res.optionCode }
-          : excluded.has(i.question.issuedId)
-            ? { ...i, effective: false }
-            : i,
-      );
+
+      const isBackendResponse = 'branchChanges' in res;
+
+      // 백엔드와 Mock 응답을 동일한 구조로 처리
+      const branchChanges: SaveAnswerBranchChanges = isBackendResponse
+        ? res.branchChanges
+        : {
+            excludedIssuedIds: res.excludedIssuedIds,
+            restoredIssuedIds: [],
+            pendingQuestionCount: 0,
+            budgetLimited: false,
+          };
+
+      const responseStage = isBackendResponse ? res.stage : session.stage;
+      const effective = isBackendResponse ? res.effective : true;
+      const rewound = isBackendResponse ? res.rewound : false;
+
+      const excluded = new Set(branchChanges.excludedIssuedIds);
+      const restored = new Set(branchChanges.restoredIssuedIds);
+
+      const issued = get().issued.map((item) => {
+        const issuedId = item.question.issuedId;
+
+        if (issuedId === res.issuedId) {
+          return { ...item, answerCode: res.optionCode, effective, stage: responseStage };
+        }
+        if (excluded.has(issuedId)) return { ...item, effective: false };
+        if (restored.has(issuedId)) return { ...item, effective: true };
+        return item;
+      });
+
+      const affectedCount = isBackendResponse
+        ? branchChanges.excludedIssuedIds.length + branchChanges.restoredIssuedIds.length
+        : res.affectedCount;
+
       set({
+        session: { ...session, revision: res.revision, stage: responseStage },
         issued,
         progress: res.progress,
         nextAction: res.nextAction,
         pending: null,
         saveState: 'IDLE',
         failedOp: null,
-        affectedCount: res.affectedCount,
-        adjustedNotice: get().adjustedNotice || res.excludedIssuedIds.length > 0,
+        affectedCount,
+        branchChanges,
+        adjustedNotice: get().adjustedNotice ||
+          rewound ||
+          branchChanges.excludedIssuedIds.length > 0 ||
+          branchChanges.restoredIssuedIds.length > 0 ||
+          branchChanges.budgetLimited,
       });
 
-      // 이미 받아둔 이후 문항이 있으면 그 문항으로, 없으면 서버가 정한 다음 행동을 따른다
-      const { cursor } = get();
-      const later = currentStageIndexes(issued, session.stage, cursor + 1, issued.length - 1).filter(
-        (i) => issued[i].answerCode === null,
-      );
-      if (later.length > 0) set({ cursor: later[0] });
-      else if (res.nextAction === 'ANSWER') {
-        const firstOpen = issued.findIndex((i) => i.effective && i.answerCode === null);
-        if (firstOpen !== -1) set({ cursor: firstOpen });
-      } else await followNextAction(res.nextAction);
+      const currentCursor = get().cursor;
+      const later = currentStageIndexes(issued, responseStage, currentCursor + 1, issued.length - 1)
+        .filter((index) => issued[index].answerCode === null);
+
+      if (later.length > 0) {
+        set({ cursor: later[0], phase: 'ANSWERING' });
+      } else if (res.nextAction === 'ANSWER') {
+        const firstOpen = issued.findIndex((item) =>
+          item.effective && item.stage === responseStage && item.answerCode === null,
+        );
+        if (firstOpen !== -1) set({ cursor: firstOpen, phase: 'ANSWERING' });
+        else await followNextAction(res.nextAction);
+      } else {
+        await followNextAction(res.nextAction);
+      }
     } catch (e) {
       failWith('save', e);
     }
@@ -221,7 +311,9 @@ const useExplorationStore = create<ExplorationState>((set, get) => {
   const doComplete = async () => {
     const { session } = get();
     if (!session) return;
+
     set({ phase: 'COMPLETING', saveState: 'SAVING', errorCode: null });
+
     try {
       const res = await completeExplorationSession(session.sessionId, session.revision);
       set({
@@ -237,24 +329,15 @@ const useExplorationStore = create<ExplorationState>((set, get) => {
     }
   };
 
-  // 같은 회차를 동시에 두 번 불러오면 next 요청이 같은 revision으로 겹쳐 409가 난다.
-  // (개발 모드 StrictMode의 effect 이중 실행, 빠른 재진입 등) 진행 중인 불러오기를 재사용한다.
   let inflight: { sessionId: number; promise: Promise<void> } | null = null;
-
-  const load = (sessionId: number) => {
-    if (inflight && inflight.sessionId === sessionId) return inflight.promise;
-    const promise = doLoad(sessionId).finally(() => {
-      if (inflight?.promise === promise) inflight = null;
-    });
-    inflight = { sessionId, promise };
-    return promise;
-  };
 
   const doLoad = async (sessionId: number) => {
     set({ ...initial, phase: 'RESUMING' });
+
     try {
       const detail = await getExplorationSession(sessionId);
-      const firstOpen = detail.issued.findIndex((i) => i.effective && i.answerCode === null);
+      const firstOpen = detail.issued.findIndex((item) => item.effective && item.answerCode === null);
+
       set({
         session: detail.session,
         issued: detail.issued,
@@ -263,10 +346,12 @@ const useExplorationStore = create<ExplorationState>((set, get) => {
         cursor: firstOpen !== -1 ? firstOpen : Math.max(detail.issued.length - 1, 0),
         resultId: detail.session.resultId,
       });
+
       if (detail.session.status === 'completed') {
         set({ phase: 'RESULT_READY' });
         return;
       }
+
       if (detail.nextAction === 'ANSWER') set({ phase: 'ANSWERING' });
       else await followNextAction(detail.nextAction);
     } catch (e) {
@@ -274,15 +359,36 @@ const useExplorationStore = create<ExplorationState>((set, get) => {
     }
   };
 
+  const load = (sessionId: number) => {
+    if (inflight && inflight.sessionId === sessionId) return inflight.promise;
+
+    const promise = doLoad(sessionId).finally(() => {
+      if (inflight?.promise === promise) inflight = null;
+    });
+
+    inflight = { sessionId, promise };
+    return promise;
+  };
+
   return {
     ...initial,
 
+    // 검사 시작
     start: async () => {
       set({ ...initial, phase: 'STARTING' });
+
       try {
         const session = await startExplorationSession();
         return session.sessionId;
       } catch (e) {
+        const existingSessionId = getExistingSessionId(e);
+
+        // 이미 진행 중인 검사가 있으면 해당 회차로 이동
+        if (existingSessionId !== null) {
+          set({ ...initial });
+          return existingSessionId;
+        }
+
         set({ phase: 'LOAD_FAILED', errorCode: toExplorationErrorCode(e) });
         return null;
       }
@@ -290,35 +396,48 @@ const useExplorationStore = create<ExplorationState>((set, get) => {
 
     load,
 
+    // 선택지 저장
     select: async (optionCode) => {
       const { issued, cursor, saveState, phase } = get();
       const current = issued[cursor];
+
       if (!current || phase !== 'ANSWERING' || saveState === 'SAVING') return;
       if (current.answerCode === optionCode) {
         get().goNextAnswered();
         return;
       }
+
       set({
-        pending: { issuedId: current.question.issuedId, optionCode, clientMutationId: createMutationId() },
+        pending: {
+          issuedId: current.question.issuedId,
+          optionCode,
+          clientMutationId: createMutationId(),
+        },
         affectedCount: 0,
       });
+
       await doSave();
     },
 
     goPrev: () => {
       const { issued, cursor, saveState, session } = get();
       if (saveState === 'SAVING') return;
+
       const prev = currentStageIndexes(issued, session?.stage, 0, cursor - 1);
-      if (prev.length > 0) set({ cursor: prev[prev.length - 1], pending: null, saveState: 'IDLE', affectedCount: 0 });
+      if (prev.length > 0) {
+        set({ cursor: prev[prev.length - 1], pending: null, saveState: 'IDLE', affectedCount: 0 });
+      }
     },
 
     goNextAnswered: () => {
       const { issued, cursor, nextAction, session } = get();
       const later = currentStageIndexes(issued, session?.stage, cursor + 1, issued.length - 1);
+
       if (later.length > 0) {
         set({ cursor: later[0], affectedCount: 0 });
         return;
       }
+
       if (nextAction && nextAction !== 'ANSWER') void followNextAction(nextAction);
     },
 
@@ -330,13 +449,18 @@ const useExplorationStore = create<ExplorationState>((set, get) => {
       else if (op === 'complete') await doComplete();
     },
 
-    // 409: 최신 회차를 다시 읽고, 사용자가 확인한 뒤 다시 선택하게 한다
+    // 최신 회차 정보 다시 불러오기
     reloadLatest: async () => {
       const { session, pending } = get();
       if (!session) return;
+
       const keepIssuedId = pending?.issuedId ?? get().issued[get().cursor]?.question.issuedId;
       await load(session.sessionId);
-      const idx = get().issued.findIndex((i) => i.question.issuedId === keepIssuedId && i.effective);
+
+      const idx = get().issued.findIndex((item) =>
+        item.question.issuedId === keepIssuedId && item.effective,
+      );
+
       if (idx !== -1 && get().phase === 'ANSWERING') set({ cursor: idx });
     },
 
@@ -348,7 +472,6 @@ const useExplorationStore = create<ExplorationState>((set, get) => {
     complete: doComplete,
 
     dismissAdjusted: () => set({ adjustedNotice: false }),
-
     reset: () => set({ ...initial }),
   };
 });

@@ -15,30 +15,55 @@ const STEPS = [
   { no: '04', title: '결과 확인', desc: '먼저 살펴볼 전공군과 다음 행동을 안내해요' },
 ];
 
-const STAGE_LABEL: Record<string, string> = { STAGE_1: '1단계', STAGE_2: '2단계', STAGE_3: '3단계' };
+const STAGE_LABEL: Record<string, string> = {
+  STAGE_1: '1단계',
+  STAGE_2: '2단계',
+  STAGE_3: '3단계',
+};
 
 const formatDate = (iso: string) => {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+
+  return Number.isNaN(d.getTime())
+    ? ''
+    : `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
 };
 
 const ExplorationIntro = () => {
   const navigate = useNavigate();
+
   const start = useExplorationStore((s) => s.start);
   const phase = useExplorationStore((s) => s.phase);
   const errorCode = useExplorationStore((s) => s.errorCode);
+
   const [sessions, setSessions] = useState<ExplorationSessionSummary[]>([]);
   const [legacy, setLegacy] = useState<DiagnosisSession | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
-    Promise.all([listExplorationSessions().catch(() => []), getInProgressSession()]).then(([list, legacyData]) => {
+
+    Promise.all([
+      listExplorationSessions().catch(() => []),
+      getInProgressSession(),
+    ]).then(([list, legacyData]) => {
       if (!alive) return;
-      setSessions(list.filter((s) => s.diagnosisType === 'EXPLORATION_V1' && s.status === 'in_progress'));
+
+      setSessions(
+        list.filter((session) => {
+          const sessionType = session.type ?? session.diagnosisType;
+
+          return (
+            sessionType === 'EXPLORATION_V1' &&
+            session.status === 'in_progress'
+          );
+        }),
+      );
+
       setLegacy(legacyData?.session ?? null);
       setLoading(false);
     });
+
     return () => {
       alive = false;
     };
@@ -46,7 +71,10 @@ const ExplorationIntro = () => {
 
   const handleStart = async () => {
     const id = await start();
-    if (id !== null) navigate(`/diagnosis/exploration/session/${id}`);
+
+    if (id !== null) {
+      navigate(`/diagnosis/exploration/session/${id}`);
+    }
   };
 
   const starting = phase === 'STARTING';
@@ -59,14 +87,18 @@ const ExplorationIntro = () => {
 
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold bg-secondary-container/20 text-secondary mb-4">
-            <span className="material-symbols-outlined text-[14px]" aria-hidden="true">explore</span>
+            <span className="material-symbols-outlined text-[14px]" aria-hidden="true">
+              explore
+            </span>
             전공 탐색 진단
           </div>
+
           <h1 className="text-2xl sm:text-3xl font-bold text-primary-container mb-3 leading-snug">
             나에게 맞는 전공 방향을
             <br />
             함께 탐색해볼까요?
           </h1>
+
           <p className="text-sm sm:text-base text-on-surface-variant leading-relaxed">
             관심 분야와 해본 활동, 공부하고 싶은 방식을 바탕으로 먼저 살펴볼 전공을 찾아봐요.
             <br className="hidden sm:block" />
@@ -76,55 +108,102 @@ const ExplorationIntro = () => {
 
         <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
           {STEPS.map((step) => (
-            <li key={step.no} className="bg-surface-container-lowest rounded-brand border border-outline-variant/20 p-5">
-              <p className="text-xs font-bold text-secondary mb-1">{step.no}</p>
-              <p className="font-bold text-primary-container mb-1">{step.title}</p>
-              <p className="text-sm text-on-surface-variant leading-relaxed">{step.desc}</p>
+            <li
+              key={step.no}
+              className="bg-surface-container-lowest rounded-brand border border-outline-variant/20 p-5"
+            >
+              <p className="text-xs font-bold text-secondary mb-1">
+                {step.no}
+              </p>
+              <p className="font-bold text-primary-container mb-1">
+                {step.title}
+              </p>
+              <p className="text-sm text-on-surface-variant leading-relaxed">
+                {step.desc}
+              </p>
             </li>
           ))}
         </ol>
 
         <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
           <div className="bg-surface-container-low rounded-brand p-5">
-            <dt className="text-xs font-semibold text-on-surface-variant mb-1">질문 수</dt>
-            <dd className="font-bold text-primary-container">최대 78문항</dd>
-            <dd className="text-xs text-on-surface-variant mt-1">응답에 따라 더 적게 끝날 수 있어요</dd>
+            <dt className="text-xs font-semibold text-on-surface-variant mb-1">
+              질문 수
+            </dt>
+            <dd className="font-bold text-primary-container">
+              최대 78문항
+            </dd>
+            <dd className="text-xs text-on-surface-variant mt-1">
+              응답에 따라 더 적게 끝날 수 있어요
+            </dd>
           </div>
+
           <div className="bg-surface-container-low rounded-brand p-5">
-            <dt className="text-xs font-semibold text-on-surface-variant mb-1">진행 방식</dt>
-            <dd className="font-bold text-primary-container">사용자별 맞춤 질문</dd>
-            <dd className="text-xs text-on-surface-variant mt-1">앞선 답변에 따라 다음 질문이 정해져요</dd>
+            <dt className="text-xs font-semibold text-on-surface-variant mb-1">
+              진행 방식
+            </dt>
+            <dd className="font-bold text-primary-container">
+              사용자별 맞춤 질문
+            </dd>
+            <dd className="text-xs text-on-surface-variant mt-1">
+              앞선 답변에 따라 다음 질문이 정해져요
+            </dd>
           </div>
+
           <div className="bg-surface-container-low rounded-brand p-5">
-            <dt className="text-xs font-semibold text-on-surface-variant mb-1">저장</dt>
-            <dd className="font-bold text-primary-container">자동 저장 · 이어하기</dd>
-            <dd className="text-xs text-on-surface-variant mt-1">중간에 나가도 답변이 남아 있어요</dd>
+            <dt className="text-xs font-semibold text-on-surface-variant mb-1">
+              저장
+            </dt>
+            <dd className="font-bold text-primary-container">
+              자동 저장 · 이어하기
+            </dd>
+            <dd className="text-xs text-on-surface-variant mt-1">
+              중간에 나가도 답변이 남아 있어요
+            </dd>
           </div>
         </dl>
 
         {!loading && hasResume && (
           <section aria-labelledby="resume-title" className="mb-8">
-            <h2 id="resume-title" className="text-sm font-bold text-primary-container mb-3">
+            <h2
+              id="resume-title"
+              className="text-sm font-bold text-primary-container mb-3"
+            >
               진행 중인 검사
             </h2>
+
             <ul className="space-y-2">
-              {sessions.map((s) => (
-                <li key={s.sessionId}>
+              {sessions.map((session) => (
+                <li key={session.sessionId}>
                   <button
                     type="button"
-                    onClick={() => navigate(`/diagnosis/exploration/session/${s.sessionId}`)}
+                    onClick={() =>
+                      navigate(
+                        `/diagnosis/exploration/session/${session.sessionId}`,
+                      )
+                    }
                     className="w-full min-h-[44px] flex items-center justify-between gap-3 text-left bg-surface-container-lowest border border-outline-variant/30 rounded-brand px-5 py-4 hover:border-secondary/50 motion-safe:transition-colors"
                   >
                     <span>
-                      <span className="block font-semibold text-primary-container">전공 탐색 진단 이어하기</span>
+                      <span className="block font-semibold text-primary-container">
+                        전공 탐색 진단 이어하기
+                      </span>
                       <span className="block text-xs text-on-surface-variant mt-0.5">
-                        {formatDate(s.startedAt)} 시작 · {s.stage ? STAGE_LABEL[s.stage] : ''} 진행 중
+                        {formatDate(session.startedAt)} 시작 ·{' '}
+                        {session.stage ? STAGE_LABEL[session.stage] : ''} 진행 중
                       </span>
                     </span>
-                    <span className="material-symbols-outlined text-secondary" aria-hidden="true">arrow_forward</span>
+
+                    <span
+                      className="material-symbols-outlined text-secondary"
+                      aria-hidden="true"
+                    >
+                      arrow_forward
+                    </span>
                   </button>
                 </li>
               ))}
+
               {legacy && (
                 <li>
                   <button
@@ -133,12 +212,20 @@ const ExplorationIntro = () => {
                     className="w-full min-h-[44px] flex items-center justify-between gap-3 text-left bg-surface-container-lowest border border-outline-variant/30 rounded-brand px-5 py-4 hover:border-secondary/50 motion-safe:transition-colors"
                   >
                     <span>
-                      <span className="block font-semibold text-primary-container">이전 방식 진단 이어하기</span>
+                      <span className="block font-semibold text-primary-container">
+                        이전 방식 진단 이어하기
+                      </span>
                       <span className="block text-xs text-on-surface-variant mt-0.5">
                         {formatDate(legacy.startedAt)} 시작 · 성향·역량 진단
                       </span>
                     </span>
-                    <span className="material-symbols-outlined text-secondary" aria-hidden="true">arrow_forward</span>
+
+                    <span
+                      className="material-symbols-outlined text-secondary"
+                      aria-hidden="true"
+                    >
+                      arrow_forward
+                    </span>
                   </button>
                 </li>
               )}
@@ -166,7 +253,11 @@ const ExplorationIntro = () => {
             disabled={starting}
             className="min-h-[44px] w-full sm:w-auto px-10 py-4 rounded-lg bg-primary-container text-white font-bold shadow-lg motion-safe:transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
           >
-            {starting ? '검사를 준비하는 중…' : hasResume ? '새로 시작하기' : '검사 시작하기'}
+            {starting
+              ? '검사를 준비하는 중…'
+              : hasResume
+                ? '새로 시작하기'
+                : '검사 시작하기'}
           </button>
         </div>
       </div>
