@@ -132,19 +132,12 @@ const fixMojibake = (value?: string | null) => {
   }
 };
 
+// 백엔드 점수는 이미 0~100 척도이므로 별도 배율 변환 없이 사용
 const normalizeScoreToHundred = (value: unknown, fallback: number) => {
   const numeric = Number(value);
 
   if (!Number.isFinite(numeric)) {
     return fallback;
-  }
-
-  if (numeric <= 1) {
-    return clamp(numeric * 100, 0, 100);
-  }
-
-  if (numeric <= 10) {
-    return clamp(numeric * 10, 0, 100);
   }
 
   return clamp(numeric, 0, 100);
