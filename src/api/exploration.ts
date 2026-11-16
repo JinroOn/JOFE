@@ -96,10 +96,11 @@ export const toExplorationResult = (dto: BackendExplorationResult): ExplorationR
   const byCode = new Map(dto.majors.map((major) => [major.majorCode, major]));
   const toCard = (major: BackendExplorationResult['majors'][number]): ExplorationMajorCard => ({
     majorCode: major.majorCode,
-    majorId: null,
-    name: major.majorName,
-    reasons: [],
-    collapsed: false,
+    majorId: major.majorId ?? null,
+    name: major.name ?? major.majorName,
+    reasons: major.reasons ?? [],
+    evidenceLevel: major.evidenceLevel,
+    collapsed: major.collapsed ?? false,
     explanation: major.explanation,
   });
   return {
@@ -110,29 +111,30 @@ export const toExplorationResult = (dto: BackendExplorationResult): ExplorationR
     createdAt: dto.completedAt,
     groups: dto.groups.map((group) => ({
       groupCode: group.groupCode,
-      name: '',
-      summary: '',
-      reasonCodes: dto.reasonCodes,
+      name: group.name ?? '',
+      summary: group.summary ?? '',
+      evidenceLevel: group.evidenceLevel,
+      reasonCodes: group.reasonCodes ?? dto.reasonCodes,
       majors: group.majorCodes
         .map((code) => byCode.get(code))
         .filter((major) => major !== undefined)
         .map(toCard),
     })),
-    cautions: dto.cautions.map((caution) => ({
-      tagCode: caution.questionId,
-      majorCode: null,
-      text: caution.questionText,
-      checkAction: '',
-      answerText: caution.answerText,
-    })),
+    // #103 이후 cautions는 서버가 승인 조건을 확인한 안내다. 이전 준비 응답과 섞지 않는다.
+    cautions: dto.cautions.filter((caution) => 'tagCode' in caution),
+    preparationResponses: dto.preparationResponses ?? dto.cautions.filter((caution) => 'questionId' in caution),
     nextActivities: dto.nextActivities,
-    recheckAxes: [],
+    recheckAxes: (dto.recheckAxes ?? []).filter((axis) => axis.name?.trim()),
     notes: [],
     capabilities: dto.capabilities,
     activityAvailability: dto.activityAvailability,
     activityMessage: dto.activityMessage,
     testOnly: dto.testOnly,
-    displayTextMissing: true,
+    displayTextMissing: dto.groups.some((group) => !group.name?.trim()),
+    displayVersion: dto.displayVersion,
+    displaySource: dto.displaySource,
+    cautionAvailability: dto.cautionAvailability ?? 'UNAVAILABLE',
+    cautionUnavailableReason: dto.cautionUnavailableReason,
   };
 };
 

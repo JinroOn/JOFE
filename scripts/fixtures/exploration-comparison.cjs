@@ -37,4 +37,23 @@ const pair = (left, right, state = 'DISTINCT_DIRECTIONS') => ({
   message: '고정된 매핑과 당시 응답을 나란히 확인하는 탐색 자료입니다.',
 });
 
-module.exports = { candidates, result, overview, unavailable, pair };
+const preparationResponse = { questionId: 'PREP-1', questionText: '실험 수업을 해본 경험이 있나요?', answerText: '아직 경험이 없어요', usage: 'PREPARATION_RESPONSE_ONLY' };
+const displayResult = {
+  ...result,
+  displayVersion: 'RESULT_DISPLAY_V1_0', displaySource: 'COMPLETION_SNAPSHOT',
+  groups: [{ ...result.groups[0], name: '인문', summary: '언어·역사·문화에 관한 전공을 먼저 탐색해볼 수 있습니다.', evidenceLevel: 'LOW_EVIDENCE', reasonCodes: ['USED_INTEREST_AXIS_INSUFFICIENT'] }],
+  majors: result.majors.map((major) => ({
+    ...major, name: major.majorName, majorId: null, collapsed: false, evidenceLevel: 'LOW_EVIDENCE',
+    reasons: [
+      { kind: 'INTEREST', reasonCode: 'INTEREST_RESPONSES_USED', text: '인문·언어·역사에 관한 관심 응답을 탐색 단서로 참고했습니다.' },
+      { kind: 'ACTIVITY', reasonCode: 'ACTIVITY_RESPONSES_USED', text: '조사와 연구에 관한 활동 응답을 탐색 단서로 참고했습니다.' },
+      { kind: 'LEARNING', reasonCode: 'LEARNING_EVIDENCE_NOT_USED', text: '학습 응답이 충분하지 않아 해당 근거를 사용하지 않았습니다.' },
+    ],
+  })),
+  cautions: [{ majorCode: 'MAJOR_ROW_2', tagCode: 'CAUTION_MATH', text: '수학을 어떤 방식으로 사용하는지 확인해볼 수 있습니다.', checkAction: '공식 교육과정에서 기초 과목과 예시 과제를 확인해보세요.', usage: 'DEV_EXPLORATION_CHECK_ONLY' }],
+  preparationResponses: [preparationResponse],
+  recheckAxes: [{ metricCode: 'INT_HUM', name: '인문·언어·역사', reasonCode: 'INTEREST_RESPONSES_INSUFFICIENT' }],
+  cautionAvailability: 'EVALUATED', cautionUnavailableReason: null,
+};
+
+module.exports = { candidates, result, overview, unavailable, pair, preparationResponse, displayResult };

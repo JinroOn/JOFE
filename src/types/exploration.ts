@@ -200,8 +200,7 @@ export interface ExplorationGroupCard {
   majors: ExplorationMajorCard[];
 }
 
-// 주의 사항. 백엔드 cautions는 승인된 주의 태그가 아니라 CAUTION_CHECK·SUBJECT_BURDEN
-// 응답을 그대로 보존한 것이다(`usage: PREPARATION_RESPONSE_ONLY`) — 성격이 다른 자료다.
+// 서버가 승인 조건을 확인한 주의 안내. 준비 상황 응답은 preparationResponses로 구분한다.
 export interface ExplorationCaution {
   tagCode: string;
   majorCode: string | null;
@@ -260,6 +259,33 @@ export interface ExplorationResult {
   testOnly?: boolean;
   // 서버가 표시용 문구(전공군 이름·근거 문장 등)를 아직 내려주지 않는 응답임을 표시한다.
   displayTextMissing?: boolean;
+  preparationResponses?: ExplorationPreparationResponse[];
+  cautionAvailability?: 'EVALUATED' | 'UNAVAILABLE';
+  cautionUnavailableReason?: string | null;
+  displayVersion?: string;
+  displaySource?: 'COMPLETION_SNAPSHOT' | 'SEALED_RESULT_PROJECTION';
+}
+
+export interface ExplorationPreparationResponse {
+  questionId: string;
+  questionText: string;
+  answerText: string;
+}
+
+export interface BackendExplorationMajor {
+  majorCode: string;
+  majorName: string;
+  name?: string;
+  majorId?: number | null;
+  explanation: string;
+  reasons?: ExplorationMajorCard['reasons'];
+  evidenceLevel?: EvidenceLevel;
+  collapsed?: boolean;
+  groupCode: string;
+  interestEvidence?: { metricCode: string; validCount: number; evidenceLevel: EvidenceLevel; inconsistent: boolean }[];
+  usedInterestAxes?: string[];
+  usedActivityAxes?: string[];
+  usedLearningSets?: string[];
 }
 
 // 백엔드 결과 DTO (ExplorationResultStore.response()). 화면이 쓰는 ExplorationResult와 구조가 달라
@@ -273,18 +299,23 @@ export interface BackendExplorationResult {
   completedAt: string;
   completionReason: string;
   reasonCodes: string[];
-  groups: { groupCode: string; majorCodes: string[] }[];
-  majors: {
-    majorCode: string;
-    majorName: string;
+  groups: {
     groupCode: string;
-    explanation: string;
-    interestEvidence: { metricCode: string; validCount: number; evidenceLevel: EvidenceLevel; inconsistent: boolean }[];
-    usedInterestAxes: string[];
-    usedActivityAxes: string[];
-    usedLearningSets: string[];
+    majorCodes: string[];
+    name?: string;
+    summary?: string;
+    evidenceLevel?: EvidenceLevel;
+    reasonCodes?: string[];
+    majors?: BackendExplorationMajor[];
   }[];
-  cautions: { questionId: string; questionText: string; answerText: string; usage: string }[];
+  majors: BackendExplorationMajor[];
+  cautions: (ExplorationCaution | ExplorationPreparationResponse)[];
+  preparationResponses?: ExplorationPreparationResponse[];
+  recheckAxes?: RecheckAxis[];
+  displayVersion?: string;
+  displaySource?: ExplorationResult['displaySource'];
+  cautionAvailability?: ExplorationResult['cautionAvailability'];
+  cautionUnavailableReason?: string | null;
   nextActivities: ExplorationActivity[];
   activityAvailability: ActivityAvailability;
   activityMessage: string;

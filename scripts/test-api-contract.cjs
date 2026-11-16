@@ -318,3 +318,65 @@ test('mock comparison has no candidates for a result without positive evidence',
   assert.equal(data.available, false);
   assert.equal(data.candidateChoices.length, 0);
 });
+
+test('result display maps server labels, evidence, explanations and recheck labels without reranking', () => {
+  const api = comparisonApi();
+  const dto = comparisonFixture.displayResult;
+  const before = JSON.stringify(dto);
+  const result = api.toExplorationResult(dto);
+  assert.equal(result.groups[0].name, '인문');
+  assert.equal(result.groups[0].summary, dto.groups[0].summary);
+  assert.equal(result.groups[0].evidenceLevel, 'LOW_EVIDENCE');
+  assert.equal(JSON.stringify(result.groups[0].majors.map((m) => m.majorCode)), JSON.stringify(dto.groups[0].majorCodes));
+  assert.equal(result.groups[0].majors[0].reasons.length, 3);
+  assert.equal(result.groups[0].majors[0].evidenceLevel, 'LOW_EVIDENCE');
+  assert.equal(result.groups[0].majors[0].collapsed, false);
+  assert.equal(result.recheckAxes[0].name, '인문·언어·역사');
+  assert.equal(result.displayTextMissing, false);
+  assert.equal(result.displaySource, 'COMPLETION_SNAPSHOT');
+  assert.equal(JSON.stringify(dto), before);
+});
+
+test('approved caution guidance and saved preparation responses remain separate', () => {
+  const result = comparisonApi().toExplorationResult(comparisonFixture.displayResult);
+  assert.equal(result.cautions[0].tagCode, 'CAUTION_MATH');
+  assert.match(result.cautions[0].checkAction, /공식 교육과정/);
+  assert.equal(result.preparationResponses[0].questionId, 'PREP-1');
+  assert.equal(result.preparationResponses[0].answerText, '아직 경험이 없어요');
+  assert.equal(result.cautionAvailability, 'EVALUATED');
+  assert.equal(result.cautions.some((c) => c.text.includes('실험 수업')), false);
+});
+
+test('older backend preparation-only cautions never become approved guidance', () => {
+  const dto = { ...comparisonFixture.result, cautions: [comparisonFixture.preparationResponse] };
+  const result = comparisonApi().toExplorationResult(dto);
+  assert.equal(result.cautions.length, 0);
+  assert.equal(result.preparationResponses[0].questionId, 'PREP-1');
+  assert.equal(result.groups[0].name, '');
+  assert.equal(result.groups[0].majors[0].name, '고고학과');
+  assert.equal(result.displayTextMissing, true);
+});
+
+test('historical result projection preserves unavailable guidance and omits unnamed recheck codes', () => {
+  const dto = { ...comparisonFixture.displayResult, displaySource: 'SEALED_RESULT_PROJECTION',
+    cautions: [], cautionAvailability: 'UNAVAILABLE', cautionUnavailableReason: 'APPROVAL_SNAPSHOT_NOT_AVAILABLE',
+    recheckAxes: [{ metricCode: 'INT_UNKNOWN', name: null }],
+  };
+  const result = comparisonApi().toExplorationResult(dto);
+  assert.equal(result.groups[0].name, '인문');
+  assert.equal(result.cautions.length, 0);
+  assert.equal(result.displaySource, 'SEALED_RESULT_PROJECTION');
+  assert.equal(result.cautionUnavailableReason, 'APPROVAL_SNAPSHOT_NOT_AVAILABLE');
+  assert.equal(result.recheckAxes.length, 0);
+});
+
+test('preparation responses render as the original answers without becoming confirmation actions', () => {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const Responses = compile('src/pages/Analysis/ExplorationResult/components/PreparationResponses.tsx').default;
+  const html = renderToStaticMarkup(React.createElement(Responses, { responses: [comparisonFixture.preparationResponse] }));
+  assert.match(html, /내가 답한 준비 상황 보기/);
+  assert.match(html, /아직 경험이 없어요/);
+  assert.doesNotMatch(html, /이렇게 확인해보세요|CAUTION_MATH|PREP-1/);
+  assert.equal(renderToStaticMarkup(React.createElement(Responses, { responses: [] })), '');
+});
