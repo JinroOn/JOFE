@@ -41,7 +41,8 @@ const StatusPanel = ({ title, body, children }: { title: string; body?: string; 
   </div>
 );
 
-const COMPARE_MAX = 3;
+// 백엔드 비교는 쌍(left/right)만 지원한다 (JOFE#118)
+const COMPARE_MAX = 2;
 
 interface ResultViewProps {
   result: ExplorationResult;
@@ -125,7 +126,7 @@ const ResultView = ({ result, onExit, onCompare, onActivities, onAsk, onPlan }: 
           <h2 id="groups-title" className="sr-only">탐색 후보 전공군</h2>
           {compareHint && (
             <p role="status" className="rounded-brand bg-secondary-container/15 px-4 py-3 mb-4 text-sm text-secondary">
-              비교할 전공을 2개 이상 &quot;비교에 담기&quot; 해주세요. (최대 {COMPARE_MAX}개)
+              비교할 전공을 2개 &quot;비교에 담기&quot; 해주세요.
             </p>
           )}
           <div className="space-y-4">

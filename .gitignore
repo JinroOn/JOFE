@@ -39,3 +39,6 @@ vite.config.ts.timestamp-*
 .env
 .env.*
 !.env.example
+
+# Local browser verification artifacts
+output/playwright/

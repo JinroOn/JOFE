@@ -3,7 +3,10 @@ import { isExplorationMock } from '../config/features';
 import * as mock from './explorationMock';
 import type {
   AdvanceResponse,
+  BackendComparisonMajor,
+  BackendExplorationComparison,
   BackendExplorationResult,
+  ComparisonMajorProfile,
   CompleteResponse,
   ExplorationActivities,
   ExplorationAskResponse,
@@ -150,14 +153,58 @@ export const getExplorationResult = (sessionId: number): Promise<ExplorationResu
         .get<BackendExplorationResult>(`${BASE}/sessions/${sessionId}/result`)
         .then((r) => ({ state: 'READY' as const, result: toExplorationResult(r.data) }));
 
-export const getExplorationComparison = (resultId: number, majorCodes: string[]) =>
+// 백엔드 쌍 비교 DTO를 화면 형태로 옮긴다.
+// 축(learningSets·activityAxes·primaryInterestAxes)은 코드만 오고 진로·준비 정보는 NOT_PROVIDED라
+// 비워 둔다. 사람이 읽을 문장은 comparisonSets의 descriptions뿐이다. (JOFE#118, JinroOn/JOBE#100)
+export const toExplorationComparison = (
+  dto: BackendExplorationComparison,
+  resultId: number,
+): ExplorationComparison => {
+  const toProfile = (major: BackendComparisonMajor): ComparisonMajorProfile => ({
+    majorCode: major.majorCode,
+    name: major.majorName,
+    groupName: major.groupName ?? '',
+    learning: [],
+    activities: [],
+    careerDirections: [],
+    checkPoints: [],
+  });
+  const directions = (rows: { directionCode: string; descriptions: { text: string }[] }[]) =>
+    rows.map((row) => ({ directionCode: row.directionCode, descriptions: row.descriptions.map((d) => d.text) }));
+  return {
+    resultId,
+    majors: [dto.left, dto.right].filter((major) => major !== undefined).map(toProfile),
+    commonPoints: [],
+    differences: [],
+    sourceNote: dto.message ?? '',
+    comparisonSets: (dto.comparisonSets ?? []).map((set) => ({
+      comparisonSet: set.comparisonSet,
+      left: directions(set.leftDirections),
+      right: directions(set.rightDirections),
+      focusResponses: set.focusResponses ?? [],
+    })),
+    comparisonState: dto.comparisonState ?? null,
+    skippedComparisonSets: dto.skippedComparisonSets ?? [],
+    available: dto.available,
+    candidateChoices: (dto.candidateChoices ?? []).map((major) => ({
+      majorCode: major.majorCode,
+      name: major.majorName,
+      groupName: major.groupName ?? '',
+    })),
+    reasonCode: dto.reasonCode,
+  };
+};
+
+// 백엔드는 쌍 비교만 지원한다. query key 집합이 정확히 leftMajorCode+rightMajorCode여야 하고
+// majorCodes 같은 다른 키를 보내면 400 INVALID_REQUEST다. (JOFE#118)
+export const getExplorationComparison = (resultId: number, pair?: readonly [string, string]) =>
   isExplorationMock
-    ? mock.getComparison(resultId, majorCodes)
+    ? mock.getComparison(resultId, pair).then((dto) => toExplorationComparison(dto, resultId))
     : api
-        .get<ExplorationComparison>(`${BASE}/results/${resultId}/comparison`, {
-          params: { majorCodes: majorCodes.join(',') },
+        .get<BackendExplorationComparison>(`${BASE}/results/${resultId}/comparison`, {
+          params: pair ? { leftMajorCode: pair[0], rightMajorCode: pair[1] } : undefined,
         })
-        .then((r) => r.data);
+        .then((r) => toExplorationComparison(r.data, resultId));
 
 export const getExplorationActivities = (resultId: number) =>
   isExplorationMock

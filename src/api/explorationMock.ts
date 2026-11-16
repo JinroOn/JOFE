@@ -9,7 +9,8 @@ import type {
   ExplorationActivities,
   ExplorationAskResponse,
   ExplorationChatMessage,
-  ExplorationComparison,
+  BackendExplorationComparison,
+  BackendComparisonMajor,
   ExplorationMajorProfile,
   ExplorationPlan,
   ExplorationPlanSummary,
@@ -674,29 +675,41 @@ const PROFILES: Record<string, Omit<ComparisonMajorProfile, 'majorCode' | 'name'
   },
 };
 
-export const getComparison = (resultId: number, majorCodes: string[]) =>
-  delay((): ExplorationComparison => {
+export const getComparison = (resultId: number, pair?: readonly [string, string]) =>
+  delay((): BackendExplorationComparison => {
     const s = Object.values(load().sessions).find((x) => x.session.resultId === resultId);
     if (!s) throw fail(404, 'RESOURCE_NOT_FOUND');
     const result = buildResult(s);
-    const cards = result.groups.flatMap((g) => g.majors.map((m) => ({ ...m, groupName: g.name })));
-    const unique = [...new Set(majorCodes)];
-    if (unique.length < 2 || unique.length > 3) throw fail(400, 'INVALID_REQUEST');
-    const majors = unique.map((code) => {
+    const cards = result.groups.flatMap((g) => g.majors.map((m) => ({ ...m, groupCode: g.groupCode, groupName: g.name })));
+    const candidateChoices = cards.map((m) => ({ majorCode: m.majorCode, majorName: m.name, groupCode: m.groupCode, groupName: m.groupName }));
+    if (!pair) return {
+      resultId, sessionId: result.sessionId, available: cards.length >= 2, candidateChoices,
+      reasonCode: cards.length >= 2 ? 'SELECT_TWO_CANDIDATES' : 'COMPARISON_TARGET_UNAVAILABLE',
+    };
+    if (pair.length !== 2 || pair[0] === pair[1]) throw fail(400, 'INVALID_REQUEST');
+    if (cards.length < 2) throw fail(409, 'COMPARISON_TARGET_UNAVAILABLE');
+    const majors = pair.map((code) => {
       const card = cards.find((c) => c.majorCode === code);
       const profile = PROFILES[code];
-      if (!card || !profile) throw fail(422, 'INVALID_REQUEST');
-      return { majorCode: code, name: card.name, groupName: card.groupName, ...profile };
+      if (!card || !profile) throw fail(422, 'MAJOR_NOT_IN_RESULT');
+      return { card, profile };
     });
-    const sameGroup = new Set(majors.map((m) => m.groupName)).size === 1;
+    const toCard = ({ card }: typeof majors[number]): BackendComparisonMajor => ({
+      majorCode: card.majorCode, majorName: card.name, groupCode: card.groupCode, groupName: card.groupName,
+      learningSets: [], activityAxes: [], primaryInterestAxes: [], secondaryInterestAxes: [],
+      careerInformationStatus: 'NOT_PROVIDED', preparationInformationStatus: 'NOT_PROVIDED',
+    });
+    const directions = (index: number) => [{
+      directionCode: `MOCK-DIRECTION-${index}`,
+      descriptions: [...majors[index].profile.learning, ...majors[index].profile.activities]
+        .map((text, i) => ({ questionId: `MOCK-COMPARE-${i}`, text })),
+    }];
     return {
-      resultId,
-      majors,
-      commonPoints: sameGroup
-        ? [`모두 ${majors[0].groupName}에 속해서, 기초 과목이 겹치는 부분이 있어요.`]
-        : ['모두 이번 응답에서 먼저 탐색해볼 후보로 나온 전공이에요.'],
-      differences: majors.map((m) => `${m.name} · 주로 배우는 것: ${m.learning[0]} / 자주 하는 활동: ${m.activities[0]}`),
-      sourceNote: '전공 프로필은 mock 샘플 문구예요. 실제 서비스에서는 검토를 거친 전공 프로필 자료를 사용해요.',
+      resultId, sessionId: result.sessionId, available: true,
+      left: toCard(majors[0]), right: toCard(majors[1]),
+      comparisonState: 'DISTINCT_DIRECTIONS', skippedComparisonSets: [],
+      comparisonSets: [{ comparisonSet: 'MOCK-COMPARE', leftDirections: directions(0), rightDirections: directions(1), focusResponses: [] }],
+      message: '전공 프로필은 mock 샘플 문구예요. 실제 서비스에서는 검토를 거친 전공 프로필 자료를 사용해요.',
     };
   });
 
