@@ -70,9 +70,36 @@ MySQL 8.0 컨테이너(호스트 13307), 백엔드 `SERVER_PORT=18080`,
   `activityAvailability: UNAVAILABLE`에 따라 12주 계획·공유 패널·활동 섹션이 노출되지 않았다.
 - 브라우저 콘솔 오류 0. `npm test` 23개 통과.
 
-남은 것: 새로 완료한 회차의 `COMPLETION_SNAPSHOT` 경로(승인 주의 태그가 있는 결과)는
-이번에 확인하지 않았다. 과거 봉인 결과 경로만 검증했다.
 공유는 `exploration.sharing.enabled`가 꺼진 상태라 발급·철회 흐름은 범위 밖이다.
+
+### `COMPLETION_SNAPSHOT` 경로도 통과 (2026-11-17)
+
+위에서 남겨 둔 "새로 완료한 회차의 승인 주의 태그" 경로를 같은 환경에서 이어 확인했다.
+회차를 새로 시작해 73문항(1단계 39 → 2단계 24 → 3단계 10)을 끝까지 응답하고 완료했다.
+
+- `displaySource: COMPLETION_SNAPSHOT`, `cautionAvailability: EVALUATED`,
+  `cautionUnavailableReason: null`.
+- 승인 주의 태그 2건(`CAUTION_PRACTICE`, `CAUTION_SCIENCE`)이 `usage: DEV_EXPLORATION_CHECK_ONLY`로
+  내려오고, 화면 "탐색하면서 확인해볼 점"에 전공명 + 안내 문구 + "이렇게 확인해보세요 ·" + 확인 행동으로
+  표시됐다.
+- 검사 당시 준비 답변 7건은 "내가 답한 준비 상황 보기" 접이식에 그대로 남았고,
+  과거 결과에서 나오던 "당시 확인된 안내 자료가 없어…" 문구는 출력되지 않았다.
+  **승인 안내와 준비 답변 두 의미가 섞이지 않는다.**
+- 적재된 주의 태그는 `APPROVED_FOR_IMPLEMENTATION` 139건 / `PENDING` 48건으로 명세와 같고,
+  결과에는 승인분만 나왔다.
+- 콘솔 오류는 외부 폰트 CDN(Google Fonts·jsdelivr) 차단 4건뿐이고 앱 요청은 모두 200이다.
+
+### 전환 시 알아둘 점 — 런타임 번들은 회차 시작 시점에 고정된다
+
+확인 중에 드러난 사실이다. 주의 태그는 회차 시작 때 고정된 런타임 스냅샷에서 읽는다
+(`ExplorationRuntimeCatalog`가 `cautionTags`를 payload에 넣고 `exploration_session_pin`으로 묶는다).
+
+- JOBE PR #103 **이전에 시작된** 회차는 완료를 #103 이후에 해도 번들에 `cautionTags`가 없어
+  확인 안내가 영구히 `UNAVAILABLE`이다. 실제로 이전 회차 둘은 같은 구 스냅샷을 공유했고
+  (`JSON_CONTAINS_PATH($.cautionTags)` = 0), 새로 시작한 회차만 새 스냅샷을 고정해 `EVALUATED`가 됐다.
+- 결과 불변·재현성 원칙상 맞는 동작이다. 소급 적용하거나 기존 결과를 재봉인하지 않는다.
+- 다만 파일럿에서 "같은 서비스인데 어떤 회차는 확인 안내가 없다"로 보일 수 있으므로,
+  진행 중 회차가 있는 상태로 전환할 때의 안내 문구를 제품 쪽에서 정해야 한다.
 
 ## 후속 순서
 
@@ -80,7 +107,7 @@ MySQL 8.0 컨테이너(호스트 13307), 백엔드 `SERVER_PORT=18080`,
 |---|---|
 | 공유 (#115, PR #122) | 발급 본문 `expectedShareRevision`·`includeNickname`, 철회 `POST /share/revoke`와 멱등키, 공개 조회 `/shared-results/{token}` 반영 완료. 이슈는 닫았다. `exploration.sharing.enabled`가 꺼져 있어 발급·철회 실서버 인수와 공개 프록시 제약은 남아 있다. |
 | 관리자 카탈로그 (PR #124) | 백엔드 검토·활성화(`/admin/exploration/reviews`, `/activations`)와 목록·상세(JOBE PR #104)가 모두 들어와 프론트 연동을 맞췄다. 실서버 인수는 남아 있다. |
-| 결과 표시 문구 (#100, PR #103) | 새 DTO와 이전 준비 답변 형식 연결 완료. **2026-11-17 실제 DEV 서버에서 과거 봉인 결과 경로를 인수 검증했다**(위 절 참고). 새로 완료한 회차의 `COMPLETION_SNAPSHOT` 경로는 남아 있다. |
+| 결과 표시 문구 (#100, PR #103) | 새 DTO와 이전 준비 답변 형식 연결 완료. **2026-11-17 실제 DEV 서버에서 과거 봉인 결과 경로와 새 회차의 `COMPLETION_SNAPSHOT` 경로를 모두 인수 검증했다**(위 절 참고). 런타임 번들이 회차 시작 시점에 고정되는 전환 안내만 제품 쪽 결정이 남았다. |
 | AI 상담·12주 계획 (#101) | 전공 상세는 JOBE PR #105로 생겼다. 상담 2개·계획 3개는 여전히 없어 기능을 공개하지 않는다. |
 | 통합 이력·대시보드 | 서버의 통합 API를 확인해 마이페이지·최근 결과 진입·요약을 연결한다. 진행 중 검사 폐기와 동시 수정 안내도 정리한다. |
 | main 릴리스 (#111) | 레거시 진단 안내의 문항 수·2차 심화 설명을 실제 흐름으로 수정한다. 프로덕션 기능 플래그·API 대상과 스테이징 레거시 회귀를 확인한 뒤 별도 릴리스한다. |
