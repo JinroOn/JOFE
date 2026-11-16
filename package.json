@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "node --test scripts/test-api-contract.cjs",
+    "test:comparison-ui": "node scripts/check-exploration-comparison.cjs",
     "preview": "vite preview"
   },
   "dependencies": {

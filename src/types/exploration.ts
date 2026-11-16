@@ -310,12 +310,82 @@ export interface ComparisonMajorProfile {
   checkPoints: string[];
 }
 
+// 비교 세트별 방향. 백엔드가 유일하게 사람이 읽을 문장을 주는 곳이다.
+export interface ComparisonDirection {
+  directionCode: string;
+  descriptions: string[];
+}
+
+export interface ComparisonSetView {
+  comparisonSet: string;
+  left: ComparisonDirection[];
+  right: ComparisonDirection[];
+  focusResponses: { questionId: string; answerText: string; uncertain: boolean }[];
+}
+
+export type ComparisonState =
+  | 'DISTINCT_DIRECTIONS'
+  | 'SAME_DIRECTIONS'
+  | 'NO_SHARED_COMPARISON_SET';
+
+export interface ComparisonCandidate {
+  majorCode: string;
+  name: string;
+  groupName: string;
+}
+
+export interface SkippedComparisonSet {
+  comparisonSet: string;
+  reasonCode: string;
+  declaredSkipPair: boolean;
+}
+
 export interface ExplorationComparison {
   resultId: number;
   majors: ComparisonMajorProfile[];
   commonPoints: string[];
   differences: string[];
   sourceNote: string;
+  comparisonSets: ComparisonSetView[];
+  comparisonState: ComparisonState | null;
+  skippedComparisonSets: SkippedComparisonSet[];
+  candidateChoices: ComparisonCandidate[];
+  available: boolean;
+  reasonCode?: string;
+}
+
+// 백엔드 쌍 비교 DTO (ExplorationComparisonController). 축은 코드만 오므로 화면에 쓰지 않는다.
+export interface BackendComparisonMajor {
+  majorCode: string;
+  majorName: string;
+  groupCode: string;
+  groupName?: string;
+  learningSets: string[];
+  activityAxes: string[];
+  primaryInterestAxes: string[];
+  secondaryInterestAxes: string[];
+  careerInformationStatus: string;
+  preparationInformationStatus: string;
+}
+
+export interface BackendExplorationComparison {
+  resultId?: number;
+  sessionId: number;
+  available: boolean;
+  message?: string;
+  comparisonState?: ComparisonState;
+  left?: BackendComparisonMajor;
+  right?: BackendComparisonMajor;
+  skippedComparisonSets?: SkippedComparisonSet[];
+  comparisonSets?: {
+    comparisonSet: string;
+    leftDirections: { directionCode: string; descriptions: { questionId: string; text: string }[] }[];
+    rightDirections: { directionCode: string; descriptions: { questionId: string; text: string }[] }[];
+    focusResponses?: { questionId: string; answerText: string; uncertain: boolean }[];
+  }[];
+  // 파라미터 없이 부르면 후보 목록이 온다 (reasonCode: SELECT_TWO_CANDIDATES)
+  candidateChoices?: { majorCode: string; majorName: string; groupCode: string; groupName?: string }[];
+  reasonCode?: string;
 }
 
 // 탐색 활동
@@ -491,6 +561,8 @@ export type ExplorationErrorCode =
   | 'OPTION_NOT_ISSUED'
   | 'QUESTION_NOT_EFFECTIVE'
   | 'STAGE_INCOMPLETE'
+  | 'MAJOR_NOT_IN_RESULT'
+  | 'COMPARISON_TARGET_UNAVAILABLE'
   | 'NO_ACTIVE_CATALOG'
   | 'NETWORK'
   | 'UNKNOWN';
