@@ -28,8 +28,13 @@ const MajorItem = ({ major, compare, onDetail }: MajorItemProps) => {
     <li className={`rounded-xl border p-4 bg-surface-container-lowest ${picked ? 'border-secondary' : 'border-outline-variant/30'}`}>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h4 className="font-bold text-primary-container">{major.name}</h4>
-        <EvidenceBadge level={major.evidenceLevel} />
+        {/* 백엔드는 전공 단위 근거 수준을 주지 않는다 (축별 값만) — 없으면 배지를 숨긴다. JinroOn/JOBE#95 */}
+        {major.evidenceLevel && <EvidenceBadge level={major.evidenceLevel} />}
       </div>
+      {/* 근거 문장이 없으면 서버가 준 공통 안내 문구만 보여준다 */}
+      {major.reasons.length === 0 && major.explanation && (
+        <p className="text-sm text-on-surface-variant leading-relaxed">{major.explanation}</p>
+      )}
       <ul className="space-y-2">
         {major.reasons.map((r) => (
           <li key={`${r.kind}-${r.reasonCode}`} className="flex items-start gap-2 text-sm text-on-surface-variant">
@@ -87,11 +92,11 @@ const GroupCard = ({ group, index, compare }: GroupCardProps) => {
       <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
         <h3 id={headingId} className="text-lg font-bold text-primary-container">
           <span className="sr-only">탐색 후보 {index + 1}: </span>
-          {group.name}
+          {group.name || group.groupCode}
         </h3>
-        <EvidenceBadge level={group.evidenceLevel} />
+        {group.evidenceLevel && <EvidenceBadge level={group.evidenceLevel} />}
       </div>
-      <p className="text-sm text-on-surface-variant leading-relaxed mb-4">{group.summary}</p>
+      {group.summary && <p className="text-sm text-on-surface-variant leading-relaxed mb-4">{group.summary}</p>}
       <ul className="space-y-3">
         {visible.map((m) => (
           <MajorItem key={m.majorCode} major={m} compare={compare} onDetail={() => setDetail(m)} />

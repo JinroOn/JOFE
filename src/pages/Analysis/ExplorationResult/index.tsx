@@ -54,6 +54,16 @@ interface ResultViewProps {
 
 const ResultView = ({ result, onExit, onCompare, onActivities, onAsk, onPlan }: ResultViewProps) => {
   const noCandidate = result.status === 'NO_SUPPORTED_CANDIDATE';
+  // 기능 가용성은 서버가 결과와 함께 내려준 값만 믿는다. 플래그가 없으면(mock) 기존 동작을 유지한다.
+  const caps = result.capabilities;
+  const canCompare = caps?.comparisonAvailable ?? true;
+  const canPlan = caps?.planAvailable ?? true;
+  const canShare = caps?.sharingAvailable ?? true;
+  const canActivities = result.activityAvailability !== 'UNAVAILABLE';
+  // 상담은 백엔드에 엔드포인트도 가용성 플래그도 없다 — mock에서만 노출한다 (JinroOn/JOBE#95).
+  const canAsk = isExplorationMock;
+  const notes = result.notes ?? [];
+  const recheckAxes = result.recheckAxes ?? [];
   const [selected, setSelected] = useState<string[]>([]);
   const [compareHint, setCompareHint] = useState(false);
   const toggle = (code: string) => {
@@ -90,9 +100,17 @@ const ResultView = ({ result, onExit, onCompare, onActivities, onAsk, onPlan }: 
         )}
       </header>
 
-      {result.notes.length > 0 && (
+      {/* 서버가 표시용 문구를 아직 내려주지 않는 응답이면 비워 둔 이유를 알린다 (JinroOn/JOBE#95) */}
+      {result.displayTextMissing && (
+        <p role="note" className="rounded-brand border border-outline-variant/30 px-5 py-4 mb-8 text-sm text-on-surface-variant">
+          전공군 이름과 전공별 근거 문구는 서버에서 아직 내려주지 않아 비워 두었어요. 전공 이름과 후보 묶음은 서버가 확정한
+          결과 그대로예요.
+        </p>
+      )}
+
+      {notes.length > 0 && (
         <div role="note" className="rounded-brand bg-secondary-container/15 px-5 py-4 mb-8 text-sm text-primary-container space-y-1">
-          {result.notes.map((n) => (
+          {notes.map((n) => (
             <p key={n}>{n}</p>
           ))}
         </div>
@@ -114,14 +132,14 @@ const ResultView = ({ result, onExit, onCompare, onActivities, onAsk, onPlan }: 
         </section>
       )}
 
-      {result.recheckAxes.length > 0 && (
+      {recheckAxes.length > 0 && (
         <section aria-labelledby="recheck-title" className="mb-10">
           <h2 id="recheck-title" className="text-lg font-bold text-primary-container mb-2">다시 확인해볼 관심 분야</h2>
           <p className="text-sm text-on-surface-variant mb-3">
             아래 분야는 응답만으로는 판단할 정보가 충분하지 않았어요. 관련 활동을 해본 뒤 다시 확인해보세요.
           </p>
           <ul className="flex flex-wrap gap-2">
-            {result.recheckAxes.map((a) => (
+            {recheckAxes.map((a) => (
               <li key={a.metricCode} className="rounded-full bg-surface-container-high px-4 py-2 text-sm font-semibold text-primary-container">
                 {a.name}
               </li>
@@ -140,17 +158,34 @@ const ResultView = ({ result, onExit, onCompare, onActivities, onAsk, onPlan }: 
                   <span className="material-symbols-outlined text-[18px] text-secondary mt-0.5" aria-hidden="true">info</span>
                   {c.text}
                 </p>
-                <p className="text-sm text-on-surface-variant leading-relaxed pl-7">
-                  <span className="font-semibold text-primary-container">이렇게 확인해보세요 · </span>
-                  {c.checkAction}
-                </p>
+                {c.checkAction ? (
+                  <p className="text-sm text-on-surface-variant leading-relaxed pl-7">
+                    <span className="font-semibold text-primary-container">이렇게 확인해보세요 · </span>
+                    {c.checkAction}
+                  </p>
+                ) : (
+                  // 백엔드 cautions는 승인된 주의 태그가 아니라 내가 답한 준비 상황 응답이다
+                  // (usage: PREPARATION_RESPONSE_ONLY). 확인 행동으로 둔갑시키지 않는다. JinroOn/JOBE#95
+                  c.answerText && (
+                    <p className="text-sm text-on-surface-variant leading-relaxed pl-7">
+                      <span className="font-semibold text-primary-container">내가 답한 내용 · </span>
+                      {c.answerText}
+                    </p>
+                  )
+                )}
               </li>
             ))}
           </ul>
         </section>
       )}
 
-      {result.nextActivities.length > 0 && (
+      {!canActivities && result.activityMessage && (
+        <p role="note" className="rounded-brand bg-surface-container-low px-5 py-4 mb-8 text-sm text-on-surface-variant">
+          {result.activityMessage}
+        </p>
+      )}
+
+      {canActivities && result.nextActivities.length > 0 && (
         <section aria-labelledby="activity-title" className="mb-10">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <h2 id="activity-title" className="text-lg font-bold text-primary-container">이번 주에 해볼 수 있는 탐색 활동</h2>
@@ -178,23 +213,28 @@ const ResultView = ({ result, onExit, onCompare, onActivities, onAsk, onPlan }: 
         </section>
       )}
 
-      <SharePanel resultId={result.resultId} />
+      {/* 서버가 sharingAvailable: false를 주면 공유 엔드포인트가 없다 — 패널을 아예 띄우지 않는다 */}
+      {canShare && <SharePanel resultId={result.resultId} />}
 
       <section aria-labelledby="next-title" className="rounded-brand bg-surface-container-low p-5 sm:p-6 mb-8">
         <h2 id="next-title" className="font-bold text-primary-container mb-3">다음으로 할 수 있는 것</h2>
         <div className="flex flex-wrap gap-2">
-          {!noCandidate && (
+          {!noCandidate && canCompare && (
             <button type="button" onClick={startCompare} className={secondaryBtn}>
               후보 전공 비교하기{selected.length > 0 ? ` (${selected.length}개 담음)` : ''}
             </button>
           )}
-          <button type="button" onClick={onActivities} className={secondaryBtn}>
-            탐색 활동 보기
-          </button>
-          <button type="button" onClick={onAsk} className={secondaryBtn}>
-            결과에 대해 AI에게 묻기
-          </button>
-          {!noCandidate && (
+          {canActivities && (
+            <button type="button" onClick={onActivities} className={secondaryBtn}>
+              탐색 활동 보기
+            </button>
+          )}
+          {canAsk && (
+            <button type="button" onClick={onAsk} className={secondaryBtn}>
+              결과에 대해 AI에게 묻기
+            </button>
+          )}
+          {!noCandidate && canPlan && (
             <button type="button" onClick={onPlan} className={secondaryBtn}>
               12주 탐색 계획 만들기
             </button>

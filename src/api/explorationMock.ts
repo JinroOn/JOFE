@@ -362,9 +362,8 @@ export const complete = (sessionId: number, expectedRevision: number) =>
   delay((): CompleteResponse => {
     const db = load();
     const s = getMock(db, sessionId);
-    if (s.session.status === 'completed' && s.session.resultId) {
-      return { revision: s.session.revision, resultId: s.session.resultId, status: 'completed' };
-    }
+    // 백엔드는 complete 응답으로 결과 DTO 전체를 준다 (JOFE#113). mock도 같은 스키마로 맞춘다.
+    if (s.session.status === 'completed' && s.session.resultId) return buildResult(s);
     checkRevision(s, expectedRevision);
     if (nextActionOf(s) !== 'COMPLETE') throw fail(422, 'STAGE_INCOMPLETE');
     s.session.status = 'completed';
@@ -372,7 +371,7 @@ export const complete = (sessionId: number, expectedRevision: number) =>
     s.session.resultId = 9000 + sessionId;
     s.session.revision += 1;
     save(db);
-    return { revision: s.session.revision, resultId: s.session.resultId, status: 'completed' };
+    return buildResult(s);
   });
 
 // ---- 결과 ----

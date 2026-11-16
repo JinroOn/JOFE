@@ -3,12 +3,14 @@ import { isExplorationMock } from '../config/features';
 import * as mock from './explorationMock';
 import type {
   AdvanceResponse,
+  BackendExplorationResult,
   CompleteResponse,
   ExplorationActivities,
   ExplorationAskResponse,
   ExplorationComparison,
   ExplorationConsultation,
   ExplorationErrorCode,
+  ExplorationMajorCard,
   ExplorationMajorProfile,
   ExplorationPlan,
   ExplorationPlanSummary,
@@ -83,22 +85,70 @@ export const advanceExplorationStage = (sessionId: number, expectedRevision: num
         .post<AdvanceResponse>(`${BASE}/sessions/${sessionId}/advance`, { expectedRevision }, idem())
         .then((r) => r.data);
 
-export const completeExplorationSession = (sessionId: number, expectedRevision: number) =>
+// 백엔드 결과 DTO를 화면이 쓰는 형태로 옮긴다.
+// 전공은 전공군에 중첩되지 않고 평면 배열(majorSummaries)로 오므로 전공군의 majorCodes로 다시 묶는다.
+// 서버가 주지 않는 전공군 이름·요약, 전공별 근거 문장, 주의 태그 문구, 재확인 축은
+// 만들어내지 않고 비워 둔다 — 화면이 해당 영역을 숨긴다 (JinroOn/JOBE#95).
+export const toExplorationResult = (dto: BackendExplorationResult): ExplorationResult => {
+  const byCode = new Map(dto.majors.map((major) => [major.majorCode, major]));
+  const toCard = (major: BackendExplorationResult['majors'][number]): ExplorationMajorCard => ({
+    majorCode: major.majorCode,
+    majorId: null,
+    name: major.majorName,
+    reasons: [],
+    collapsed: false,
+    explanation: major.explanation,
+  });
+  return {
+    resultId: dto.resultId,
+    sessionId: dto.sessionId,
+    status: dto.status,
+    resultVersion: dto.resultVersion,
+    createdAt: dto.completedAt,
+    groups: dto.groups.map((group) => ({
+      groupCode: group.groupCode,
+      name: '',
+      summary: '',
+      reasonCodes: dto.reasonCodes,
+      majors: group.majorCodes
+        .map((code) => byCode.get(code))
+        .filter((major) => major !== undefined)
+        .map(toCard),
+    })),
+    cautions: dto.cautions.map((caution) => ({
+      tagCode: caution.questionId,
+      majorCode: null,
+      text: caution.questionText,
+      checkAction: '',
+      answerText: caution.answerText,
+    })),
+    nextActivities: dto.nextActivities,
+    recheckAxes: [],
+    notes: [],
+    capabilities: dto.capabilities,
+    activityAvailability: dto.activityAvailability,
+    activityMessage: dto.activityMessage,
+    testOnly: dto.testOnly,
+    displayTextMissing: true,
+  };
+};
+
+// complete 응답은 결과 DTO 전체다(GET result와 같은 본문). 결과 화면이 다시 조회하지 않도록 그대로 돌려준다.
+export const completeExplorationSession = (sessionId: number, expectedRevision: number): Promise<CompleteResponse> =>
   isExplorationMock
     ? mock.complete(sessionId, expectedRevision)
     : api
-        .post<CompleteResponse>(`${BASE}/sessions/${sessionId}/complete`, { expectedRevision }, idem())
-        .then((r) => r.data);
+        .post<BackendExplorationResult>(`${BASE}/sessions/${sessionId}/complete`, { expectedRevision }, idem())
+        .then((r) => toExplorationResult(r.data));
 
-// 결과 생성이 끝나지 않았으면 서버가 202를 준다고 가정한다
+// 완료된 회차면 200, 완료 전이면 404 RESOURCE_NOT_FOUND다.
+// 백엔드는 결과를 complete 요청 안에서 동기로 만들므로 202·Retry-After는 내려오지 않는다 (JOFE#113).
 export const getExplorationResult = (sessionId: number): Promise<ExplorationResultResponse> =>
   isExplorationMock
     ? mock.getResult(sessionId)
-    : api.get<ExplorationResult>(`${BASE}/sessions/${sessionId}/result`).then((r) =>
-        r.status === 202
-          ? { state: 'GENERATING', retryAfterMs: Number(r.headers['retry-after'] ?? 1) * 1000 }
-          : { state: 'READY', result: r.data },
-      );
+    : api
+        .get<BackendExplorationResult>(`${BASE}/sessions/${sessionId}/result`)
+        .then((r) => ({ state: 'READY' as const, result: toExplorationResult(r.data) }));
 
 export const getExplorationComparison = (resultId: number, majorCodes: string[]) =>
   isExplorationMock
