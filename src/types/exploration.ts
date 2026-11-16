@@ -1,6 +1,9 @@
 // 탐색형 진단(EXPLORATION_V1) 타입
 
-export type ExplorationStage = 'STAGE_1' | 'STAGE_2' | 'STAGE_3';
+// 백엔드는 API로 나가는 stage를 모두 숫자로 직렬화한다
+// (ExplorationSessionService의 회차 DTO·답변 응답·진행률·회차 목록·통합 이력 전부 stageNumber()).
+// 문자열 'STAGE_1'은 DB 내부 표현이라 응답에 나오지 않는다. (JOFE#116)
+export type ExplorationStage = 1 | 2 | 3;
 
 export type ExplorationSessionStatus = 'in_progress' | 'completed' | 'abandoned';
 
@@ -42,7 +45,7 @@ export interface IssuedQuestion {
 }
 
 export interface ExplorationProgress {
-  stage: 1 | 2 | 3;
+  stage: ExplorationStage;
   answered: number;
   issued: number;
   stageMax: number;
@@ -153,11 +156,11 @@ export interface MockAdvanceResponse {
 
 export type AdvanceResponse = BackendAdvanceResponse | MockAdvanceResponse;
 
-export interface CompleteResponse {
-  revision: number;
-  resultId: number;
-  status: 'completed';
-}
+// POST /sessions/{id}/complete
+// 백엔드(ExplorationSessionService.complete)는 결과를 같은 요청 안에서 동기로 만들고
+// ExplorationResultStore.response()의 결과 DTO 전체를 200으로 돌려준다.
+// 응답에 revision 필드는 없다 — 완료 후에는 낙관적 잠금 대상이 아니다. (JOFE#113)
+export type CompleteResponse = ExplorationResult;
 
 // 결과
 
@@ -173,29 +176,39 @@ export interface ExplorationReason {
   text: string;
 }
 
+// 화면이 쓰는 전공 카드. 백엔드 응답은 api/exploration.ts의 매퍼가 이 형태로 바꿔 준다.
+// evidenceLevel은 백엔드가 전공 단위로 주지 않아 없을 수 있다 (축별 값만 있음, JinroOn/JOBE#95).
 export interface ExplorationMajorCard {
   majorCode: string;
   majorId: number | null;
   name: string;
-  evidenceLevel: EvidenceLevel;
+  evidenceLevel?: EvidenceLevel;
   reasons: ExplorationReason[];
   collapsed: boolean;
+  // 백엔드가 전공마다 내려주는 공통 안내 문구 (근거 문장이 아니다)
+  explanation?: string;
 }
 
+// 화면이 쓰는 전공군 카드. 백엔드 groupSummaries는 `{groupCode, majorCodes[]}`만 주므로
+// name·summary·evidenceLevel은 매퍼가 채우지 못하는 경우가 있다 (JinroOn/JOBE#95).
 export interface ExplorationGroupCard {
   groupCode: string;
   name: string;
   summary: string;
-  evidenceLevel: EvidenceLevel;
+  evidenceLevel?: EvidenceLevel;
   reasonCodes: string[];
   majors: ExplorationMajorCard[];
 }
 
+// 주의 사항. 백엔드 cautions는 승인된 주의 태그가 아니라 CAUTION_CHECK·SUBJECT_BURDEN
+// 응답을 그대로 보존한 것이다(`usage: PREPARATION_RESPONSE_ONLY`) — 성격이 다른 자료다.
 export interface ExplorationCaution {
   tagCode: string;
   majorCode: string | null;
   text: string;
   checkAction: string;
+  // 백엔드 형태에서 옮겨온 값. checkAction이 비면 확인 행동 대신 이 응답을 보여준다.
+  answerText?: string;
 }
 
 export type ActivityKind = 'INFO_CHECK' | 'HANDS_ON' | 'COMPARE_ASK';
@@ -218,6 +231,17 @@ export interface RecheckAxis {
   name: string;
 }
 
+// 백엔드가 결과와 함께 내려주는 기능 가용성(ExplorationResultStore.response()).
+// 아직 서버에 엔드포인트가 없는 기능은 false로 온다 — planAvailable·sharingAvailable은 현재 고정 false다.
+export interface ExplorationCapabilities {
+  comparisonAvailable: boolean;
+  supportAvailable: boolean;
+  planAvailable: boolean;
+  sharingAvailable: boolean;
+}
+
+export type ActivityAvailability = 'AVAILABLE' | 'UNAVAILABLE';
+
 export interface ExplorationResult {
   resultId: number;
   sessionId: number;
@@ -229,6 +253,45 @@ export interface ExplorationResult {
   nextActivities: ExplorationActivity[];
   recheckAxes: RecheckAxis[];
   notes: string[];
+  // 백엔드가 결과와 함께 내려주는 값. mock 응답에는 없다.
+  capabilities?: ExplorationCapabilities;
+  activityAvailability?: ActivityAvailability;
+  activityMessage?: string;
+  testOnly?: boolean;
+  // 서버가 표시용 문구(전공군 이름·근거 문장 등)를 아직 내려주지 않는 응답임을 표시한다.
+  displayTextMissing?: boolean;
+}
+
+// 백엔드 결과 DTO (ExplorationResultStore.response()). 화면이 쓰는 ExplorationResult와 구조가 달라
+// api/exploration.ts의 매퍼로 변환한다. 서버가 주지 않은 문구는 만들어내지 않는다 (JinroOn/JOBE#95).
+export interface BackendExplorationResult {
+  resultId: number;
+  sessionId: number;
+  status: ExplorationResultStatus;
+  resultVersion: string;
+  resultContractVersion: string;
+  completedAt: string;
+  completionReason: string;
+  reasonCodes: string[];
+  groups: { groupCode: string; majorCodes: string[] }[];
+  majors: {
+    majorCode: string;
+    majorName: string;
+    groupCode: string;
+    explanation: string;
+    interestEvidence: { metricCode: string; validCount: number; evidenceLevel: EvidenceLevel; inconsistent: boolean }[];
+    usedInterestAxes: string[];
+    usedActivityAxes: string[];
+    usedLearningSets: string[];
+  }[];
+  cautions: { questionId: string; questionText: string; answerText: string; usage: string }[];
+  nextActivities: ExplorationActivity[];
+  activityAvailability: ActivityAvailability;
+  activityMessage: string;
+  capabilities: ExplorationCapabilities;
+  flags: Record<string, boolean>;
+  runMode: string;
+  testOnly: boolean;
 }
 
 export type ExplorationResultResponse =

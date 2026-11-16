@@ -13,6 +13,7 @@ import type {
   ExplorationErrorCode,
   ExplorationNextAction,
   ExplorationProgress,
+  ExplorationResult,
   ExplorationSession,
   IssuedQuestionState,
   SaveAnswerBranchChanges,
@@ -47,7 +48,9 @@ interface ExplorationState {
   pending: PendingAnswer | null;
   failedOp: PendingOp | null;
   resultId: number | null;
-  
+  // complete 응답이 결과 DTO 전체를 주므로 결과 화면이 다시 조회하지 않도록 보관한다 (JOFE#113)
+  result: ExplorationResult | null;
+
   start: () => Promise<number | null>;
   load: (sessionId: number) => Promise<void>;
   select: (optionCode: string) => Promise<void>;
@@ -78,6 +81,7 @@ const initial = {
   pending: null,
   failedOp: null,
   resultId: null,
+  result: null,
 };
 
 const currentStageIndexes = (
@@ -316,9 +320,12 @@ const useExplorationStore = create<ExplorationState>((set, get) => {
 
     try {
       const res = await completeExplorationSession(session.sessionId, session.revision);
+      // 완료 응답에는 revision이 없다. 완료 후에는 낙관적 잠금 대상이 아니므로 마지막 값을 유지한다.
+      // 결과 DTO는 그대로 보관해 결과 화면이 다시 조회하지 않게 한다. (JOFE#113)
       set({
-        session: { ...session, revision: res.revision, status: 'completed', resultId: res.resultId },
+        session: { ...session, status: 'completed', resultId: res.resultId },
         resultId: res.resultId,
+        result: res,
         phase: 'RESULT_READY',
         saveState: 'IDLE',
         failedOp: null,

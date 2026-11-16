@@ -5,158 +5,107 @@ import useAuthStore from '../store/useAuthStore';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://52.79.202.196:8080/api';
 
-const instance = axios.create({
-  baseURL: BASE_URL,
-  timeout: 60000,
-});
-
-export const publicApi = axios.create({
-  baseURL: BASE_URL,
-  timeout: 60000,
-});
+const instance = axios.create({ baseURL: BASE_URL, timeout: 60000 });
+export const publicApi = axios.create({ baseURL: BASE_URL, timeout: 60000 });
 
 interface RetryRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
+  _authSessionVersion?: number;
 }
 
-// 동시에 발생한 401 요청들이 하나의 refresh 요청을 공유한다.
-let refreshPromise: Promise<string> | null = null;
+// 같은 로그인 세션에서 발생한 401만 하나의 갱신 요청을 공유한다.
+let refreshRequest: { sessionVersion: number; promise: Promise<string> } | null = null;
 
-// 로그인, 회원가입, 비밀번호 관련 요청은 자동 갱신 대상에서 제외한다.
-const isAuthRequest = (url?: string) => {
-  if (!url) return false;
+const isAuthRequest = (url?: string) => [
+  '/auth/login', '/auth/signup', '/auth/refresh', '/auth/logout',
+  '/auth/email-verifications', '/auth/password-resets', '/auth/password',
+].some((path) => url?.includes(path));
 
-  const excludedPaths = [
-    '/auth/login',
-    '/auth/signup',
-    '/auth/refresh',
-    '/auth/logout',
-    '/auth/email-verifications',
-    '/auth/password-resets',
-    '/auth/password',
-  ];
-
-  return excludedPaths.some((path) => url.includes(path));
-};
-
-// refresh 실패 시 서버 세션 정리 후 로컬 로그아웃한다.
-const expireSession = async (refreshToken: string | null) => {
-  if (refreshToken) {
-    await publicApi
-      .post('/auth/logout', { refreshToken })
-      .catch(() => undefined);
-  }
-
+const expireSession = (sessionVersion: number, refreshToken: string | null) => {
   const auth = useAuthStore.getState();
+  if (!auth.isLoggedIn || auth.sessionVersion !== sessionVersion || auth.refreshToken !== refreshToken) return;
 
+  // 서버 응답을 기다리지 않고 만료된 로컬 세션을 먼저 종료한다.
   auth.logout();
   auth.setSessionExpired(true);
+  if (refreshToken) {
+    void publicApi.post('/auth/logout', { refreshToken }).catch(() => undefined);
+  }
 };
 
-// 요청마다 현재 Access Token을 헤더에 넣는다.
-instance.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken;
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+instance.interceptors.request.use((config: RetryRequestConfig) => {
+  const auth = useAuthStore.getState();
+  if (config._authSessionVersion !== undefined && config._authSessionVersion !== auth.sessionVersion) {
+    throw new Error('로그인 상태가 변경되었습니다.');
   }
-
+  config._authSessionVersion = auth.sessionVersion;
+  if (auth.accessToken) config.headers.Authorization = `Bearer ${auth.accessToken}`;
+  else delete config.headers.Authorization;
   return config;
 });
 
 instance.interceptors.response.use(
   (response) => response,
-
   async (error: AxiosError) => {
-    const originalRequest = error.config as RetryRequestConfig | undefined;
-
-    // 401이 아니거나 원래 요청 정보가 없으면 그대로 반환한다.
-    if (error.response?.status !== 401 || !originalRequest) {
-      return Promise.reject(error);
-    }
-
-    // 인증 관련 요청은 자동 갱신하지 않는다.
-    if (isAuthRequest(originalRequest.url)) {
+    const request = error.config as RetryRequestConfig | undefined;
+    if (error.response?.status !== 401 || !request || isAuthRequest(request.url)) {
       return Promise.reject(error);
     }
 
     const auth = useAuthStore.getState();
+    const sessionVersion = auth.sessionVersion;
+    if (!auth.isLoggedIn || request._authSessionVersion !== sessionVersion) return Promise.reject(error);
 
-    if (!auth.isLoggedIn) {
+    if (request._retry) {
+      if (request.headers.Authorization === `Bearer ${auth.accessToken}`) {
+        expireSession(sessionVersion, auth.refreshToken);
+      }
       return Promise.reject(error);
     }
+    request._retry = true;
 
-    // 새 Access Token으로 재요청했는데도 401이면 세션을 종료한다.
-    if (originalRequest._retry) {
-      await expireSession(auth.refreshToken);
-      return Promise.reject(error);
+    // 먼저 끝난 다른 요청이 이미 갱신했다면 새 refresh token을 다시 소모하지 않는다.
+    if (auth.accessToken && request.headers.Authorization !== `Bearer ${auth.accessToken}`) {
+      return instance(request);
     }
 
     const refreshToken = auth.refreshToken;
-
     if (!refreshToken) {
-      await expireSession(null);
+      expireSession(sessionVersion, null);
       return Promise.reject(error);
     }
 
-    originalRequest._retry = true;
-
-    try {
-      // 이미 갱신 중인 요청이 있으면 해당 요청의 결과를 기다린다.
-      if (!refreshPromise) {
-        refreshPromise = publicApi
-          .post<AuthResponse>('/auth/refresh', { refreshToken })
-          .then(({ data }) => {
-            const currentAuth = useAuthStore.getState();
-
-            // 갱신 중 로그아웃 또는 계정 변경이 발생했다면 토큰을 덮어쓰지 않는다.
-            if (
-              !currentAuth.isLoggedIn ||
-              currentAuth.refreshToken !== refreshToken
-            ) {
-              throw new Error('로그인 상태가 변경되었습니다.');
-            }
-
-            // 새 Access Token과 Refresh Token 저장
-            currentAuth.setTokens(
-              data.accessToken,
-              data.refreshToken
-            );
-
-            return data.accessToken;
-          })
-          .catch(async (refreshError) => {
-            // Refresh Token 자체가 401이면 서버 로그아웃 및 로컬 로그아웃
-            if (
-              axios.isAxiosError(refreshError) &&
-              refreshError.response?.status === 401
-            ) {
-              const latestRefreshToken =
-                useAuthStore.getState().refreshToken ?? refreshToken;
-
-              await expireSession(latestRefreshToken);
-            }
-
-            throw refreshError;
-          })
-          .finally(() => {
-            refreshPromise = null;
-          });
-      }
-
-      // 갱신 결과를 기다린다.
-      const newAccessToken = await refreshPromise;
-
-      // 기존 요청에 새로운 Access Token 적용
-      originalRequest.headers.Authorization =
-        `Bearer ${newAccessToken}`;
-
-      // 실패했던 원래 요청을 딱 한 번 다시 실행
-      return instance(originalRequest);
-    } catch (refreshError) {
-      return Promise.reject(refreshError);
+    if (!refreshRequest || refreshRequest.sessionVersion !== sessionVersion) {
+      const promise: Promise<string> = publicApi.post<AuthResponse>('/auth/refresh', { refreshToken })
+        .then(({ data }) => {
+          const current = useAuthStore.getState();
+          if (!current.isLoggedIn || current.sessionVersion !== sessionVersion || current.refreshToken !== refreshToken) {
+            throw new Error('로그인 상태가 변경되었습니다.');
+          }
+          current.setTokens(data.accessToken, data.refreshToken);
+          return data.accessToken;
+        })
+        .catch((refreshError: unknown) => {
+          if (axios.isAxiosError(refreshError) && refreshError.response?.status === 401) {
+            expireSession(sessionVersion, refreshToken);
+          }
+          throw refreshError;
+        })
+        .finally(() => {
+          // 이전 로그인 세션의 완료가 새 세션의 갱신 요청을 지우지 않게 한다.
+          if (refreshRequest?.promise === promise) refreshRequest = null;
+        });
+      refreshRequest = { sessionVersion, promise };
     }
-  }
+
+    const accessToken = await refreshRequest.promise;
+    const current = useAuthStore.getState();
+    if (!current.isLoggedIn || current.sessionVersion !== sessionVersion) {
+      return Promise.reject(new Error('로그인 상태가 변경되었습니다.'));
+    }
+    request.headers.Authorization = `Bearer ${accessToken}`;
+    return instance(request);
+  },
 );
 
 export default instance;
