@@ -28,7 +28,7 @@ const MajorItem = ({ major, compare, onDetail }: MajorItemProps) => {
     <li className={`rounded-xl border p-4 bg-surface-container-lowest ${picked ? 'border-secondary' : 'border-outline-variant/30'}`}>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h4 className="font-bold text-primary-container">{major.name}</h4>
-        {/* 백엔드는 전공 단위 근거 수준을 주지 않는다 (축별 값만) — 없으면 배지를 숨긴다. JinroOn/JOBE#95 */}
+        {/* 이전 응답에 근거 수준이 없으면 배지를 숨긴다. */}
         {major.evidenceLevel && <EvidenceBadge level={major.evidenceLevel} />}
       </div>
       {/* 근거 문장이 없으면 서버가 준 공통 안내 문구만 보여준다 */}
@@ -92,7 +92,7 @@ const GroupCard = ({ group, index, compare }: GroupCardProps) => {
       <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
         <h3 id={headingId} className="text-lg font-bold text-primary-container">
           <span className="sr-only">탐색 후보 {index + 1}: </span>
-          {group.name || group.groupCode}
+          {group.name || '전공 후보'}
         </h3>
         {group.evidenceLevel && <EvidenceBadge level={group.evidenceLevel} />}
       </div>

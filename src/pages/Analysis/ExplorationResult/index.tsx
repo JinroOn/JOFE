@@ -7,6 +7,7 @@ import type { ActivityKind, ExplorationResult } from '../../../types/exploration
 import MockBanner from '../../Diagnosis/Exploration/components/MockBanner';
 import GroupCard from './components/GroupCard';
 import SharePanel from './components/SharePanel';
+import PreparationResponses from './components/PreparationResponses';
 
 const ACTIVITY_LABEL: Record<ActivityKind, { text: string; icon: string }> = {
   INFO_CHECK: { text: '정보 확인', icon: 'search' },
@@ -65,6 +66,7 @@ const ResultView = ({ result, onExit, onCompare, onActivities, onAsk, onPlan }: 
   const canAsk = isExplorationMock;
   const notes = result.notes ?? [];
   const recheckAxes = result.recheckAxes ?? [];
+  const majorNames = new Map(result.groups.flatMap((group) => group.majors).map((major) => [major.majorCode, major.name]));
   const [selected, setSelected] = useState<string[]>([]);
   const [compareHint, setCompareHint] = useState(false);
 
@@ -108,8 +110,7 @@ const ResultView = ({ result, onExit, onCompare, onActivities, onAsk, onPlan }: 
       {/* 서버가 표시용 문구를 아직 내려주지 않는 응답이면 비워 둔 이유를 알린다 (JinroOn/JOBE#95) */}
       {result.displayTextMissing && (
         <p role="note" className="rounded-brand border border-outline-variant/30 px-5 py-4 mb-8 text-sm text-on-surface-variant">
-          전공군 이름과 전공별 근거 문구는 서버에서 아직 내려주지 않아 비워 두었어요. 전공 이름과 후보 묶음은 서버가 확정한
-          결과 그대로예요.
+          일부 전공 설명을 준비 중이에요. 전공 이름과 후보 묶음을 먼저 확인해주세요.
         </p>
       )}
 
@@ -158,7 +159,8 @@ const ResultView = ({ result, onExit, onCompare, onActivities, onAsk, onPlan }: 
           <h2 id="caution-title" className="text-lg font-bold text-primary-container mb-3">탐색하면서 확인해볼 점</h2>
           <ul className="space-y-3">
             {result.cautions.slice(0, 2).map((c) => (
-              <li key={c.tagCode} className="rounded-brand border border-outline-variant/30 bg-surface-container-lowest p-5">
+              <li key={`${c.majorCode ?? ''}:${c.tagCode}`} className="rounded-brand border border-outline-variant/30 bg-surface-container-lowest p-5">
+                {c.majorCode && majorNames.has(c.majorCode) && <p className="text-xs font-bold text-secondary mb-2">{majorNames.get(c.majorCode)}</p>}
                 <p className="flex items-start gap-2 font-semibold text-primary-container mb-2">
                   <span className="material-symbols-outlined text-[18px] text-secondary mt-0.5" aria-hidden="true">info</span>
                   {c.text}
@@ -169,8 +171,7 @@ const ResultView = ({ result, onExit, onCompare, onActivities, onAsk, onPlan }: 
                     {c.checkAction}
                   </p>
                 ) : (
-                  // 백엔드 cautions는 승인된 주의 태그가 아니라 내가 답한 준비 상황 응답이다
-                  // (usage: PREPARATION_RESPONSE_ONLY). 확인 행동으로 둔갑시키지 않는다. JinroOn/JOBE#95
+                  // 이전 화면 상태에서 확인 행동 없이 보관된 응답도 표시할 수 있다.
                   c.answerText && (
                     <p className="text-sm text-on-surface-variant leading-relaxed pl-7">
                       <span className="font-semibold text-primary-container">내가 답한 내용 · </span>
@@ -183,6 +184,14 @@ const ResultView = ({ result, onExit, onCompare, onActivities, onAsk, onPlan }: 
           </ul>
         </section>
       )}
+
+      {result.cautionAvailability === 'UNAVAILABLE' && result.cautionUnavailableReason === 'APPROVAL_SNAPSHOT_NOT_AVAILABLE' && (
+        <p role="note" className="rounded-brand border border-outline-variant/30 px-5 py-4 mb-8 text-sm text-on-surface-variant">
+          이 결과에는 당시 확인된 안내 자료가 없어 전공별 확인 안내를 제공하지 않아요.
+        </p>
+      )}
+
+      <PreparationResponses responses={result.preparationResponses ?? []} />
 
       {!canActivities && result.activityMessage && (
         <p role="note" className="rounded-brand bg-surface-container-low px-5 py-4 mb-8 text-sm text-on-surface-variant">
