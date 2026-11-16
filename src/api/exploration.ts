@@ -254,5 +254,8 @@ export const getExplorationMajorProfile = (majorCode: string) =>
 export const toExplorationErrorCode = (error: unknown): ExplorationErrorCode => {
   const e = error as { response?: { status?: number; data?: { code?: string } } };
   if (!e?.response) return 'NETWORK';
+  // 탐색형 전용 advice와 레거시 공통 advice의 코드 체계를 화면에서 통일한다.
+  if (e.response.data?.code === 'INVALID_REQUEST') return 'INVALID_INPUT';
+  if (e.response.data?.code === 'RESOURCE_NOT_FOUND') return 'NOT_FOUND';
   return (e.response.data?.code as ExplorationErrorCode | undefined) ?? 'UNKNOWN';
 };

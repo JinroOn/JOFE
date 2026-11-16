@@ -171,7 +171,7 @@ const ExplorationCompare = () => {
   }
 
   if (resultState.kind === 'ERROR' || resultState.kind === 'TIMEOUT' || error) {
-    const invalid = error === 'INVALID_REQUEST';
+    const invalid = error === 'INVALID_INPUT';
     return (
       <Shell>
         <Message

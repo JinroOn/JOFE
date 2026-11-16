@@ -15,6 +15,8 @@ interface AuthState {
   refreshToken: string | null;
   isLoggedIn: boolean;
   sessionExpired: boolean;
+  // 토큰 회전과 별개로 로그인·로그아웃을 구분한다. 저장소에는 보존하지 않는다.
+  sessionVersion: number;
   login: (user: User, accessToken: string, refreshToken: string) => void;
   logout: () => void;
   updateUser: (user: User) => void;
@@ -30,10 +32,11 @@ const useAuthStore = create<AuthState>()(
       refreshToken: null,
       isLoggedIn: false,
       sessionExpired: false,
+      sessionVersion: 0,
       login: (user, accessToken, refreshToken) =>
-        set({ user, accessToken, refreshToken, isLoggedIn: true, sessionExpired: false }),
+        set((state) => ({ user, accessToken, refreshToken, isLoggedIn: true, sessionExpired: false, sessionVersion: state.sessionVersion + 1 })),
       logout: () =>
-        set({ user: null, accessToken: null, refreshToken: null, isLoggedIn: false }),
+        set((state) => ({ user: null, accessToken: null, refreshToken: null, isLoggedIn: false, sessionVersion: state.sessionVersion + 1 })),
       updateUser: (user) => set({ user }),
       setTokens: (accessToken, refreshToken) => set({ accessToken, refreshToken }),
       setSessionExpired: (v) => set({ sessionExpired: v }),

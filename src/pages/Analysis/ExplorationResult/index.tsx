@@ -66,12 +66,14 @@ const ResultView = ({ result, onExit, onCompare, onActivities, onAsk, onPlan }: 
   const recheckAxes = result.recheckAxes ?? [];
   const [selected, setSelected] = useState<string[]>([]);
   const [compareHint, setCompareHint] = useState(false);
+
   const toggle = (code: string) => {
     setCompareHint(false);
     setSelected((prev) =>
       prev.includes(code) ? prev.filter((c) => c !== code) : prev.length >= COMPARE_MAX ? prev : [...prev, code],
     );
   };
+
   const startCompare = () => {
     if (selected.length >= 2) onCompare(selected);
     else {
@@ -79,7 +81,9 @@ const ResultView = ({ result, onExit, onCompare, onActivities, onAsk, onPlan }: 
       document.getElementById('groups-title')?.parentElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
+
   const compare = { selected, max: COMPARE_MAX, onToggle: toggle };
+
   return (
     <>
       <header className="mb-8">
@@ -309,15 +313,28 @@ const ExplorationResultPage = () => {
   }
 
   if (state.kind === 'TIMEOUT' || state.kind === 'ERROR') {
-    const notFound = state.kind === 'ERROR' && state.code === 'RESOURCE_NOT_FOUND';
+    const notFound = state.kind === 'ERROR' && state.code === 'NOT_FOUND';
+    const invalidInput = state.kind === 'ERROR' && state.code === 'INVALID_INPUT';
+
+    const title = notFound
+      ? '결과를 찾을 수 없어요'
+      : invalidInput
+        ? '결과 요청 정보가 올바르지 않아요'
+        : state.kind === 'TIMEOUT'
+          ? '결과 정리가 평소보다 오래 걸리고 있어요'
+          : '결과를 불러오지 못했어요';
+
+    const body = notFound
+      ? '검사를 끝까지 마쳤는지 확인해주세요.'
+      : invalidInput
+        ? '검사 안내로 돌아가 다시 확인해주세요.'
+        : '답변은 저장되어 있어요. 잠시 후 다시 확인해주세요.';
+
     return (
       <Shell>
-        <StatusPanel
-          title={notFound ? '결과를 찾을 수 없어요' : state.kind === 'TIMEOUT' ? '결과 정리가 평소보다 오래 걸리고 있어요' : '결과를 불러오지 못했어요'}
-          body={notFound ? '검사를 끝까지 마쳤는지 확인해주세요.' : '답변은 저장되어 있어요. 잠시 후 다시 확인해주세요.'}
-        >
+        <StatusPanel title={title} body={body}>
           <div role="alert" className="flex flex-wrap justify-center gap-2">
-            {!notFound && (
+            {!notFound && !invalidInput && (
               <button type="button" className={primaryBtn} onClick={retry}>다시 확인하기</button>
             )}
             <button type="button" className={secondaryBtn} onClick={exit}>검사 안내로</button>

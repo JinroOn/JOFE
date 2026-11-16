@@ -1,5 +1,5 @@
 import type { AuthResponse, UserResponse } from '../types/auth';
-import api from './axios';
+import api, { publicApi } from './axios';
 
 export const login = (email: string, password: string) =>
   api.post<AuthResponse>('/auth/login', { email, password }).then((r) => r.data);
@@ -13,11 +13,15 @@ export const signup = (data: {
   marketingAgreed: boolean;
 }) => api.post<UserResponse>('/auth/signup', data).then((r) => r.data);
 
+// Access Token 없이 Refresh Token으로 로그아웃
 export const logout = (refreshToken: string) =>
-  api.post('/auth/logout', { refreshToken });
+  publicApi.post('/auth/logout', { refreshToken });
 
+// Access Token 없이 Refresh Token 갱신
 export const refreshTokens = (refreshToken: string) =>
-  api.post<AuthResponse>('/auth/refresh', { refreshToken }).then((r) => r.data);
+  publicApi
+    .post<AuthResponse>('/auth/refresh', { refreshToken })
+    .then((r) => r.data);
 
 export const changePassword = (data: {
   refreshToken: string;
@@ -28,11 +32,19 @@ export const changePassword = (data: {
 export const sendPasswordResetCode = (email: string) =>
   api.post('/auth/password-resets', { email });
 
-export const resetPassword = (data: { email: string; code: string; newPassword: string }) =>
-  api.post('/auth/password-resets/confirm', data);
+export const resetPassword = (data: {
+  email: string;
+  code: string;
+  newPassword: string;
+}) => api.post('/auth/password-resets/confirm', data);
 
 export const sendEmailVerification = (email: string) =>
-  api.post<{ email: string; expiresAt: string }>('/auth/email-verifications', { email }).then((r) => r.data);
+  api
+    .post<{ email: string; expiresAt: string }>(
+      '/auth/email-verifications',
+      { email }
+    )
+    .then((r) => r.data);
 
 export const confirmEmailVerification = (email: string, token: string) =>
   api.post('/auth/email-verifications/confirm', { email, token });
