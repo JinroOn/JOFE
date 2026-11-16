@@ -4,7 +4,7 @@ import { listExplorationSessions } from '../../../../api/exploration';
 import { getInProgressSession } from '../../../../api/diagnosis';
 import { isExplorationMock } from '../../../../config/features';
 import useExplorationStore from '../../../../store/useExplorationStore';
-import type { ExplorationSessionSummary } from '../../../../types/exploration';
+import type { ExplorationSessionSummary, ExplorationStage } from '../../../../types/exploration';
 import type { DiagnosisSession } from '../../../../types/diagnosis';
 import MockBanner from '../components/MockBanner';
 
@@ -15,10 +15,10 @@ const STEPS = [
   { no: '04', title: '결과 확인', desc: '먼저 살펴볼 전공군과 다음 행동을 안내해요' },
 ];
 
-const STAGE_LABEL: Record<string, string> = {
-  STAGE_1: '1단계',
-  STAGE_2: '2단계',
-  STAGE_3: '3단계',
+const STAGE_LABEL: Record<ExplorationStage, string> = {
+  1: '1단계',
+  2: '2단계',
+  3: '3단계',
 };
 
 const formatDate = (iso: string) => {

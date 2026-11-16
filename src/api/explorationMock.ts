@@ -40,8 +40,8 @@ import type {
 import { MOCK_MAJOR_PROFILES } from './explorationMockMajors';
 
 const STORAGE_KEY = 'jinroon.exploration.mock.v1';
-const STAGES: ExplorationStage[] = ['STAGE_1', 'STAGE_2', 'STAGE_3'];
-const STAGE_MAX: Record<ExplorationStage, number> = { STAGE_1: 42, STAGE_2: 24, STAGE_3: 12 };
+const STAGES: ExplorationStage[] = [1, 2, 3];
+const STAGE_MAX: Record<ExplorationStage, number> = { 1: 42, 2: 24, 3: 12 };
 
 const SCALE: ExplorationOption[] = [
   { code: 'STRONGLY_DISAGREE', text: '전혀 그렇지 않다', order: 1 },
@@ -62,16 +62,16 @@ interface SampleQuestion {
 }
 
 const BANK: SampleQuestion[] = [
-  { questionId: 'MOCK-S1-01', stage: 'STAGE_1', text: '생물이 자라고 변하는 과정을 알아보는 일에 관심이 간다.' },
-  { questionId: 'MOCK-S1-02', stage: 'STAGE_1', text: '숫자나 자료에서 규칙을 찾아보는 일이 흥미롭다.' },
-  { questionId: 'MOCK-S1-03', stage: 'STAGE_1', text: '사람들이 왜 그렇게 행동하는지 이야기 나누는 것이 재미있다.' },
-  { questionId: 'MOCK-S1-04', stage: 'STAGE_1', text: '그림·영상·디자인처럼 눈에 보이는 결과물을 만드는 일에 끌린다.' },
-  { questionId: 'MOCK-S1-05', stage: 'STAGE_1', text: '직접 무언가를 만들거나 고쳐본 경험이 있다면, 그 과정이 즐거웠다.' },
-  { questionId: 'MOCK-S1-06', stage: 'STAGE_1', text: '다른 사람에게 무언가를 설명하거나 가르쳐 본 시간이 즐거웠다.' },
-  { questionId: 'MOCK-S2-01', stage: 'STAGE_2', text: '자료를 모아 정리하고 그 안에서 의미를 찾는 활동을 더 해보고 싶다.' },
+  { questionId: 'MOCK-S1-01', stage: 1, text: '생물이 자라고 변하는 과정을 알아보는 일에 관심이 간다.' },
+  { questionId: 'MOCK-S1-02', stage: 1, text: '숫자나 자료에서 규칙을 찾아보는 일이 흥미롭다.' },
+  { questionId: 'MOCK-S1-03', stage: 1, text: '사람들이 왜 그렇게 행동하는지 이야기 나누는 것이 재미있다.' },
+  { questionId: 'MOCK-S1-04', stage: 1, text: '그림·영상·디자인처럼 눈에 보이는 결과물을 만드는 일에 끌린다.' },
+  { questionId: 'MOCK-S1-05', stage: 1, text: '직접 무언가를 만들거나 고쳐본 경험이 있다면, 그 과정이 즐거웠다.' },
+  { questionId: 'MOCK-S1-06', stage: 1, text: '다른 사람에게 무언가를 설명하거나 가르쳐 본 시간이 즐거웠다.' },
+  { questionId: 'MOCK-S2-01', stage: 2, text: '자료를 모아 정리하고 그 안에서 의미를 찾는 활동을 더 해보고 싶다.' },
   {
     questionId: 'MOCK-S2-02',
-    stage: 'STAGE_2',
+    stage: 2,
     comparisonSet: 'MOCK-CMP-DATA',
     text: '다음 중 더 해보고 싶은 공부 방식에 가까운 것을 골라주세요.',
     options: [
@@ -81,28 +81,28 @@ const BANK: SampleQuestion[] = [
       { code: 'UNKNOWN', text: '잘 모르겠음', order: 4 },
     ],
   },
-  { questionId: 'MOCK-S2-03', stage: 'STAGE_2', text: '혼자 깊이 파고드는 시간보다 여럿이 함께 만드는 시간이 더 잘 맞는다.' },
-  { questionId: 'MOCK-S3-01', stage: 'STAGE_3', text: '실험·실습 수업이 많은 환경도 괜찮을 것 같다.' },
-  { questionId: 'MOCK-S3-02', stage: 'STAGE_3', text: '탐색 활동에 쓸 수 있는 시간이 일주일에 2시간 이상 있다.' },
+  { questionId: 'MOCK-S2-03', stage: 2, text: '혼자 깊이 파고드는 시간보다 여럿이 함께 만드는 시간이 더 잘 맞는다.' },
+  { questionId: 'MOCK-S3-01', stage: 3, text: '실험·실습 수업이 많은 환경도 괜찮을 것 같다.' },
+  { questionId: 'MOCK-S3-02', stage: 3, text: '탐색 활동에 쓸 수 있는 시간이 일주일에 2시간 이상 있다.' },
 ];
 
 // MOCK-S2-01에 긍정 응답하면 추가되는 조건부 문항
 const CONDITIONAL: SampleQuestion = {
   questionId: 'MOCK-S2-01A',
-  stage: 'STAGE_2',
+  stage: 2,
   text: '정리한 자료를 그래프나 표로 보여주는 작업을 해보고 싶다.',
 };
 const TRIGGER_ID = 'MOCK-S2-01';
 const TRIGGER_CODES = ['AGREE', 'STRONGLY_AGREE'];
 
 const NOTICES: Partial<Record<ExplorationStage, StageNotice>> = {
-  STAGE_2: {
+  2: {
     title: '조금 더 확인해볼 부분이 있어요.',
     description:
       '앞선 응답에서 관심이 비슷하게 나타난 분야가 있어요. 어떤 공부와 활동 방식이 더 끌리는지 몇 가지 더 여쭤볼게요. (mock 안내 문구)',
     expectedMaxQuestions: 24,
   },
-  STAGE_3: {
+  3: {
     title: '거의 다 왔어요.',
     description:
       '탐색을 시작할 때 미리 알아두면 좋은 점을 확인합니다. 이 응답은 추천 순서를 바꾸지 않아요. (mock 안내 문구)',
@@ -201,7 +201,7 @@ const progressOf = (s: MockSession): ExplorationProgress => {
   const stage = s.session.stage;
   const inStage = s.issued.filter((i) => i.stage === stage && i.effective);
   return {
-    stage: (STAGES.indexOf(stage) + 1) as 1 | 2 | 3,
+    stage,
     answered: inStage.filter((i) => i.answerCode !== null).length,
     issued: inStage.length,
     stageMax: STAGE_MAX[stage],
@@ -214,7 +214,7 @@ const nextActionOf = (s: MockSession) => {
   const pending = s.issued.some((i) => i.stage === stage && i.effective && i.answerCode === null);
   if (pending) return 'ANSWER' as const;
   if (s.queue.length > 0) return 'NEXT' as const;
-  return stage === 'STAGE_3' ? ('COMPLETE' as const) : ('ADVANCE' as const);
+  return stage === 3 ? ('COMPLETE' as const) : ('ADVANCE' as const);
 };
 
 export const startSession = () =>
@@ -225,7 +225,7 @@ export const startSession = () =>
       sessionId,
       diagnosisType: 'EXPLORATION_V1',
       status: 'in_progress',
-      stage: 'STAGE_1',
+      stage: 1,
       revision: 1,
       versions: {
         questionCatalog: 'MOCK_QUESTION_CATALOG',
@@ -236,7 +236,7 @@ export const startSession = () =>
       startedAt: new Date().toISOString(),
       resultId: null,
     };
-    db.sessions[sessionId] = { session, issued: [], queue: queueFor('STAGE_1'), adjustPending: false, mutations: {} };
+    db.sessions[sessionId] = { session, issued: [], queue: queueFor(1), adjustPending: false, mutations: {} };
     save(db);
     return session;
   });
@@ -581,7 +581,7 @@ const CAUTIONS: ExplorationResult['cautions'] = [
 ];
 
 const buildResult = (s: MockSession): ExplorationResult => {
-  const stage1 = s.issued.filter((i) => i.stage === 'STAGE_1' && i.effective);
+  const stage1 = s.issued.filter((i) => i.stage === 1 && i.effective);
   const positive = stage1.filter((i) => i.answerCode === 'AGREE' || i.answerCode === 'STRONGLY_AGREE').length;
   const abstain = stage1.filter((i) => i.answerCode === 'UNKNOWN' || i.answerCode === 'NO_EXPERIENCE').length;
   const base = {
@@ -705,7 +705,7 @@ export const getComparison = (resultId: number, majorCodes: string[]) =>
 const SUPPORT_QUESTIONS: SampleQuestion[] = [
   {
     questionId: 'MOCK-PR-TIME',
-    stage: 'STAGE_3',
+    stage: 3,
     text: '탐색 활동에 일주일에 쓸 수 있는 시간은 어느 정도인가요?',
     options: [
       { code: 'TIME_SHORT', text: '30분 정도', order: 1 },
@@ -716,7 +716,7 @@ const SUPPORT_QUESTIONS: SampleQuestion[] = [
   },
   {
     questionId: 'MOCK-PR-COST',
-    stage: 'STAGE_3',
+    stage: 3,
     text: '비용이 드는 활동도 괜찮나요?',
     options: [
       { code: 'FREE_ONLY', text: '무료 활동만 하고 싶어요', order: 1 },
@@ -726,7 +726,7 @@ const SUPPORT_QUESTIONS: SampleQuestion[] = [
   },
   {
     questionId: 'MOCK-PR-PLACE',
-    stage: 'STAGE_3',
+    stage: 3,
     text: '어디에서 하는 활동이 편한가요?',
     options: [
       { code: 'ONLINE_ONLY', text: '온라인으로 할 수 있는 활동', order: 1 },
@@ -736,7 +736,7 @@ const SUPPORT_QUESTIONS: SampleQuestion[] = [
   },
   {
     questionId: 'MOCK-PR-PEOPLE',
-    stage: 'STAGE_3',
+    stage: 3,
     text: '다른 사람에게 물어보거나 함께하는 활동도 괜찮나요?',
     options: [
       { code: 'SOLO', text: '혼자 하는 활동이 편해요', order: 1 },
@@ -746,7 +746,7 @@ const SUPPORT_QUESTIONS: SampleQuestion[] = [
   },
   {
     questionId: 'MOCK-PR-KIND',
-    stage: 'STAGE_3',
+    stage: 3,
     text: '어떤 방식의 활동을 해보고 싶나요?',
     options: [
       { code: 'READ', text: '강의나 글을 보고 정리하기', order: 1 },
