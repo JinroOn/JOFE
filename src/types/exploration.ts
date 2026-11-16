@@ -2,10 +2,7 @@
 
 export type ExplorationStage = 'STAGE_1' | 'STAGE_2' | 'STAGE_3';
 
-export type ExplorationSessionStatus =
-  | 'in_progress'
-  | 'completed'
-  | 'abandoned';
+export type ExplorationSessionStatus = 'in_progress' | 'completed' | 'abandoned';
 
 export type ExplorationSessionType = 'EXPLORATION_V1' | 'LEGACY';
 
@@ -53,11 +50,7 @@ export interface ExplorationProgress {
   totalIssued?: number;
 }
 
-export type ExplorationNextAction =
-  | 'ANSWER'
-  | 'NEXT'
-  | 'ADVANCE'
-  | 'COMPLETE';
+export type ExplorationNextAction = 'ANSWER' | 'NEXT' | 'ADVANCE' | 'COMPLETE';
 
 export interface NextQuestionsResponse {
   revision: number;
@@ -133,9 +126,7 @@ export interface MockSaveAnswerResponse {
   nextAction: ExplorationNextAction;
 }
 
-export type SaveAnswerResponse =
-  | BackendSaveAnswerResponse
-  | MockSaveAnswerResponse;
+export type SaveAnswerResponse = BackendSaveAnswerResponse | MockSaveAnswerResponse;
 
 // 단계 사이 안내 문구
 export interface StageNotice {
@@ -146,8 +137,7 @@ export interface StageNotice {
 
 // 실제 백엔드 단계 진행 응답
 export interface BackendAdvanceResponse {
-  session: Partial<ExplorationSession> &
-    Pick<ExplorationSession, 'revision' | 'stage'>;
+  session: Partial<ExplorationSession> & Pick<ExplorationSession, 'revision' | 'stage'>;
   progress: ExplorationProgress;
   nextAction: ExplorationNextAction;
   fixedCandidates: unknown;
@@ -161,9 +151,7 @@ export interface MockAdvanceResponse {
   notice: StageNotice | null;
 }
 
-export type AdvanceResponse =
-  | BackendAdvanceResponse
-  | MockAdvanceResponse;
+export type AdvanceResponse = BackendAdvanceResponse | MockAdvanceResponse;
 
 export interface CompleteResponse {
   revision: number;
@@ -173,15 +161,9 @@ export interface CompleteResponse {
 
 // 결과
 
-export type ExplorationResultStatus =
-  | 'READY'
-  | 'LOW_EVIDENCE'
-  | 'NO_SUPPORTED_CANDIDATE';
+export type ExplorationResultStatus = 'READY' | 'LOW_EVIDENCE' | 'NO_SUPPORTED_CANDIDATE';
 
-export type EvidenceLevel =
-  | 'CONFIRMED'
-  | 'LOW_EVIDENCE'
-  | 'NO_EVIDENCE';
+export type EvidenceLevel = 'CONFIRMED' | 'LOW_EVIDENCE' | 'NO_EVIDENCE';
 
 export type ReasonKind = 'INTEREST' | 'ACTIVITY' | 'LEARNING';
 
@@ -216,10 +198,7 @@ export interface ExplorationCaution {
   checkAction: string;
 }
 
-export type ActivityKind =
-  | 'INFO_CHECK'
-  | 'HANDS_ON'
-  | 'COMPARE_ASK';
+export type ActivityKind = 'INFO_CHECK' | 'HANDS_ON' | 'COMPARE_ASK';
 
 export interface ExplorationActivity {
   activityCode: string;
@@ -232,11 +211,7 @@ export interface ExplorationActivity {
   tags: ActivityTag[];
 }
 
-export type ActivityTag =
-  | 'FREE'
-  | 'ONLINE'
-  | 'SOLO'
-  | 'WITH_OTHERS';
+export type ActivityTag = 'FREE' | 'ONLINE' | 'SOLO' | 'WITH_OTHERS';
 
 export interface RecheckAxis {
   metricCode: string;
@@ -365,10 +340,7 @@ export interface ExplorationAskResponse {
 
 export type PlanStatus = 'GENERATING' | 'READY' | 'FAILED';
 
-export type PlanPhase =
-  | 'INFO'
-  | 'BASIC_LEARNING'
-  | 'SMALL_ACTIVITY';
+export type PlanPhase = 'INFO' | 'BASIC_LEARNING' | 'SMALL_ACTIVITY';
 
 export interface PlanWeek {
   week: number;
@@ -395,11 +367,7 @@ export interface ExplorationPlan extends ExplorationPlanSummary {
 
 // 결과 공유
 
-export type ShareStatus =
-  | 'NONE'
-  | 'ACTIVE'
-  | 'EXPIRED'
-  | 'DISABLED';
+export type ShareStatus = 'NONE' | 'ACTIVE' | 'EXPIRED' | 'DISABLED';
 
 export interface ExplorationShareState {
   resultId: number;
@@ -449,9 +417,10 @@ export interface ExplorationMajorProfile {
   source: string | null;
 }
 
+// 백엔드 공통 오류 코드
 export type ExplorationErrorCode =
-  | 'INVALID_REQUEST'
-  | 'RESOURCE_NOT_FOUND'
+  | 'INVALID_INPUT'
+  | 'NOT_FOUND'
   | 'STALE_REVISION'
   | 'IDEMPOTENCY_CONFLICT'
   | 'SESSION_ALREADY_COMPLETED'
@@ -459,12 +428,8 @@ export type ExplorationErrorCode =
   | 'OPTION_NOT_ISSUED'
   | 'QUESTION_NOT_EFFECTIVE'
   | 'STAGE_INCOMPLETE'
-  | 'NO_SUPPORTED_CANDIDATE'
   | 'NO_ACTIVE_CATALOG'
   | 'NETWORK'
   | 'UNKNOWN';
 
-export const ABSTAIN_OPTION_CODES = [
-  'UNKNOWN',
-  'NO_EXPERIENCE',
-] as const;
+export const ABSTAIN_OPTION_CODES = ['UNKNOWN', 'NO_EXPERIENCE'] as const;

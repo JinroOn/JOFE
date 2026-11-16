@@ -74,11 +74,14 @@ const ExplorationQuestion = () => {
 
   if (s.phase === 'LOAD_FAILED') {
     const message =
-      s.errorCode === 'RESOURCE_NOT_FOUND'
+      s.errorCode === 'NOT_FOUND'
         ? '검사를 찾을 수 없어요.'
-        : s.errorCode === 'NO_ACTIVE_CATALOG'
-          ? '지금은 검사를 진행할 수 없어요. 잠시 후 다시 시도해주세요.'
-          : '검사를 불러오지 못했어요. 연결 상태를 확인하고 다시 시도해주세요.';
+        : s.errorCode === 'INVALID_INPUT'
+          ? '검사 요청 정보가 올바르지 않아요. 검사 안내로 돌아가 다시 시작해주세요.'
+          : s.errorCode === 'NO_ACTIVE_CATALOG'
+            ? '지금은 검사를 진행할 수 없어요. 잠시 후 다시 시도해주세요.'
+            : '검사를 불러오지 못했어요. 연결 상태를 확인하고 다시 시도해주세요.';
+
     return wrap(
       <Panel>
         <p role="alert" className="text-primary-container font-bold mb-6">{message}</p>

@@ -114,7 +114,7 @@ const ExplorationPlanPage = () => {
       else openPlan(res.planId);
     } catch (e) {
       setCreateError(
-        toExplorationErrorCode(e) === 'INVALID_REQUEST'
+        toExplorationErrorCode(e) === 'INVALID_INPUT'
           ? '이 결과에 있는 전공으로만 계획을 만들 수 있어요.'
           : '계획 만들기를 요청하지 못했어요. 잠시 후 다시 시도해주세요.',
       );
