@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getExplorationResult, toExplorationErrorCode } from '../api/exploration';
+import useExplorationStore from '../store/useExplorationStore';
 import type { ExplorationErrorCode, ExplorationResult } from '../types/exploration';
 
 type ResultLoadState =
@@ -12,9 +13,19 @@ type ResultLoadState =
 const MAX_WAIT_MS = 60_000;
 const MAX_INTERVAL_MS = 5_000;
 
-// 결과 생성 지연 시 backoff로 다시 조회한다. 완료 요청은 다시 보내지 않는다.
+// 방금 완료한 회차는 complete 응답으로 이미 결과를 받아 스토어에 있다 — 다시 조회하지 않는다.
+const cachedResult = (sessionId: number) => {
+  const cached = useExplorationStore.getState().result;
+  return cached && cached.sessionId === sessionId ? cached : null;
+};
+
+// 완료 요청은 다시 보내지 않는다.
+// GENERATING 분기는 mock 어댑터 전용이다 — 실제 백엔드는 202를 주지 않는다 (JOFE#113).
 const useExplorationResult = (sessionId: number) => {
-  const [state, setState] = useState<ResultLoadState>({ kind: 'LOADING' });
+  const [state, setState] = useState<ResultLoadState>(() => {
+    const cached = cachedResult(sessionId);
+    return cached ? { kind: 'READY', result: cached } : { kind: 'LOADING' };
+  });
   const [attempt, setAttempt] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -25,6 +36,11 @@ const useExplorationResult = (sessionId: number) => {
 
     const poll = async () => {
       try {
+        const cached = cachedResult(sessionId);
+        if (cached) {
+          if (alive) setState({ kind: 'READY', result: cached });
+          return;
+        }
         const res = await getExplorationResult(sessionId);
         if (!alive) return;
         if (res.state === 'READY') {
