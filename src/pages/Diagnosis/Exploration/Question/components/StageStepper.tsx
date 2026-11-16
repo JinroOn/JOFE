@@ -1,9 +1,9 @@
 import type { ExplorationStage } from '../../../../../types/exploration';
 
 const STAGES: { key: ExplorationStage; label: string }[] = [
-  { key: 'STAGE_1', label: '공통 탐색' },
-  { key: 'STAGE_2', label: '맞춤 탐색' },
-  { key: 'STAGE_3', label: '탐색 전 확인' },
+  { key: 1, label: '공통 탐색' },
+  { key: 2, label: '맞춤 탐색' },
+  { key: 3, label: '탐색 전 확인' },
 ];
 
 interface StageStepperProps {

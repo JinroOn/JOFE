@@ -1,6 +1,9 @@
 // 탐색형 진단(EXPLORATION_V1) 타입
 
-export type ExplorationStage = 'STAGE_1' | 'STAGE_2' | 'STAGE_3';
+// 백엔드는 API로 나가는 stage를 모두 숫자로 직렬화한다
+// (ExplorationSessionService의 회차 DTO·답변 응답·진행률·회차 목록·통합 이력 전부 stageNumber()).
+// 문자열 'STAGE_1'은 DB 내부 표현이라 응답에 나오지 않는다. (JOFE#116)
+export type ExplorationStage = 1 | 2 | 3;
 
 export type ExplorationSessionStatus =
   | 'in_progress'
@@ -45,7 +48,7 @@ export interface IssuedQuestion {
 }
 
 export interface ExplorationProgress {
-  stage: 1 | 2 | 3;
+  stage: ExplorationStage;
   answered: number;
   issued: number;
   stageMax: number;
