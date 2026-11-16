@@ -43,16 +43,45 @@ npm run dev -- --host 127.0.0.1 --port 5175 --strictPort
 
 다른 터미널에서 `npm run test:comparison-ui`를 실행한다. 다른 로컬 포트를 쓰면 `COMPARISON_UI_BASE_URL`도 맞춘다. 브라우저가 설치돼 있어야 하며, 스크린샷과 보고서는 Git에서 제외한 `output/playwright/`에 생성된다.
 
-실행 중인 DEV 백엔드가 없어 실제 MySQL·DEV 서버에서 완료된 회차로 결과→비교 흐름을 검증하는 항목은 남아 있다. 이번 검증을 실서버 통합 통과로 기록하지 않는다.
+## 실제 DEV 서버 인수 검증 (2026-11-17 통과)
+
+앞선 확인에서 남아 있던 "실행 중인 DEV 백엔드로 완료된 회차의 결과→비교 흐름" 항목을 실제로 돌려 통과했다.
+
+환경: JOBE `develop` `bf73ee4`(PR #106까지), JOFE `develop` `ffd82e1`(PR #124까지).
+MySQL 8.0 컨테이너(호스트 13307), 백엔드 `SERVER_PORT=18080`,
+`SPRING_PROFILES_ACTIVE=dev,exploration-dev`, `EXPLORATION_RUN_MODE=DEV`,
+`EXPLORATION_DEV_USER_IDS`에 호출 사용자 포함. 프런트는 `VITE_EXPLORATION_MOCK=false`,
+`VITE_API_BASE_URL=http://localhost:18080/api`.
+
+- Flyway V8~V11이 기존 V7 DB에 순서대로 적용됐다.
+- 결과 조회: `GET /exploration/v1/sessions/{id}/result` 200.
+  `displaySource: SEALED_RESULT_PROJECTION`, `displayVersion: RESULT_DISPLAY_V1_0`.
+- 결과 화면: 전공군 이름·요약(예술·생명·경영·경제)과 전공별 근거 3종(관심·활동·학습) 문장,
+  근거 수준 배지, 재확인 축 이름 8개가 모두 표시됐다. 코드가 노출된 자리는 없다.
+- 확인 안내: `cautionAvailability: UNAVAILABLE`,
+  `cautionUnavailableReason: APPROVAL_SNAPSHOT_NOT_AVAILABLE`인 과거 봉인 결과에서
+  "당시 확인된 안내 자료가 없어 전공별 확인 안내를 제공하지 않아요"로 표시되고,
+  검사 당시 준비 답변 7건은 접이식 영역에 원문으로 남았다. 두 의미가 섞이지 않았다.
+- 비교(방향이 갈리는 쌍, 미생물학과·생명과학과): `leftMajorCode`·`rightMajorCode`로 200.
+  `comparisonSets`의 방향 문구("미생물 중심의 학습 내용" 대 "생명 원리 중심의 학습 내용")가 표시됐다.
+- 비교(공유 세트 없는 쌍, 디지털디자인학과·무용학과): `comparisonState: NO_SHARED_COMPARISON_SET`에서
+  "같은 기준으로 나눠 보여줄 비교 항목이 아직 없어요" 안내로 처리되고 방향 차이 영역은 숨었다.
+- 기능 가용성: `planAvailable: false`, `sharingAvailable: false`,
+  `activityAvailability: UNAVAILABLE`에 따라 12주 계획·공유 패널·활동 섹션이 노출되지 않았다.
+- 브라우저 콘솔 오류 0. `npm test` 23개 통과.
+
+남은 것: 새로 완료한 회차의 `COMPLETION_SNAPSHOT` 경로(승인 주의 태그가 있는 결과)는
+이번에 확인하지 않았다. 과거 봉인 결과 경로만 검증했다.
+공유는 `exploration.sharing.enabled`가 꺼진 상태라 발급·철회 흐름은 범위 밖이다.
 
 ## 후속 순서
 
 | 작업 | 확인 상태와 프론트 조치 |
 |---|---|
-| 공유 (#115) | 발급 본문에 `expectedShareRevision`·`includeNickname`, 철회는 `POST /share/revoke`와 멱등키, 공개 조회는 `/shared-results/{token}`으로 맞춘다. 현재 공유는 DEV 검증 범위이며 공개 프록시 제약을 별도 확인한다. |
-| 관리자 카탈로그 | 백엔드 검토·활성화는 `/admin/exploration/reviews`, `/activations`다. 프론트 요청·검토 근거 입력·이력 화면을 맞춘다. 목록·상세 API는 백엔드 #101 의존성이 남아 있다. |
-| 결과 표시 문구 (#100, PR #103) | 새 DTO와 이전 준비 답변 형식 연결 완료. 전공군·근거·확인 안내·과거 결과 가용성을 검증했다. 실제 DEV 서버 인수는 남아 있다. |
-| AI 상담·12주 계획·전공 상세 (#101) | 화면은 있으나 탐색형 소비자 API가 없다. 실제 엔드포인트와 DTO가 확정되기 전 기능을 공개하지 않는다. |
+| 공유 (#115, PR #122) | 발급 본문 `expectedShareRevision`·`includeNickname`, 철회 `POST /share/revoke`와 멱등키, 공개 조회 `/shared-results/{token}` 반영 완료. 이슈는 닫았다. `exploration.sharing.enabled`가 꺼져 있어 발급·철회 실서버 인수와 공개 프록시 제약은 남아 있다. |
+| 관리자 카탈로그 (PR #124) | 백엔드 검토·활성화(`/admin/exploration/reviews`, `/activations`)와 목록·상세(JOBE PR #104)가 모두 들어와 프론트 연동을 맞췄다. 실서버 인수는 남아 있다. |
+| 결과 표시 문구 (#100, PR #103) | 새 DTO와 이전 준비 답변 형식 연결 완료. **2026-11-17 실제 DEV 서버에서 과거 봉인 결과 경로를 인수 검증했다**(위 절 참고). 새로 완료한 회차의 `COMPLETION_SNAPSHOT` 경로는 남아 있다. |
+| AI 상담·12주 계획 (#101) | 전공 상세는 JOBE PR #105로 생겼다. 상담 2개·계획 3개는 여전히 없어 기능을 공개하지 않는다. |
 | 통합 이력·대시보드 | 서버의 통합 API를 확인해 마이페이지·최근 결과 진입·요약을 연결한다. 진행 중 검사 폐기와 동시 수정 안내도 정리한다. |
 | main 릴리스 (#111) | 레거시 진단 안내의 문항 수·2차 심화 설명을 실제 흐름으로 수정한다. 프로덕션 기능 플래그·API 대상과 스테이징 레거시 회귀를 확인한 뒤 별도 릴리스한다. |
 
