@@ -539,6 +539,11 @@ export interface ExplorationShareState {
   token: string | null;
   createdAt: string | null;
   expiresAt: string | null;
+
+  // 실제 백엔드 공유 응답
+  shareRevision?: number;
+  available?: boolean;
+  publicPath?: string | null;
 }
 
 export interface SharedExplorationMajor {
@@ -547,21 +552,35 @@ export interface SharedExplorationMajor {
 }
 
 export interface SharedExplorationGroup {
+  groupCode?: string;
   name: string;
   summary: string;
   majors: SharedExplorationMajor[];
 }
 
 export interface SharedExplorationResult {
-  nickname: string;
-  completedAt: string;
-  status: ExplorationResultStatus;
+  nickname: string | null;
+  completedAt?: string;
+  status?: ExplorationResultStatus;
   groups: SharedExplorationGroup[];
-  activities: {
+
+  // 기존 mock 응답과의 호환성을 위해 선택적으로 유지
+  activities?: {
     title: string;
     duration: string;
   }[];
-  notes: string[];
+  notes?: string[];
+
+  // 실제 백엔드 공개 결과 응답
+  uncertainty?: {
+    lowEvidence: boolean;
+    noSupportedCandidate: boolean;
+    interestTie: boolean;
+    lowDifferentiation: boolean;
+    message: string;
+  };
+  nextSteps?: string[];
+
   expiresAt: string;
 }
 
