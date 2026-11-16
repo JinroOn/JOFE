@@ -1,50 +1,133 @@
-// 관리자 탐색형 진단 카탈로그 타입
-// 기준: 04 문서 DB 3절(상태와 버전)·exploration_catalog, 01 문서 D-32·D-33, 05 문서 롤백 절차
-// 관리자 API는 04 문서에 없어 백엔드와 합의 전 프런트 가정이다.
+export type CatalogTargetType =
+  | 'CATALOG'
+  | 'RULESET'
+  | 'ACTIVITY_CATALOG';
 
-export type CatalogType = 'QUESTION_CATALOG' | 'OPTION_CATALOG' | 'MAJOR_MAPPING' | 'RULESET';
+export type CatalogContentStatus =
+  | 'DRAFT'
+  | 'REVIEWED'
+  | 'ACTIVE'
+  | 'ARCHIVED';
 
-// D-32 콘텐츠 상태
-export type CatalogStatus = 'DRAFT' | 'REVIEWED' | 'ACTIVE' | 'ARCHIVED';
+export type CatalogAction =
+  | 'REVIEW'
+  | 'ACTIVATE'
+  | 'ARCHIVE';
 
-// 04 문서: 외부 검토 상태는 콘텐츠 상태와 섞지 않고 따로 저장한다
-export type ExternalReviewStatus = 'APPROVED_FOR_IMPLEMENTATION' | 'DOMAIN_REVIEW_PENDING' | null;
+export type CatalogReviewKind =
+  | 'IMPLEMENTATION'
+  | 'DOMAIN'
+  | 'PILOT'
+  | 'RELEASE';
 
-export type CatalogAction = 'REVIEW' | 'ACTIVATE' | 'ROLLBACK';
+export type CatalogReviewDecision =
+  | 'APPROVED'
+  | 'REJECTED';
 
+export type CatalogActivationScope =
+  | 'DEV'
+  | 'PILOT'
+  | 'PUBLIC';
+
+// GET /api/admin/exploration/catalogs
 export interface CatalogSummary {
-  catalogId: number;
-  catalogType: CatalogType;
+  targetType: CatalogTargetType;
+  targetId: number;
+  catalogType: string;
   version: string;
-  status: CatalogStatus;
+
+  contentStatus: CatalogContentStatus;
+
+  implementationReviewStatus: string | null;
+  domainReviewStatus: string | null;
+
   contentHash: string;
-  itemCount: number;
-  author: string;
-  reviewer: string | null;
-  externalReviewStatus: ExternalReviewStatus;
-  createdAt: string;
-  activatedAt: string | null;
-  // 서버가 현재 관리자에게 허용한 동작. 화면은 이 목록만 버튼으로 보여준다.
+  itemCount: number | null;
+  createdAt: string | null;
+
+  usedByRuntime: boolean;
+
   allowedActions: CatalogAction[];
-  // 허용되지 않은 이유 (예: 작성자 본인은 검토 불가)
-  blockedReason: string | null;
+  blockedReasons: Partial<Record<CatalogAction, string>>;
 }
 
+// 상세 조회에 포함되는 문항
 export interface CatalogQuestion {
   questionId: string;
   questionVersion: string;
-  stage: 'STAGE_1' | 'STAGE_2' | 'STAGE_3' | 'POST_RESULT';
+  stage: string;
   moduleCode: string;
   metricCode: string | null;
-  text: string;
-  optionCount: number;
+  text: string | null;
+
+  contentStatus: string;
+  implementationReviewStatus: string;
+  domainReviewStatus: string;
 }
 
-export interface CatalogDetail extends CatalogSummary {
-  // 문항 카탈로그일 때만 채워진다
+// 검토 이력
+export interface CatalogReview {
+  reviewId: number;
+  reviewKind: string;
+  decision: string;
+  scope: string;
+  reviewerId: number;
+  reviewedAt: string;
+
+  targetVersion: string;
+  targetHash: string;
+  matchesCurrentContent: boolean;
+
+  evidenceReference: string;
+}
+
+// 활성화 및 보관 이력
+export interface CatalogActivation {
+  activationId: number;
+  action: string;
+
+  targetType: string;
+  targetId: number;
+  targetVersion: string;
+  targetHash: string;
+
+  scope: string | null;
+  actorId: number;
+  relatedTargetId: number | null;
+
+  reviewIds: number[];
+  reason: string;
+  createdAt: string;
+}
+
+// GET /catalogs/{targetType}/{targetId}
+export interface CatalogDetail {
+  catalog: CatalogSummary;
+  reviews: CatalogReview[];
+  activations: CatalogActivation[];
   questions: CatalogQuestion[];
 }
 
-export interface CatalogTransitionRequest {
-  expectedStatus: CatalogStatus;
+// POST /reviews
+export interface CatalogReviewRequest {
+  targetType: CatalogTargetType;
+  targetId: number;
+  reviewKind: CatalogReviewKind;
+  decision: CatalogReviewDecision;
+  evidenceReference: string;
+}
+
+// POST /activations
+export interface CatalogActivationRequest {
+  targetType: CatalogTargetType;
+  targetId: number;
+  scope: CatalogActivationScope;
+  reason: string;
+}
+
+// POST /activations/archive
+export interface CatalogArchiveRequest {
+  targetType: CatalogTargetType;
+  targetId: number;
+  reason: string;
 }
