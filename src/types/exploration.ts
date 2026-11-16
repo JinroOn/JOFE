@@ -77,6 +77,12 @@ export interface ExplorationSessionDetail {
   nextAction: ExplorationNextAction;
 }
 
+export type ExplorationResultAvailability =
+  | 'AVAILABLE'
+  | 'NOT_COMPLETED'
+  | 'MISSING'
+  | 'UNAVAILABLE';
+
 // GET /sessions
 // 백엔드: type, Mock: diagnosisType
 export interface ExplorationSessionSummary {
@@ -88,6 +94,8 @@ export interface ExplorationSessionSummary {
   startedAt: string;
   completedAt: string | null;
   resultId: number | null;
+  resultAvailability?: ExplorationResultAvailability;
+  resultUnavailableReason?: string | null;
 }
 
 // PUT /sessions/{id}/answers/{issuedId}

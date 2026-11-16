@@ -82,9 +82,13 @@ const MyPage = () => {
           : Promise.resolve([] as ExplorationSessionSummary[]),
       ]);
 
+      // 백엔드는 type, 기존 Mock은 diagnosisType을 사용한다.
       const explorationItems =
         explorationList.status === 'fulfilled'
-          ? explorationList.value.filter((item) => item.diagnosisType === 'EXPLORATION_V1')
+          ? explorationList.value.filter(
+              (item) =>
+                (item.type ?? item.diagnosisType) === 'EXPLORATION_V1'
+            )
           : [];
 
       setExplorations(explorationItems);
@@ -94,6 +98,7 @@ const MyPage = () => {
           list.value.map(async (favorite) => {
             try {
               const major = await getMajor(favorite.majorId);
+
               return {
                 id: favorite.id,
                 majorId: favorite.majorId,
@@ -101,7 +106,8 @@ const MyPage = () => {
                 major,
               };
             } catch (err: unknown) {
-              const status = (err as { response?: { status?: number } })?.response?.status;
+              const status = (err as { response?: { status?: number } })
+                ?.response?.status;
 
               if (status === 404) {
                 deleteFavorite(favorite.id).catch(() => {});
@@ -123,6 +129,7 @@ const MyPage = () => {
 
       setFavoritesLoading(false);
 
+      // 레거시와 탐색형의 완료 이력을 합산한다.
       const completedDates = [
         ...(results.status === 'fulfilled'
           ? results.value.map((result) => result.createdAt)
@@ -152,7 +159,8 @@ const MyPage = () => {
         setSessions(
           [...sessionList.value].sort(
             (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+              new Date(b.createdAt).getTime() -
+              new Date(a.createdAt).getTime()
           )
         );
       }
@@ -166,7 +174,9 @@ const MyPage = () => {
 
     try {
       await deleteFavorite(favoriteId);
-      setFavorites((prev) => prev.filter((favorite) => favorite.id !== favoriteId));
+      setFavorites((prev) =>
+        prev.filter((favorite) => favorite.id !== favoriteId)
+      );
     } finally {
       setDeletingId(null);
     }
@@ -181,8 +191,13 @@ const MyPage = () => {
       await deleteSession(sessionToDelete.id);
 
       setSessions((prev) => {
-        const next = prev.filter((session) => session.id !== sessionToDelete.id);
-        const maxPage = Math.max(1, Math.ceil(next.length / SESSIONS_PER_PAGE));
+        const next = prev.filter(
+          (session) => session.id !== sessionToDelete.id
+        );
+        const maxPage = Math.max(
+          1,
+          Math.ceil(next.length / SESSIONS_PER_PAGE)
+        );
 
         setSessionPage((page) => Math.min(page, maxPage));
         return next;
@@ -233,7 +248,8 @@ const MyPage = () => {
 
         <div className="flex-grow text-center md:text-left">
           <h1 className="text-4xl md:text-5xl font-extrabold text-primary-container mb-2 tracking-tight">
-            {displayName} <span className="text-on-primary-container font-medium text-2xl">님</span>
+            {displayName}{' '}
+            <span className="text-on-primary-container font-medium text-2xl">님</span>
           </h1>
 
           <p className="text-on-surface-variant flex items-center justify-center md:justify-start gap-2">
@@ -422,6 +438,14 @@ const MyPage = () => {
                               : '/analysis/dashboard'
                           );
 
+                      // 백엔드 결과가 AVAILABLE인 경우에만 결과 링크를 표시한다.
+                      // 기존 Mock 응답은 resultAvailability가 없으므로 resultId로 판단한다.
+                      const canOpenResult = isExploration
+                        ? row.exploration.resultAvailability === undefined
+                          ? row.exploration.resultId !== null
+                          : row.exploration.resultAvailability === 'AVAILABLE'
+                        : true;
+
                       return (
                         <div key={row.key} className="bg-white rounded-2xl px-5 py-4 shadow-sm flex items-center justify-between gap-4">
                           <div className="flex items-center gap-4 min-w-0">
@@ -456,13 +480,22 @@ const MyPage = () => {
                               </button>
                             )}
 
-                            {status === 'completed' && (
+                            {status === 'completed' && canOpenResult && (
                               <button
                                 onClick={openResult}
                                 className="px-3 py-1.5 bg-surface-container text-on-surface text-xs font-bold rounded-lg hover:bg-surface-container-high transition-colors"
                               >
                                 결과 보기
                               </button>
+                            )}
+
+                            {status === 'completed' && isExploration && !canOpenResult && (
+                              <span
+                                className="text-xs text-on-surface-variant"
+                                title="이 회차의 결과를 사용할 수 없습니다."
+                              >
+                                결과 확인 불가
+                              </span>
                             )}
 
                             {row.kind === 'legacy' && (
