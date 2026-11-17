@@ -74,7 +74,9 @@ const ExplorationQuestion = () => {
 
   if (s.phase === 'LOAD_FAILED') {
     const message =
-      s.errorCode === 'NOT_FOUND'
+      s.errorCode === 'SESSION_ABANDONED'
+        ? '중단된 검사예요. 이 검사는 더 이상 이어할 수 없어요.'
+        : s.errorCode === 'NOT_FOUND'
         ? '검사를 찾을 수 없어요.'
         : s.errorCode === 'INVALID_INPUT'
           ? '검사 요청 정보가 올바르지 않아요. 검사 안내로 돌아가 다시 시작해주세요.'
@@ -86,7 +88,9 @@ const ExplorationQuestion = () => {
       <Panel>
         <p role="alert" className="text-primary-container font-bold mb-6">{message}</p>
         <div className="flex flex-wrap justify-center gap-2">
-          <button type="button" className={primaryBtn} onClick={() => void load(id)}>다시 시도</button>
+          {s.errorCode !== 'SESSION_ABANDONED' && (
+            <button type="button" className={primaryBtn} onClick={() => void load(id)}>다시 시도</button>
+          )}
           <button type="button" className={secondaryBtn} onClick={exit}>검사 안내로</button>
         </div>
       </Panel>,

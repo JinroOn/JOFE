@@ -190,6 +190,20 @@ export const listExplorationSessions = () =>
         )
         .then((r) => r.data);
 
+// 응답을 받지 못한 요청의 재시도는 같은 revision과 키를 유지한다.
+export const abandonExplorationSession = (
+  sessionId: number,
+  expectedRevision: number,
+  mutationId: string,
+) =>
+  isExplorationMock
+    ? mock.abandonSession(sessionId, expectedRevision, mutationId)
+    : api.post<ExplorationSession>(
+        `${BASE}/sessions/${sessionId}/abandon`,
+        { expectedRevision },
+        idem(mutationId),
+      ).then((r) => r.data);
+
 export const requestNextQuestions = (
   sessionId: number,
   expectedRevision: number,

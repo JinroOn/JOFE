@@ -124,6 +124,10 @@ const getExistingSessionId = (error: unknown): number | null => {
 const useExplorationStore = create<ExplorationState>((set, get) => {
   const failWith = (op: PendingOp, error: unknown) => {
     const code = toExplorationErrorCode(error);
+    if (code === 'SESSION_ABANDONED') {
+      set({ phase: 'LOAD_FAILED', errorCode: code, saveState: 'IDLE', failedOp: null, pending: null });
+      return;
+    }
     const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
 
     set({
@@ -356,6 +360,11 @@ const useExplorationStore = create<ExplorationState>((set, get) => {
 
       if (detail.session.status === 'completed') {
         set({ phase: 'RESULT_READY' });
+        return;
+      }
+
+      if (detail.session.status === 'abandoned') {
+        set({ phase: 'LOAD_FAILED', errorCode: 'SESSION_ABANDONED' });
         return;
       }
 

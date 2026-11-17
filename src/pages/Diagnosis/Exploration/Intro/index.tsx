@@ -7,6 +7,7 @@ import useExplorationStore from '../../../../store/useExplorationStore';
 import type { ExplorationSessionSummary, ExplorationStage } from '../../../../types/exploration';
 import type { DiagnosisSession } from '../../../../types/diagnosis';
 import MockBanner from '../components/MockBanner';
+import AbandonSessionDialog from './AbandonSessionDialog';
 
 const STEPS = [
   { no: '01', title: '공통 탐색', desc: '관심 있는 분야와 해본 활동을 확인해요' },
@@ -39,14 +40,21 @@ const ExplorationIntro = () => {
   const [sessions, setSessions] = useState<ExplorationSessionSummary[]>([]);
   const [legacy, setLegacy] = useState<DiagnosisSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionsError, setSessionsError] = useState(false);
+  const [listAttempt, setListAttempt] = useState(0);
+  const [selectedSession, setSelectedSession] = useState<ExplorationSessionSummary | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const reloadSessions = () => {
+    setLoading(true);
+    setSessionsError(false);
+    setListAttempt((value) => value + 1);
+  };
 
   useEffect(() => {
     let alive = true;
 
-    Promise.all([
-      listExplorationSessions().catch(() => []),
-      getInProgressSession(),
-    ]).then(([list, legacyData]) => {
+    listExplorationSessions().then((list) => {
       if (!alive) return;
 
       setSessions(
@@ -60,16 +68,43 @@ const ExplorationIntro = () => {
         }),
       );
 
-      setLegacy(legacyData?.session ?? null);
+      setSessionsError(false);
+      setLoading(false);
+    }).catch(() => {
+      if (!alive) return;
+      setSessions([]);
+      setSessionsError(true);
       setLoading(false);
     });
 
     return () => {
       alive = false;
     };
+  }, [listAttempt]);
+
+  useEffect(() => {
+    let alive = true;
+    getInProgressSession().then((data) => { if (alive) setLegacy(data?.session ?? null); });
+    return () => { alive = false; };
   }, []);
 
+  const closeAbandon = (terminal = false) => {
+    const store = useExplorationStore.getState();
+    if (terminal && store.session?.sessionId === selectedSession?.sessionId) store.reset();
+    setSelectedSession(null);
+    reloadSessions();
+  };
+
+  const onAbandoned = (sessionId: number) => {
+    const store = useExplorationStore.getState();
+    if (store.session?.sessionId === sessionId) store.reset();
+    setSessions((items) => items.filter((item) => item.sessionId !== sessionId));
+    setNotice(`전공 탐색 진단 #${sessionId}을 중단했어요. 새 검사는 시작 버튼으로 시작할 수 있어요.`);
+    closeAbandon();
+  };
+
   const handleStart = async () => {
+    if (loading || sessionsError || selectedSession) return;
     const id = await start();
 
     if (id !== null) {
@@ -163,6 +198,15 @@ const ExplorationIntro = () => {
           </div>
         </dl>
 
+        {loading && <p role="status" className="text-sm text-on-surface-variant mb-6">진행 중인 검사를 확인하는 중이에요…</p>}
+        {sessionsError && (
+          <div role="alert" className="text-sm text-error mb-6">
+            진행 중인 검사를 불러오지 못했어요. 목록을 확인한 뒤 새 검사를 시작해주세요.{' '}
+            <button type="button" onClick={reloadSessions} className="min-h-[44px] underline font-semibold">다시 시도</button>
+          </div>
+        )}
+        {notice && <p role="status" className="text-sm text-secondary mb-6">{notice}</p>}
+
         {!loading && hasResume && (
           <section aria-labelledby="resume-title" className="mb-8">
             <h2
@@ -174,19 +218,20 @@ const ExplorationIntro = () => {
 
             <ul className="space-y-2">
               {sessions.map((session) => (
-                <li key={session.sessionId}>
+                <li key={session.sessionId} className="flex flex-wrap items-center gap-2 bg-surface-container-lowest border border-outline-variant/30 rounded-brand px-4 py-3">
                   <button
                     type="button"
+                    disabled={starting}
                     onClick={() =>
                       navigate(
                         `/diagnosis/exploration/session/${session.sessionId}`,
                       )
                     }
-                    className="w-full min-h-[44px] flex items-center justify-between gap-3 text-left bg-surface-container-lowest border border-outline-variant/30 rounded-brand px-5 py-4 hover:border-secondary/50 motion-safe:transition-colors"
+                    className="flex-1 min-w-[180px] min-h-[44px] flex items-center justify-between gap-3 text-left px-1 py-1 hover:text-secondary disabled:opacity-50"
                   >
                     <span>
                       <span className="block font-semibold text-primary-container">
-                        전공 탐색 진단 이어하기
+                        전공 탐색 진단 #{session.sessionId} 이어하기
                       </span>
                       <span className="block text-xs text-on-surface-variant mt-0.5">
                         {formatDate(session.startedAt)} 시작 ·{' '}
@@ -200,6 +245,11 @@ const ExplorationIntro = () => {
                     >
                       arrow_forward
                     </span>
+                  </button>
+                  <button type="button" disabled={starting} aria-label={`전공 탐색 진단 #${session.sessionId} 중단`}
+                    onClick={() => { setNotice(null); setSelectedSession(session); }}
+                    className="min-h-[44px] px-4 py-2 text-sm font-semibold text-error rounded-lg border border-error/30 disabled:opacity-50">
+                    검사 중단
                   </button>
                 </li>
               ))}
@@ -238,7 +288,7 @@ const ExplorationIntro = () => {
           탐색해볼 전공을 찾는 참고 자료로 활용해주세요.
         </p>
 
-        {phase === 'LOAD_FAILED' && (
+        {phase === 'LOAD_FAILED' && errorCode !== 'SESSION_ABANDONED' && (
           <p role="alert" className="text-sm text-error text-center mb-4">
             {errorCode === 'NO_ACTIVE_CATALOG'
               ? '지금은 새 검사를 시작할 수 없어요. 진행 중인 검사와 이전 결과는 그대로 볼 수 있어요.'
@@ -250,7 +300,7 @@ const ExplorationIntro = () => {
           <button
             type="button"
             onClick={handleStart}
-            disabled={starting}
+            disabled={starting || loading || sessionsError || selectedSession !== null}
             className="min-h-[44px] w-full sm:w-auto px-10 py-4 rounded-lg bg-primary-container text-white font-bold shadow-lg motion-safe:transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
           >
             {starting
@@ -260,6 +310,9 @@ const ExplorationIntro = () => {
                 : '검사 시작하기'}
           </button>
         </div>
+        {selectedSession && (
+          <AbandonSessionDialog key={selectedSession.sessionId} session={selectedSession} onClose={closeAbandon} onAbandoned={onAbandoned} />
+        )}
       </div>
     </div>
   );
