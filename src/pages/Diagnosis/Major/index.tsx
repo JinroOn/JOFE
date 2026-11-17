@@ -310,11 +310,11 @@ const DiagnosisMajor = () => {
             </div>
             <p className="shrink-0 flex items-end gap-1">
               <span className="font-headline text-2xl font-black text-secondary">01</span>
-              <span className="text-base font-bold text-on-surface-variant">/ 03</span>
+              <span className="text-base font-bold text-on-surface-variant">/ 04</span>
             </p>
           </div>
           <div className="h-3 bg-surface-container-high rounded-full overflow-hidden">
-            <div className="h-full w-1/3 bg-secondary-container" />
+            <div className="h-full w-1/4 bg-secondary-container" />
           </div>
         </div>
 

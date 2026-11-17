@@ -1,17 +1,16 @@
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 const STEPS = [
-  { no: '01', title: '기본 정보', desc: '관심·학습환경' },
-  { no: '02', title: '1차 공통 성향', desc: '활동·학습 성향' },
-  { no: '03', title: '1차 공통 역량', desc: '기초 사고력' },
-  { no: '04', title: '2차 심화 진단', desc: '필요 영역 심화 확인' },
-  { no: '05', title: '결과 확인', desc: '추천·탐색 방향' },
+  { no: '01', title: '기본 정보', desc: '관심·학습환경 입력' },
+  { no: '02', title: '성향 진단', desc: '활동·학습 성향 선택' },
+  { no: '03', title: '역량 진단', desc: '객관식·서술형 문항 응답' },
+  { no: '04', title: '결과 확인', desc: '추천 전공·탐색 방향 확인' },
 ];
 
 const INFOS = [
-  { label: '예상 문항', title: '약 66~86문항', desc: '추가 질문 여부에 따라 달라집니다.' },
-  { label: '진행 방식', title: '사용자별 맞춤 진단', desc: '필요 영역만 2차로 추가 확인합니다.' },
-  { label: '자동 저장', title: '이어하기 지원', desc: '중간에 나가도 저장됩니다.' },
+  { label: '문항 안내', title: '진단 화면에서 확인', desc: '역량 문항 수는 진단 화면에 표시됩니다.' },
+  { label: '진행 방식', title: '성향 선택 후 역량 진단', desc: '성향 질문에 답한 뒤 역량 문항을 풉니다.' },
+  { label: '응답 저장', title: '저장된 응답 이어하기', desc: '저장이 완료된 응답부터 이어갈 수 있습니다.' },
 ];
 
 const DiagnosisIntro = () => {
@@ -28,7 +27,7 @@ const DiagnosisIntro = () => {
       <div className="max-w-[1000px] mx-auto px-4 sm:px-6 pt-10 pb-20">
         <div className="text-center mb-14">
           <span className="inline-block px-12 py-1.5 mb-6 rounded-full bg-secondary-container/10 text-xs font-bold text-secondary">
-            전공 탐색 진단
+            전공 진단
           </span>
           <h1 className="break-keep text-2xl sm:text-[34px] sm:leading-[1.5] font-bold text-primary-container mb-6">
             나에게 맞는 전공 방향을
@@ -36,11 +35,11 @@ const DiagnosisIntro = () => {
             함께 탐색해볼까요?
           </h1>
           <p className="break-keep text-sm text-on-surface-variant">
-            활동 성향과 기초 역량을 함께 확인하고, 필요한 경우에만 맞춤 질문을 추가합니다.
+            기본 정보를 입력하고, 성향 질문과 역량 문항에 답하며 전공 방향을 탐색합니다.
           </p>
         </div>
 
-        <ol className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-12">
+        <ol className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
           {STEPS.map((step) => (
             <li
               key={step.no}
@@ -48,7 +47,7 @@ const DiagnosisIntro = () => {
             >
               <p className="text-xs font-bold text-secondary mb-2">{step.no}</p>
               <p className="break-keep text-lg sm:text-[22px] font-bold text-primary mb-2">{step.title}</p>
-              <p className="text-[11px] text-on-surface-variant">{step.desc}</p>
+              <p className="break-keep text-[11px] text-on-surface-variant">{step.desc}</p>
             </li>
           ))}
         </ol>
@@ -62,7 +61,7 @@ const DiagnosisIntro = () => {
               >
                 <p className="text-xs font-bold text-secondary mb-2">{info.label}</p>
                 <p className="break-keep text-lg sm:text-[22px] font-bold text-primary-container mb-2">{info.title}</p>
-                <p className="text-[11px] text-on-surface-variant">{info.desc}</p>
+                <p className="break-keep text-[11px] text-on-surface-variant">{info.desc}</p>
               </div>
             ))}
           </div>
