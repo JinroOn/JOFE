@@ -165,7 +165,7 @@ PUBLIC/PILOT 승인 이후에만 확인할 수 있다.
 
 검증 결과:
 
-- `npm test`: 회귀 테스트 31개 통과.
+- `npm test`: 통합 이력·API 회귀 31개와 팀원의 점수 노출 회귀 6개, 총 37개 통과.
 - `npm run lint`, `npm run build`: 린트·TypeScript·프로덕션 빌드 통과.
 - `npm run test:history-ui`: 혼합 ID, 가용성 안내, 커서 재시도, 삭제 후 재조회, 늦은 응답 차단, 레거시 대체, 특정 결과 이동, 모바일을 포함한 9개 흐름 통과.
 - `npm run test:comparison-ui`: 기존 결과·비교 화면 10개 회귀 흐름 통과.
