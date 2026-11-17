@@ -39,6 +39,7 @@ import type {
   SupportSession,
 } from '../types/exploration';
 import type { DashboardResultRef, DashboardSummary } from '../types/dashboard';
+import type { DiagnosisHistoryItem, DiagnosisHistoryPage, DiagnosisHistoryQuery } from '../types/history';
 import { MOCK_MAJOR_PROFILES } from './explorationMockMajors';
 
 const STORAGE_KEY = 'jinroon.exploration.mock.v1';
@@ -1313,5 +1314,79 @@ export const dashboardSummary = () =>
       inProgress: running,
       resume: running[0] ?? null,
       exploration: 'AVAILABLE',
+    };
+  });
+
+// ---- 통합 진단 이력 (mock) ----
+// 실제 백엔드 GET /exploration/v1/history/sessions 와 같은 형태를 돌려준다. mock에는 레거시 회차가 없다. (JOFE#129)
+export const historySessions = (query: DiagnosisHistoryQuery = {}) =>
+  delay((): DiagnosisHistoryPage => {
+    const limit = query.limit ?? 20;
+    const type = query.type ?? 'ALL';
+    const status = query.status ?? 'ALL';
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100
+      || !['ALL', 'LEGACY', 'EXPLORATION_V1'].includes(type)
+      || !['ALL', 'in_progress', 'completed', 'abandoned'].includes(status)) throw fail(400, 'INVALID_REQUEST');
+    const stored = Object.values(load().sessions);
+    let fence = Math.max(0, ...stored.map((s) => s.session.sessionId));
+    let beforeTime = Infinity;
+    let beforeId = Infinity;
+    if (query.cursor !== undefined) {
+      const parts = query.cursor.split(':');
+      if (parts.length !== 7 || parts[0] !== 'MOCK_HISTORY_V1' || parts[1] !== type || parts[2] !== status
+        || parts[3] !== String(limit) || parts.slice(4).some((part) => !/^\d+$/.test(part) || !Number.isSafeInteger(Number(part)))) {
+        throw fail(400, 'INVALID_CURSOR');
+      }
+      [fence, beforeTime, beforeId] = parts.slice(4).map(Number);
+    }
+    const rows = stored
+      .filter((s) => type !== 'LEGACY' && s.session.sessionId <= fence && (status === 'ALL' || s.session.status === status))
+      .sort((a, b) => Date.parse(b.session.startedAt) - Date.parse(a.session.startedAt) || b.session.sessionId - a.session.sessionId)
+      .filter((s) => Date.parse(s.session.startedAt) < beforeTime
+        || (Date.parse(s.session.startedAt) === beforeTime && s.session.sessionId < beforeId));
+    const visible = rows.slice(0, limit);
+    const hasMore = rows.length > limit;
+    const last = visible.at(-1)?.session;
+    const nextCursor = hasMore && last
+      ? ['MOCK_HISTORY_V1', type, status, limit, fence, Date.parse(last.startedAt), last.sessionId].join(':') : null;
+    const items = visible
+      .map(({ session, completedAt }): DiagnosisHistoryItem => {
+        const completed = session.status === 'completed';
+        const available = completed && typeof session.resultId === 'number' && session.resultId > 0;
+        const path = `/api/exploration/v1/sessions/${session.sessionId}`;
+        return {
+          key: `EXPLORATION_V1:SESSION:${session.sessionId}`,
+          sessionKey: `EXPLORATION_V1:SESSION:${session.sessionId}`,
+          sessionId: session.sessionId,
+          type: 'EXPLORATION_V1',
+          status: session.status,
+          stage: session.stage,
+          startedAt: session.startedAt,
+          completedAt: completedAt ? new Date(completedAt).toISOString() : null,
+          occurredAt: session.startedAt,
+          resultKey: available ? `EXPLORATION_V1:RESULT:${session.resultId}` : null,
+          resultId: available ? session.resultId : null,
+          resultAvailability: available ? 'AVAILABLE' : completed ? 'MISSING' : 'NOT_COMPLETED',
+          resultStatus: null,
+          resultContractVersion: null,
+          resultUnavailableReason: null,
+          runMode: 'DEV',
+          testOnly: true,
+          nextAction: session.status === 'in_progress' ? 'RESUME' : available ? 'VIEW_RESULT' : 'NONE',
+          links: {
+            session: path,
+            resume: session.status === 'in_progress' ? path : null,
+            result: available ? `/api/exploration/v1/results/${session.resultId}` : null,
+          },
+        };
+      });
+    return {
+      items,
+      limit,
+      hasMore,
+      nextCursor,
+      filters: { type, status },
+      runMode: 'DEV',
+      testOnly: true,
     };
   });

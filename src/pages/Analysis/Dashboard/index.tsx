@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { RecommendedMajor, CapabilityRow } from './types';
 import type { DiagnosisResult, ResultMajorScore } from '../../../types/results';
 import type { Major } from '../../../types/major';
@@ -139,6 +139,9 @@ const EmptyScores = ({ hasResult }: { hasResult: boolean }) => (
 );
 
 const Dashboard = () => {
+  const [searchParams] = useSearchParams();
+  const requestedResultParam = searchParams.get('resultId');
+  const requestedResultId = requestedResultParam === null ? null : Number(requestedResultParam);
   const user = useAuthStore((state) => state.user);
   const [results, setResults] = useState<DiagnosisResult[]>([]);
   const [majors, setMajors] = useState<Major[]>([]);
@@ -166,7 +169,12 @@ const Dashboard = () => {
         );
         setResults(sorted);
         setMajors(majorData);
-        setSelectedResultId(sorted[0]?.id ?? null);
+        if (requestedResultId !== null && !sorted.some((result) => result.id === requestedResultId)) {
+          setSelectedResultId(null);
+          setError('요청한 진단 결과를 찾을 수 없습니다. 진단 이력에서 다시 확인해주세요.');
+        } else {
+          setSelectedResultId(requestedResultId ?? sorted[0]?.id ?? null);
+        }
       } catch (e) {
         if (!ignore) {
           setError(getApiErrorMessage(e, '진단 결과 또는 전공 목록 조회 중 오류가 발생했습니다.'));
@@ -177,7 +185,7 @@ const Dashboard = () => {
     };
     void fetchDashboardData();
     return () => { ignore = true; };
-  }, []);
+  }, [requestedResultId]);
 
   useEffect(() => {
     if (selectedResultId === null) return;
