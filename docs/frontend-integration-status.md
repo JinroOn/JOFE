@@ -70,7 +70,56 @@ MySQL 8.0 컨테이너(호스트 13307), 백엔드 `SERVER_PORT=18080`,
   `activityAvailability: UNAVAILABLE`에 따라 12주 계획·공유 패널·활동 섹션이 노출되지 않았다.
 - 브라우저 콘솔 오류 0. `npm test` 23개 통과.
 
-공유는 `exploration.sharing.enabled`가 꺼진 상태라 발급·철회 흐름은 범위 밖이다.
+### 공유 인수 검증 (2026-11-17 통과)
+
+`EXPLORATION_SHARING_ENABLED=true`만 더해 같은 환경에서 발급 → 공개 조회 → 철회를 끝까지 돌렸다.
+
+API:
+
+- `capabilities.sharingAvailable`가 `false` → **`true`**로 바뀌고 `sharingEndpoint`가 내려온다.
+- 발급 전 `GET .../share` 200 — `shareRevision: 0`, `enabled: false`, `available: true`.
+- 발급 `POST .../share` **201** — 본문 `{expectedShareRevision, includeNickname}` + `Idempotency-Key` 필요.
+  응답에 `shareToken`·`publicPath`·`expiresAt`(발급 +30일, UTC)·`shareRevision: 1`.
+- 공개 조회 `GET /shared-results/{token}` **200**, 인증 없이.
+  `summaryVersion: SHARED_EXPLORATION_SUMMARY_V1_1`.
+- 철회 `POST .../share/revoke` 200 — `shareRevision: 2`, `enabled: false`.
+- 철회 후 공개 조회 **404 `RESOURCE_NOT_FOUND`**.
+
+제약도 계약대로 걸린다.
+
+- 쿼리 파라미터를 붙이면 **400 `INVALID_REQUEST`**.
+- `X-Forwarded-For`가 있으면 **404** (프록시 경유 차단).
+- 형식만 맞는 임의 토큰 **404**.
+
+공개 요약 최소성: `groups`(이름·요약), `majors`(전공명·공통 설명), `uncertainty`, `nextSteps`,
+`nickname`, `expiresAt`뿐이다. **근거 문장·주의 안내·준비 답변·축 코드·점수는 포함되지 않았다.**
+
+화면:
+
+- `sharingAvailable: true`가 되자 결과 화면에 공유 패널이 나타났고,
+  API로 미리 철회해 둔 상태를 "이전 링크는 꺼져 있어요"로 정확히 반영했다.
+- 공개 범위 안내(D-29)가 "보이는 것 / 보이지 않는 것"으로 나뉘어 표시되고 projector 허용목록과 일치한다.
+- "새 링크 만들기" → 링크와 만료일 표시, "링크 복사"·"공유 끄기".
+- "공유 끄기" → 확인 단계("끄면 지금 링크로는 다시 볼 수 없어요") → "지금 끄기".
+- 철회 후 공개 링크는 "볼 수 없는 링크예요 / 만료되었거나 공유한 사람이 공유를 껐어요"로 안내된다.
+
+남은 것: `exploration.sharing.enabled`는 기본 꺼짐이고 익명 조회가 loopback 전용이라
+(`ExplorationSharePolicy.localReader`가 `127.0.0.1`·`::1`만 허용), 외부에서 실제로 열리는지는
+PUBLIC/PILOT 승인 이후에만 확인할 수 있다.
+
+### 로컬 볼륨 인코딩 주의 — 앱 문제가 아니다
+
+공유 요약의 `nickname`이 깨져 보였다. 확인해 보니 **앱이 아니라 로컬 MySQL 볼륨의 기존 데이터다.**
+
+- 응답 바이트가 DB 바이트와 **완전히 동일**하다. 앱은 저장된 값을 그대로 돌려준다.
+- `init.sql`은 정상 UTF-8이고 `'테스트유저1'`이 올바른 바이트로 들어 있다.
+- 깨진 값은 볼륨에 이미 있었다. 볼륨 생성 시각은 2026-06-09이고,
+  `JOBE/scripts/verify-mysql-encoding.sql`을 돌리면 `majors.name`까지 mojibake로 나온다.
+- `JOBE/scripts/verify-mysql-encoding.md`가 이 상황을 명시한다 — 인코딩 수정 전에 만든 볼륨은
+  mojibake가 남아 있을 수 있고, 로컬 데이터를 버려도 될 때만 `docker compose down -v`로 초기화한다.
+- 같은 응답의 전공군 이름·전공명은 정상이다(앱이 직접 쓴 값). 레거시 시드 행만 영향을 받는다.
+- 이번 검증은 그 볼륨에서 돌렸다. 탐색형 데이터에는 영향이 없지만, 닉네임이 보이는 화면을
+  로컬에서 확인할 때는 볼륨 초기화가 필요하다.
 
 ### `COMPLETION_SNAPSHOT` 경로도 통과 (2026-11-17)
 
@@ -105,7 +154,7 @@ MySQL 8.0 컨테이너(호스트 13307), 백엔드 `SERVER_PORT=18080`,
 
 | 작업 | 확인 상태와 프론트 조치 |
 |---|---|
-| 공유 (#115, PR #122) | 발급 본문 `expectedShareRevision`·`includeNickname`, 철회 `POST /share/revoke`와 멱등키, 공개 조회 `/shared-results/{token}` 반영 완료. 이슈는 닫았다. `exploration.sharing.enabled`가 꺼져 있어 발급·철회 실서버 인수와 공개 프록시 제약은 남아 있다. |
+| 공유 (#115, PR #122) | 반영 완료, 이슈 닫음. **2026-11-17 실제 DEV 서버에서 발급 → 공개 조회 → 철회와 제약(쿼리 400·프록시 헤더 404)을 인수 검증했다**(위 절 참고). 외부 공개는 PUBLIC/PILOT 승인 이후 과제다. |
 | 관리자 카탈로그 (PR #124) | 백엔드 검토·활성화(`/admin/exploration/reviews`, `/activations`)와 목록·상세(JOBE PR #104)가 모두 들어와 프론트 연동을 맞췄다. 실서버 인수는 남아 있다. |
 | 결과 표시 문구 (#100, PR #103) | 새 DTO와 이전 준비 답변 형식 연결 완료. **2026-11-17 실제 DEV 서버에서 과거 봉인 결과 경로와 새 회차의 `COMPLETION_SNAPSHOT` 경로를 모두 인수 검증했다**(위 절 참고). 런타임 번들이 회차 시작 시점에 고정되는 전환 안내만 제품 쪽 결정이 남았다. |
 | AI 상담·12주 계획 (#101) | 전공 상세는 JOBE PR #105로 생겼다. 상담 2개·계획 3개는 여전히 없어 기능을 공개하지 않는다. |
