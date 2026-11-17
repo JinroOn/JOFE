@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { RecommendedMajor, CapabilityRow } from './types';
-import type { DiagnosisResult, ResultMajorScore } from '../../../types/results';
+import type {
+  RecommendedMajor,
+  CapabilityRow,
+} from './types';
+import type {
+  DiagnosisResult,
+  ResultMajorScore,
+} from '../../../types/results';
 import type { Major } from '../../../types/major';
 import {
   generateAiComment,
@@ -14,6 +20,7 @@ import AiCommentBanner from './components/AiCommentBanner';
 import RecommendedMajors from './components/RecommendedMajors';
 import CapabilityBarChart from './components/CapabilityBarChart';
 import ShareSection from './components/ShareSection';
+import { normalizeScoreToHundred } from '../../../utils/score';
 
 const AXES = [
   '수리·논리',
@@ -51,8 +58,13 @@ const MAJOR_REQUIRED_KEYS = [
   'reqSelfManagement',
 ] as const;
 
-const DEFAULT_USER_SCORES = [88, 82, 86, 74, 79, 91, 72, 84, 60];
-const DEFAULT_MAJOR_REQUIRED_SCORES = [80, 70, 80, 90, 90, 70, 60, 70, 70];
+const DEFAULT_USER_SCORES = [
+  88, 82, 86, 74, 79, 91, 72, 84, 60,
+];
+
+const DEFAULT_MAJOR_REQUIRED_SCORES = [
+  80, 70, 80, 90, 90, 70, 60, 70, 70,
+];
 
 const CP1252_REVERSE_MAP: Record<string, number> = {
   '€': 0x80,
@@ -91,15 +103,21 @@ type DisplayUser = {
   username?: string | null;
 } | null;
 
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(Math.max(value, min), max);
+const clamp = (
+  value: number,
+  min: number,
+  max: number,
+) => Math.min(Math.max(value, min), max);
 
 const fixMojibake = (value?: string | null) => {
   if (!value) {
     return undefined;
   }
 
-  const looksMojibake = /[ÃÂìíêëð]|[€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ]/.test(value);
+  const looksMojibake =
+    /[ÃÂìíêëð]|[€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ]/.test(
+      value,
+    );
 
   if (!looksMojibake) {
     return value;
@@ -121,38 +139,38 @@ const fixMojibake = (value?: string | null) => {
         }
 
         return 0x3f;
-      })
+      }),
     );
 
-    const decoded = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+    const decoded = new TextDecoder('utf-8', {
+      fatal: false,
+    }).decode(bytes);
 
-    return decoded.includes('�') ? value : decoded;
+    return decoded.includes('�')
+      ? value
+      : decoded;
   } catch {
     return value;
   }
 };
 
-// 백엔드 점수는 이미 0~100 척도이므로 별도 배율 변환 없이 사용
-const normalizeScoreToHundred = (value: unknown, fallback: number) => {
-  const numeric = Number(value);
-
-  if (!Number.isFinite(numeric)) {
-    return fallback;
-  }
-
-  return clamp(numeric, 0, 100);
-};
-
-const parseCompetencyScores = (competencyVector?: string | null) => {
+const parseCompetencyScores = (
+  competencyVector?: string | null,
+) => {
   if (!competencyVector) {
     return DEFAULT_USER_SCORES;
   }
 
   try {
-    const parsed = JSON.parse(competencyVector) as Record<string, unknown>;
+    const parsed = JSON.parse(
+      competencyVector,
+    ) as Record<string, unknown>;
 
     return COMPETENCY_KEYS.map((key, index) =>
-      normalizeScoreToHundred(parsed[key], DEFAULT_USER_SCORES[index])
+      normalizeScoreToHundred(
+        parsed[key],
+        DEFAULT_USER_SCORES[index],
+      ),
     );
   } catch {
     return DEFAULT_USER_SCORES;
@@ -165,13 +183,16 @@ const parseMajorRequiredScores = (major?: Major) => {
   }
 
   return MAJOR_REQUIRED_KEYS.map((key, index) =>
-    normalizeScoreToHundred(major[key], DEFAULT_MAJOR_REQUIRED_SCORES[index])
+    normalizeScoreToHundred(
+      major[key],
+      DEFAULT_MAJOR_REQUIRED_SCORES[index],
+    ),
   );
 };
 
 const mapMajorScoresToRecommendedMajors = (
   scores: ResultMajorScore[],
-  majorMap: Map<number, Major>
+  majorMap: Map<number, Major>,
 ): RecommendedMajor[] =>
   [...scores]
     .sort((a, b) => a.rank - b.rank)
@@ -179,13 +200,23 @@ const mapMajorScoresToRecommendedMajors = (
       const major = majorMap.get(score.majorId);
 
       const majorName = fixMojibake(major?.name);
-      const majorCategory = fixMojibake(major?.category);
-      const majorDescription = fixMojibake(major?.description);
-      const majorCareerPaths = fixMojibake(major?.careerPaths);
+      const majorCategory = fixMojibake(
+        major?.category,
+      );
+      const majorDescription = fixMojibake(
+        major?.description,
+      );
+      const majorCareerPaths = fixMojibake(
+        major?.careerPaths,
+      );
 
       const strengths = fixMojibake(score.strengths);
-      const weaknesses = fixMojibake(score.weaknesses);
-      const recommendationReason = fixMojibake(score.recommendationReason);
+      const weaknesses = fixMojibake(
+        score.weaknesses,
+      );
+      const recommendationReason = fixMojibake(
+        score.recommendationReason,
+      );
 
       return {
         rank: score.rank,
@@ -194,7 +225,9 @@ const mapMajorScoresToRecommendedMajors = (
         category: majorCategory,
         difficulty: major?.difficulty ?? undefined,
         careerPaths: majorCareerPaths,
-        suitability: Math.round(clamp(score.finalScore, 0, 100)),
+        suitability: Math.round(
+          clamp(score.finalScore, 0, 100),
+        ),
         tendencyScore: score.tendencyScore,
         competencyScore: score.competencyScore,
         failed: score.failed,
@@ -204,19 +237,29 @@ const mapMajorScoresToRecommendedMajors = (
           recommendationReason ||
           strengths ||
           majorDescription ||
-          `성향 점수 ${Math.round(score.tendencyScore)}점, 역량 점수 ${Math.round(
-            score.competencyScore
-          )}점으로 산출된 추천 결과입니다.`,
+          `성향 점수 ${Math.round(score.tendencyScore)}점, 역량 점수 ${Math.round(score.competencyScore)}점으로 산출된 추천 결과입니다.`,
       };
     });
 
-const getSafeDisplayName = (user?: DisplayUser) => {
-  const fixedNickname = fixMojibake(user?.nickname);
+const getSafeDisplayName = (
+  user?: DisplayUser,
+) => {
+  const fixedNickname = fixMojibake(
+    user?.nickname,
+  );
+
   const fixedName = fixMojibake(user?.name);
-  const fixedUsername = fixMojibake(user?.username);
+
+  const fixedUsername = fixMojibake(
+    user?.username,
+  );
+
   const emailName = user?.email?.split('@')[0];
 
-  if (fixedNickname?.trim() && !/^테스트유저\d+$/.test(fixedNickname)) {
+  if (
+    fixedNickname?.trim() &&
+    !/^테스트유저\d+$/.test(fixedNickname)
+  ) {
     return fixedNickname;
   }
 
@@ -235,8 +278,15 @@ const getSafeDisplayName = (user?: DisplayUser) => {
   return fixedNickname || '사용자';
 };
 
-const getApiErrorMessage = (error: unknown, fallback: string) => {
-  if (typeof error === 'object' && error !== null && 'response' in error) {
+const getApiErrorMessage = (
+  error: unknown,
+  fallback: string,
+) => {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error
+  ) {
     const response = (
       error as {
         response?: {
@@ -249,7 +299,10 @@ const getApiErrorMessage = (error: unknown, fallback: string) => {
     ).response;
 
     if (response?.data?.message) {
-      return fixMojibake(response.data.message) ?? response.data.message;
+      return (
+        fixMojibake(response.data.message) ??
+        response.data.message
+      );
     }
 
     if (response?.status) {
@@ -258,26 +311,54 @@ const getApiErrorMessage = (error: unknown, fallback: string) => {
   }
 
   if (error instanceof Error) {
-    return fixMojibake(error.message) ?? error.message;
+    return (
+      fixMojibake(error.message) ??
+      error.message
+    );
   }
 
   return fallback;
 };
 
 const Dashboard = () => {
-  const user = useAuthStore((state) => state.user);
+  const user = useAuthStore(
+    (state) => state.user,
+  );
 
-  const [results, setResults] = useState<DiagnosisResult[]>([]);
-  const [majors, setMajors] = useState<Major[]>([]);
-  const [selectedResultId, setSelectedResultId] = useState<number | null>(null);
-  const [majorScores, setMajorScores] = useState<ResultMajorScore[]>([]);
+  const [results, setResults] =
+    useState<DiagnosisResult[]>([]);
 
-  const [isFetchingResults, setIsFetchingResults] = useState(true);
-  const [isFetchingMajorScores, setIsFetchingMajorScores] = useState(false);
-  const [isGeneratingAiComment, setIsGeneratingAiComment] = useState(false);
+  const [majors, setMajors] =
+    useState<Major[]>([]);
 
-  const [error, setError] = useState<string | null>(null);
-  const [aiCommentError, setAiCommentError] = useState<string | null>(null);
+  const [
+    selectedResultId,
+    setSelectedResultId,
+  ] = useState<number | null>(null);
+
+  const [majorScores, setMajorScores] =
+    useState<ResultMajorScore[]>([]);
+
+  const [
+    isFetchingResults,
+    setIsFetchingResults,
+  ] = useState(true);
+
+  const [
+    isFetchingMajorScores,
+    setIsFetchingMajorScores,
+  ] = useState(false);
+
+  const [
+    isGeneratingAiComment,
+    setIsGeneratingAiComment,
+  ] = useState(false);
+
+  const [error, setError] =
+    useState<string | null>(null);
+
+  const [aiCommentError, setAiCommentError] =
+    useState<string | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -287,28 +368,41 @@ const Dashboard = () => {
         setIsFetchingResults(true);
         setError(null);
 
-        const [resultData, majorData] = await Promise.all([
-          getDiagnosisResults(),
-          getMajors(),
-        ]);
+        const [resultData, majorData] =
+          await Promise.all([
+            getDiagnosisResults(),
+            getMajors(),
+          ]);
 
         if (ignore) {
           return;
         }
 
-        const sortedResults = [...resultData].sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        const sortedResults = [
+          ...resultData,
+        ].sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() -
+            new Date(a.createdAt).getTime(),
         );
 
         setResults(sortedResults);
         setMajors(majorData);
-        setSelectedResultId(sortedResults[0]?.id ?? null);
+
+        setSelectedResultId(
+          sortedResults[0]?.id ?? null,
+        );
       } catch (e) {
         if (ignore) {
           return;
         }
 
-        setError(getApiErrorMessage(e, '진단 결과 또는 전공 목록 조회 중 오류가 발생했습니다.'));
+        setError(
+          getApiErrorMessage(
+            e,
+            '진단 결과 또는 전공 목록 조회 중 오류가 발생했습니다.',
+          ),
+        );
       } finally {
         if (!ignore) {
           setIsFetchingResults(false);
@@ -335,7 +429,9 @@ const Dashboard = () => {
         setIsFetchingMajorScores(true);
         setError(null);
 
-        const data = await getResultMajorScores(selectedResultId);
+        const data = await getResultMajorScores(
+          selectedResultId,
+        );
 
         if (ignore) {
           return;
@@ -347,7 +443,13 @@ const Dashboard = () => {
           return;
         }
 
-        setError(getApiErrorMessage(e, '전공별 점수 조회 중 오류가 발생했습니다.'));
+        setError(
+          getApiErrorMessage(
+            e,
+            '전공별 점수 조회 중 오류가 발생했습니다.',
+          ),
+        );
+
         setMajorScores([]);
       } finally {
         if (!ignore) {
@@ -364,50 +466,79 @@ const Dashboard = () => {
   }, [selectedResultId]);
 
   const majorMap = useMemo(
-    () => new Map(majors.map((major) => [major.id, major])),
-    [majors]
+    () =>
+      new Map(
+        majors.map((major) => [
+          major.id,
+          major,
+        ]),
+      ),
+    [majors],
   );
 
   const selectedResult = useMemo(
-    () => results.find((result) => result.id === selectedResultId) ?? null,
-    [results, selectedResultId]
+    () =>
+      results.find(
+        (result) =>
+          result.id === selectedResultId,
+      ) ?? null,
+    [results, selectedResultId],
   );
 
   const userScores = useMemo(
-    () => parseCompetencyScores(selectedResult?.competencyVector),
-    [selectedResult?.competencyVector]
+    () =>
+      parseCompetencyScores(
+        selectedResult?.competencyVector,
+      ),
+    [selectedResult?.competencyVector],
   );
 
   const topMajorScore = useMemo(
-    () => [...majorScores].sort((a, b) => a.rank - b.rank)[0],
-    [majorScores]
+    () =>
+      [...majorScores].sort(
+        (a, b) => a.rank - b.rank,
+      )[0],
+    [majorScores],
   );
 
-  const topMajor = topMajorScore ? majorMap.get(topMajorScore.majorId) : undefined;
+  const topMajor = topMajorScore
+    ? majorMap.get(topMajorScore.majorId)
+    : undefined;
 
   const requiredScores = useMemo(
     () => parseMajorRequiredScores(topMajor),
-    [topMajor]
+    [topMajor],
   );
 
   const capabilityRows: CapabilityRow[] = useMemo(
     () =>
       AXES.map((axis, index) => ({
         axis,
-        userScore: Math.round(userScores[index]),
-        majorAvg: Math.round(requiredScores[index]),
+        userScore: Math.round(
+          userScores[index],
+        ),
+        majorAvg: Math.round(
+          requiredScores[index],
+        ),
       })),
-    [userScores, requiredScores]
+    [userScores, requiredScores],
   );
 
   const recommendedMajors = useMemo(
-    () => mapMajorScoresToRecommendedMajors(majorScores, majorMap),
-    [majorScores, majorMap]
+    () =>
+      mapMajorScoresToRecommendedMajors(
+        majorScores,
+        majorMap,
+      ),
+    [majorScores, majorMap],
   );
 
-  const topRecommendedMajor = recommendedMajors[0];
+  const topRecommendedMajor =
+    recommendedMajors[0];
 
-  const displayName = getSafeDisplayName(user as DisplayUser);
+  const displayName = getSafeDisplayName(
+    user as DisplayUser,
+  );
 
   const handleGenerateAiComment = async () => {
     if (!selectedResultId) {
@@ -418,13 +549,25 @@ const Dashboard = () => {
       setIsGeneratingAiComment(true);
       setAiCommentError(null);
 
-      const updatedResult = await generateAiComment(selectedResultId);
+      const updatedResult =
+        await generateAiComment(
+          selectedResultId,
+        );
 
       setResults((prev) =>
-        prev.map((result) => (result.id === updatedResult.id ? updatedResult : result))
+        prev.map((result) =>
+          result.id === updatedResult.id
+            ? updatedResult
+            : result,
+        ),
       );
     } catch (e) {
-      setAiCommentError(getApiErrorMessage(e, 'AI 추천 설명 생성 중 오류가 발생했습니다.'));
+      setAiCommentError(
+        getApiErrorMessage(
+          e,
+          'AI 추천 설명 생성 중 오류가 발생했습니다.',
+        ),
+      );
     } finally {
       setIsGeneratingAiComment(false);
     }
@@ -442,19 +585,27 @@ const Dashboard = () => {
               </span>
 
               <h1 className="text-4xl md:text-5xl font-black text-primary-container tracking-tight mb-4 leading-tight">
-                {displayName}님의 <span className="text-secondary">진로 역량 리포트</span>
+                {displayName}님의{' '}
+                <span className="text-secondary">
+                  진로 역량 리포트
+                </span>
               </h1>
 
               <p className="text-on-surface-variant max-w-2xl text-base sm:text-lg leading-relaxed">
-                JinroOn AI가 9가지 핵심 역량 지표를 바탕으로 가장 적합한 전공과 진로 방향을 도출했습니다.
+                JinroOn AI가 9가지 핵심 역량 지표를
+                바탕으로 가장 적합한 전공과 진로
+                방향을 도출했습니다.
                 <br />
-                본 데이터는 진단 결과와 전공 추천 API 응답을 기반으로 생성되었습니다.
+                본 데이터는 진단 결과와 전공 추천
+                API 응답을 기반으로 생성되었습니다.
               </p>
             </div>
 
             <div className="shrink-0">
               <button className="flex items-center gap-2 px-6 py-4 rounded-[14px] bg-[#FFAB00] text-primary-container font-bold shadow-lg shadow-[#FFAB00]/20 hover:-translate-y-0.5 transition-all">
-                <span className="material-symbols-outlined">download</span>
+                <span className="material-symbols-outlined">
+                  download
+                </span>
                 리포트 다운로드 (PDF)
               </button>
             </div>
@@ -473,15 +624,22 @@ const Dashboard = () => {
           </div>
         )}
 
-        {!isFetchingResults && results.length === 0 && !error && (
-          <div className="mb-6 rounded-[14px] border border-[#FFAB00]/30 bg-[#FFAB00]/10 p-5 font-bold text-primary-container">
-            로그인한 사용자에게 저장된 진단 결과가 없습니다. 먼저 진단을 완료하거나 테스트 데이터를 생성하세요.
-          </div>
-        )}
+        {!isFetchingResults &&
+          results.length === 0 &&
+          !error && (
+            <div className="mb-6 rounded-[14px] border border-[#FFAB00]/30 bg-[#FFAB00]/10 p-5 font-bold text-primary-container">
+              로그인한 사용자에게 저장된 진단
+              결과가 없습니다. 먼저 진단을
+              완료하거나 테스트 데이터를 생성하세요.
+            </div>
+          )}
 
         {results.length > 1 && (
           <section className="mb-8 flex items-center gap-3">
-            <span className="text-xs font-bold text-on-surface-variant shrink-0">진단 회차</span>
+            <span className="text-xs font-bold text-on-surface-variant shrink-0">
+              진단 회차
+            </span>
+
             {results.length <= 5 ? (
               <div className="flex gap-2">
                 {results.map((result, idx) => (
@@ -497,11 +655,28 @@ const Dashboard = () => {
                         : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
                     }`}
                   >
-                    <span>{results.length - idx}회차</span>
-                    <span className={`text-xs font-normal ${result.id === selectedResultId ? 'text-white/70' : 'text-on-surface-variant/60'}`}>
+                    <span>
+                      {results.length - idx}회차
+                    </span>
+
+                    <span
+                      className={`text-xs font-normal ${
+                        result.id === selectedResultId
+                          ? 'text-white/70'
+                          : 'text-on-surface-variant/60'
+                      }`}
+                    >
                       {new Date(result.createdAt)
-                        .toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
-                        .replace(/\. /g, '.').replace(/\.$/, '')}
+                        .toLocaleDateString(
+                          'ko-KR',
+                          {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                          },
+                        )
+                        .replace(/\. /g, '.')
+                        .replace(/\.$/, '')}
                     </span>
                   </button>
                 ))}
@@ -510,17 +685,30 @@ const Dashboard = () => {
               <select
                 value={selectedResultId ?? ''}
                 onChange={(e) => {
-                  setSelectedResultId(Number(e.target.value));
+                  setSelectedResultId(
+                    Number(e.target.value),
+                  );
                   setAiCommentError(null);
                 }}
                 className="rounded-[12px] border border-outline-variant/30 bg-white px-4 py-2.5 text-sm font-bold text-primary-container outline-none cursor-pointer"
               >
                 {results.map((result, idx) => (
-                  <option key={result.id} value={result.id}>
+                  <option
+                    key={result.id}
+                    value={result.id}
+                  >
                     {results.length - idx}회차 ·{' '}
                     {new Date(result.createdAt)
-                      .toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
-                      .replace(/\. /g, '.').replace(/\.$/, '')}
+                      .toLocaleDateString(
+                        'ko-KR',
+                        {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit',
+                        },
+                      )
+                      .replace(/\. /g, '.')
+                      .replace(/\.$/, '')}
                   </option>
                 ))}
               </select>
@@ -531,19 +719,24 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
           <section className="md:col-span-5 bg-surface-container-lowest rounded-[14px] p-6 sm:p-8 shadow-[0px_20px_40px_rgba(10,25,47,0.06)] flex flex-col items-center">
             <h3 className="w-full text-lg sm:text-xl font-bold mb-6 flex items-center gap-2">
-              <span className="material-symbols-outlined text-secondary">analytics</span>
+              <span className="material-symbols-outlined text-secondary">
+                analytics
+              </span>
               9-Axis 역량 다이어그램
             </h3>
 
             <div className="w-full max-w-[480px] aspect-square">
               <DashboardRadarChart
-                scores={userScores.map((score) => score / 100)}
+                scores={userScores.map(
+                  (score) => score / 100,
+                )}
                 labels={AXES}
               />
             </div>
 
             <div className="mt-6 flex items-center gap-2 mb-5">
               <span className="w-3 h-3 rounded-full bg-[#00D2FF] shrink-0" />
+
               <span className="text-xs font-bold text-on-surface-variant">
                 현재 역량 점수
               </span>
@@ -553,30 +746,77 @@ const Dashboard = () => {
               <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-3">
                 역량 순위
               </p>
+
               <div className="space-y-2">
-                {[...AXES.map((axis, i) => ({ axis, score: Math.round(userScores[i] ?? 0) }))]
-                  .sort((a, b) => b.score - a.score)
-                  .map(({ axis, score }, rank) => (
-                    <div key={axis} className="flex items-center gap-3 bg-surface-container rounded-[10px] px-4 py-2">
-                      <span className={`text-xs font-black w-4 shrink-0 ${rank === 0 ? 'text-[#FFAB00]' : rank === 1 ? 'text-on-surface-variant' : rank === 2 ? 'text-[#CD7F32]' : 'text-on-surface-variant/40'}`}>
-                        {rank + 1}
-                      </span>
-                      <span className="flex-1 text-xs font-semibold text-primary-container">{axis}</span>
-                      <span className="text-xs font-black text-secondary">{score}점</span>
-                    </div>
-                  ))}
+                {[
+                  ...AXES.map((axis, i) => ({
+                    axis,
+                    score: Math.round(
+                      userScores[i] ?? 0,
+                    ),
+                  })),
+                ]
+                  .sort(
+                    (a, b) =>
+                      b.score - a.score,
+                  )
+                  .map(
+                    (
+                      { axis, score },
+                      rank,
+                    ) => (
+                      <div
+                        key={axis}
+                        className="flex items-center gap-3 bg-surface-container rounded-[10px] px-4 py-2"
+                      >
+                        <span
+                          className={`text-xs font-black w-4 shrink-0 ${
+                            rank === 0
+                              ? 'text-[#FFAB00]'
+                              : rank === 1
+                                ? 'text-on-surface-variant'
+                                : rank === 2
+                                  ? 'text-[#CD7F32]'
+                                  : 'text-on-surface-variant/40'
+                          }`}
+                        >
+                          {rank + 1}
+                        </span>
+
+                        <span className="flex-1 text-xs font-semibold text-primary-container">
+                          {axis}
+                        </span>
+
+                        <span className="text-xs font-black text-secondary">
+                          {score}점
+                        </span>
+                      </div>
+                    ),
+                  )}
               </div>
             </div>
           </section>
 
           <div className="md:col-span-7 space-y-6">
             <AiCommentBanner
-              comment={fixMojibake(selectedResult?.aiComment)}
-              status={selectedResult?.aiCommentStatus}
-              errorMessage={fixMojibake(selectedResult?.aiCommentErrorMessage) || aiCommentError}
-              isGenerating={isGeneratingAiComment}
+              comment={fixMojibake(
+                selectedResult?.aiComment,
+              )}
+              status={
+                selectedResult?.aiCommentStatus
+              }
+              errorMessage={
+                fixMojibake(
+                  selectedResult?.aiCommentErrorMessage,
+                ) || aiCommentError
+              }
+              isGenerating={
+                isGeneratingAiComment
+              }
               disabled={!selectedResultId}
-              onGenerate={handleGenerateAiComment}
+              onGenerate={
+                handleGenerateAiComment
+              }
             />
 
             {isFetchingMajorScores ? (
@@ -584,32 +824,48 @@ const Dashboard = () => {
                 전공별 점수 데이터를 조회하는 중입니다...
               </div>
             ) : (
-              <RecommendedMajors majors={recommendedMajors} />
+              <RecommendedMajors
+                majors={recommendedMajors}
+              />
             )}
           </div>
 
           <CapabilityBarChart
             rows={capabilityRows}
-            targetMajorName={fixMojibake(topMajor?.name)}
+            targetMajorName={fixMojibake(
+              topMajor?.name,
+            )}
             className="md:col-span-12"
           />
         </div>
 
-        <ShareSection userName={displayName} topMajor={topRecommendedMajor} shareToken={selectedResult?.shareToken} />
+        <ShareSection
+          userName={displayName}
+          topMajor={topRecommendedMajor}
+          shareToken={
+            selectedResult?.shareToken
+          }
+        />
 
         <footer className="mt-8 flex flex-wrap justify-center gap-4">
           <button className="flex items-center gap-2 px-6 py-4 bg-primary-container text-white rounded-[14px] font-bold hover:shadow-lg transition-shadow">
-            <span className="material-symbols-outlined">picture_as_pdf</span>
+            <span className="material-symbols-outlined">
+              picture_as_pdf
+            </span>
             리포트 저장 (PDF)
           </button>
 
           <button className="flex items-center gap-2 px-6 py-4 bg-surface-container-lowest border border-outline-variant/20 text-on-surface rounded-[14px] font-bold hover:bg-surface-container transition-colors">
-            <span className="material-symbols-outlined">image</span>
+            <span className="material-symbols-outlined">
+              image
+            </span>
             이미지 저장
           </button>
 
           <button className="flex items-center gap-2 px-6 py-4 bg-surface-container-lowest border border-outline-variant/20 text-on-surface rounded-[14px] font-bold hover:bg-surface-container transition-colors">
-            <span className="material-symbols-outlined">print</span>
+            <span className="material-symbols-outlined">
+              print
+            </span>
             인쇄
           </button>
         </footer>
