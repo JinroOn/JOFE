@@ -16,6 +16,7 @@ export interface RecommendedMajor {
 
 export interface CapabilityRow {
   axis: string;
-  userScore: number;
-  majorAvg: number;
+  // 정보가 없는 축은 임의의 0점/예시 점수로 대체하지 않습니다.
+  userScore: number | null;
+  majorAvg: number | null;
 }
