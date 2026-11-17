@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { listExplorationSessions } from '../../../api/exploration';
-import { getDiagnosisResults } from '../../../api/results';
+import { getDashboardSummary } from '../../../api/dashboard';
 import { isExplorationEnabled } from '../../../config/features';
 import Dashboard from '../Dashboard';
 
@@ -10,76 +9,30 @@ type Decision =
   | { kind: 'LEGACY' }
   | { kind: 'EXPLORATION'; sessionId: number };
 
-const time = (iso: string | null | undefined) => {
-  const t = iso ? new Date(iso).getTime() : NaN;
-  return Number.isNaN(t) ? 0 : t;
-};
-
-// 탐색형 결과가 기존 결과보다 최신이면 탐색형 결과를 기본으로 보여준다.
+// 어떤 결과를 먼저 보여줄지는 서버가 정한다 — /dashboard/summary 의 latestResult 를 그대로 따른다.
+// 두 종류 비교, 손상된 결과 건너뛰기, 탐색형 사용 가능 여부 판정 모두 서버 몫이다. (JOFE#127)
 // 기존 결과는 ?view=legacy 로 그대로 열린다.
 const ExplorationAwareHome = () => {
-  const [decision, setDecision] = useState<Decision>({
-    kind: 'LOADING',
-  });
+  const [decision, setDecision] = useState<Decision>({ kind: 'LOADING' });
 
   useEffect(() => {
     let alive = true;
 
-    Promise.allSettled([
-      listExplorationSessions(),
-      getDiagnosisResults(),
-    ]).then(([explorations, legacy]) => {
-      if (!alive) return;
-
-      const latestExploration =
-        explorations.status === 'fulfilled'
-          ? explorations.value
-              .filter((session) => {
-                const sessionType =
-                  session.type ?? session.diagnosisType;
-
-                const hasAvailableResult =
-                  session.resultAvailability === undefined
-                    ? session.resultId !== null
-                    : session.resultAvailability === 'AVAILABLE';
-
-                return (
-                  sessionType === 'EXPLORATION_V1' &&
-                  session.status === 'completed' &&
-                  hasAvailableResult
-                );
-              })
-              .sort(
-                (a, b) =>
-                  time(b.completedAt ?? b.startedAt) -
-                    time(a.completedAt ?? a.startedAt) ||
-                  b.sessionId - a.sessionId
-              )[0]
-          : undefined;
-
-      const latestLegacy =
-        legacy.status === 'fulfilled'
-          ? Math.max(
-              0,
-              ...legacy.value.map((result) => time(result.createdAt))
-            )
-          : 0;
-
-      if (
-        latestExploration &&
-        time(
-          latestExploration.completedAt ??
-            latestExploration.startedAt
-        ) >= latestLegacy
-      ) {
-        setDecision({
-          kind: 'EXPLORATION',
-          sessionId: latestExploration.sessionId,
-        });
-      } else {
-        setDecision({ kind: 'LEGACY' });
-      }
-    });
+    getDashboardSummary()
+      .then((summary) => {
+        if (!alive) return;
+        const latest = summary.latestResult;
+        // 탐색형을 쓸 수 없으면 서버가 UNAVAILABLE과 레거시 정보만 준다.
+        if (summary.exploration === 'UNAVAILABLE' || latest?.type !== 'EXPLORATION_V1') {
+          setDecision({ kind: 'LEGACY' });
+          return;
+        }
+        setDecision({ kind: 'EXPLORATION', sessionId: latest.sessionId });
+      })
+      // 요약을 못 받으면 기존 결과 화면으로 연다. 탐색형 결과를 임의로 고르지는 않는다.
+      .catch(() => {
+        if (alive) setDecision({ kind: 'LEGACY' });
+      });
 
     return () => {
       alive = false;
@@ -97,12 +50,7 @@ const ExplorationAwareHome = () => {
   }
 
   if (decision.kind === 'EXPLORATION') {
-    return (
-      <Navigate
-        to={`/analysis/exploration/${decision.sessionId}`}
-        replace
-      />
-    );
+    return <Navigate to={`/analysis/exploration/${decision.sessionId}`} replace />;
   }
 
   return <Dashboard />;
@@ -111,10 +59,7 @@ const ExplorationAwareHome = () => {
 const ResultHome = () => {
   const [params] = useSearchParams();
 
-  if (
-    !isExplorationEnabled ||
-    params.get('view') === 'legacy'
-  ) {
+  if (!isExplorationEnabled || params.get('view') === 'legacy') {
     return <Dashboard />;
   }
 

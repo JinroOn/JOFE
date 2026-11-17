@@ -38,6 +38,7 @@ import type {
   SupportPurpose,
   SupportSession,
 } from '../types/exploration';
+import type { DashboardResultRef, DashboardSummary } from '../types/dashboard';
 import { MOCK_MAJOR_PROFILES } from './explorationMockMajors';
 
 const STORAGE_KEY = 'jinroon.exploration.mock.v1';
@@ -1275,4 +1276,42 @@ export const getMajorProfile = (majorCode: string) =>
     const profile = MOCK_MAJOR_PROFILES[majorCode];
     if (!profile) throw fail(404, 'RESOURCE_NOT_FOUND');
     return { majorCode, ...profile };
+  });
+
+// ---- 통합 대시보드 요약 (mock) ----
+// 실제 백엔드 GET /dashboard/summary 와 같은 형태를 돌려준다. mock에는 레거시 쪽이 없어 LEGACY는 null이다.
+// stage는 백엔드가 DB 원문 문자열을 주므로 여기서도 문자열로 맞춘다. (JOFE#127)
+export const dashboardSummary = () =>
+  delay((): DashboardSummary => {
+    const sessions = Object.values(load().sessions);
+    const completed = sessions
+      .filter((s) => s.session.status === 'completed' && s.session.resultId !== null)
+      .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0) || b.session.sessionId - a.session.sessionId)[0];
+    const latest: DashboardResultRef | null = completed
+      ? {
+          type: 'EXPLORATION_V1',
+          resultId: completed.session.resultId as number,
+          sessionId: completed.session.sessionId,
+          resultStatus: null,
+          completedAt: completed.completedAt ? new Date(completed.completedAt).toISOString() : null,
+          path: `/api/exploration/v1/results/${completed.session.resultId}`,
+        }
+      : null;
+    const running = sessions
+      .filter((s) => s.session.status === 'in_progress')
+      .sort((a, b) => b.session.sessionId - a.session.sessionId)
+      .map((s) => ({
+        type: 'EXPLORATION_V1' as const,
+        sessionId: s.session.sessionId,
+        stage: `STAGE_${s.session.stage}`,
+        startedAt: s.session.startedAt,
+        path: `/api/exploration/v1/sessions/${s.session.sessionId}`,
+      }));
+    return {
+      latestResult: latest,
+      latestByType: { LEGACY: null, EXPLORATION_V1: latest },
+      inProgress: running,
+      resume: running[0] ?? null,
+      exploration: 'AVAILABLE',
+    };
   });
