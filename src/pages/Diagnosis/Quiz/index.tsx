@@ -529,7 +529,7 @@ const DiagnosisQuiz = () => {
             </button>
 
             <p className="hidden sm:block text-[13px] font-bold text-on-surface-variant">
-              3단계 / 5단계 · 공통 역량 · {index + 1} / {total}
+              3단계 / 4단계 · 역량 진단 · {index + 1} / {total}
             </p>
 
             <button

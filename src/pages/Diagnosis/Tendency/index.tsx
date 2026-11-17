@@ -426,7 +426,7 @@ const DiagnosisTendency = () => {
           </button>
 
           <p className="hidden sm:block text-[13px] font-bold text-on-surface-variant">
-            2단계 / 5단계 · 공통 성향 · {currentNo} / {total}
+            2단계 / 4단계 · 성향 진단 · {currentNo} / {total}
           </p>
 
           <button
