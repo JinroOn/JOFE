@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type {
   RecommendedMajor,
   CapabilityRow,
@@ -321,6 +322,9 @@ const getApiErrorMessage = (
 };
 
 const Dashboard = () => {
+  const [searchParams] = useSearchParams();
+  const requestedResultParam = searchParams.get('resultId');
+  const requestedResultId = requestedResultParam === null ? null : Number(requestedResultParam);
   const user = useAuthStore(
     (state) => state.user,
   );
@@ -389,9 +393,12 @@ const Dashboard = () => {
         setResults(sortedResults);
         setMajors(majorData);
 
-        setSelectedResultId(
-          sortedResults[0]?.id ?? null,
-        );
+        if (requestedResultId !== null && !sortedResults.some((result) => result.id === requestedResultId)) {
+          setSelectedResultId(null);
+          setError('요청한 진단 결과를 찾을 수 없습니다. 진단 이력에서 다시 확인해주세요.');
+        } else {
+          setSelectedResultId(requestedResultId ?? sortedResults[0]?.id ?? null);
+        }
       } catch (e) {
         if (ignore) {
           return;
@@ -415,7 +422,7 @@ const Dashboard = () => {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [requestedResultId]);
 
   useEffect(() => {
     if (!selectedResultId) {

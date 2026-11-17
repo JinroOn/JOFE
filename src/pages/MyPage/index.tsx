@@ -4,20 +4,15 @@ import useAuthStore from '../../store/useAuthStore';
 import ProfileEditModal from './components/ProfileEditModal';
 import PasswordChangeModal from './components/PasswordChangeModal';
 import ConsentManagement from './components/ConsentManagement';
+import DiagnosisHistoryPanel from './components/DiagnosisHistoryPanel';
+import useDiagnosisHistory from '../../hooks/useDiagnosisHistory';
 import { getFavorites, deleteFavorite, deleteMe } from '../../api/user';
 import { getMajor } from '../../api/major';
-import { getDiagnosisResults } from '../../api/results';
-import { getDiagnosisSessions, deleteSession } from '../../api/diagnosis';
+import { getDashboardSummary } from '../../api/dashboard';
 import { getApiErrorMessage } from '../../api/error';
+import type { DashboardSummary } from '../../types/dashboard';
 import type { Major } from '../../types/major';
-import type { DiagnosisSession } from '../../types/diagnosis';
-import { listExplorationSessions } from '../../api/exploration';
 import { diagnosisEntryPath, isExplorationEnabled } from '../../config/features';
-import type { ExplorationSessionSummary } from '../../types/exploration';
-
-type HistoryRow =
-  | { key: string; date: string; kind: 'legacy'; legacy: DiagnosisSession }
-  | { key: string; date: string; kind: 'exploration'; exploration: ExplorationSessionSummary };
 
 interface FavoriteItem {
   id: number;
@@ -29,184 +24,74 @@ interface FavoriteItem {
 const MyPage = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
-
+  const history = useDiagnosisHistory();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [favoritesLoading, setFavoritesLoading] = useState(true);
-  const [diagnosisCount, setDiagnosisCount] = useState<number | null>(null);
-  const [lastDiagnosisDate, setLastDiagnosisDate] = useState<string | null>(null);
-
-  const [sessions, setSessions] = useState<DiagnosisSession[]>([]);
-  const [explorations, setExplorations] = useState<ExplorationSessionSummary[]>([]);
-  const [sessionPage, setSessionPage] = useState(1);
-
+  const [summaryState, setSummaryState] = useState<{ revision: number; value: DashboardSummary } | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [sessionToDelete, setSessionToDelete] = useState<DiagnosisSession | null>(null);
-  const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
-
-  const SESSIONS_PER_PAGE = 5;
-
-  const history: HistoryRow[] = [
-    ...sessions.map((legacy) => ({
-      key: `l-${legacy.id}`,
-      date: legacy.createdAt,
-      kind: 'legacy' as const,
-      legacy,
-    })),
-    ...explorations.map((exploration) => ({
-      key: `e-${exploration.sessionId}`,
-      date: exploration.startedAt,
-      kind: 'exploration' as const,
-      exploration,
-    })),
-  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const displayName = user?.nickname ?? '';
   const displayEmail = user?.email ?? '';
   const initial = displayName[0] ?? '?';
   const avatarUrl = user?.profileImageUrl ?? null;
+  const diagnosisCount = history.phase === 'READY'
+    ? history.items.filter((item) => item.status === 'completed').length : null;
+  // 이력 API는 총 건수를 주지 않으므로, 일부 페이지만 읽었을 때 누적 전체 횟수라고 표시하지 않는다.
+  const diagnosisCountLabel = history.hasMore ? '불러온 완료 진단'
+    : history.source === 'legacy' && isExplorationEnabled ? '이전 방식 완료 진단' : '완료 진단 횟수';
+  const summary = summaryState?.revision === history.revision ? summaryState.value : null;
+  const latest = isExplorationEnabled && history.source === 'unified'
+    ? summary?.latestResult : summary?.latestByType.LEGACY;
+  const allCompletedTimes = !history.hasMore && history.phase === 'READY'
+    ? history.items.filter((item) => item.status === 'completed')
+      .map((item) => new Date(item.completedAt ?? item.occurredAt).getTime()).filter(Number.isFinite) : [];
+  const lastDate = latest?.completedAt ? new Date(latest.completedAt)
+    : allCompletedTimes.length ? new Date(Math.max(...allCompletedTimes)) : null;
+  const lastDiagnosisDate = lastDate && Number.isFinite(lastDate.getTime())
+    ? lastDate.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : null;
 
   useEffect(() => {
-    const load = async () => {
-      const [list, results, sessionList, explorationList] = await Promise.allSettled([
-        getFavorites(),
-        getDiagnosisResults(),
-        getDiagnosisSessions(),
-        isExplorationEnabled
-          ? listExplorationSessions()
-          : Promise.resolve([] as ExplorationSessionSummary[]),
-      ]);
-
-      // 백엔드는 type, 기존 Mock은 diagnosisType을 사용한다.
-      const explorationItems =
-        explorationList.status === 'fulfilled'
-          ? explorationList.value.filter(
-              (item) =>
-                (item.type ?? item.diagnosisType) === 'EXPLORATION_V1'
-            )
-          : [];
-
-      setExplorations(explorationItems);
-
-      if (list.status === 'fulfilled') {
-        const favoriteResults = await Promise.all(
-          list.value.map(async (favorite) => {
-            try {
-              const major = await getMajor(favorite.majorId);
-
-              return {
-                id: favorite.id,
-                majorId: favorite.majorId,
-                createdAt: favorite.createdAt,
-                major,
-              };
-            } catch (err: unknown) {
-              const status = (err as { response?: { status?: number } })
-                ?.response?.status;
-
-              if (status === 404) {
-                deleteFavorite(favorite.id).catch(() => {});
-                return null;
-              }
-
-              return {
-                id: favorite.id,
-                majorId: favorite.majorId,
-                createdAt: favorite.createdAt,
-                major: null,
-              };
+    let alive = true;
+    const loadFavorites = async () => {
+      try {
+        const list = await getFavorites();
+        const items = await Promise.all(list.map(async (favorite) => {
+          try { return { ...favorite, major: await getMajor(favorite.majorId) }; }
+          catch (error) {
+            if ((error as { response?: { status?: number } })?.response?.status === 404) {
+              void deleteFavorite(favorite.id).catch(() => undefined);
+              return null;
             }
-          })
-        );
-
-        setFavorites(favoriteResults.filter((item) => item !== null));
-      }
-
-      setFavoritesLoading(false);
-
-      // 레거시와 탐색형의 완료 이력을 합산한다.
-      const completedDates = [
-        ...(results.status === 'fulfilled'
-          ? results.value.map((result) => result.createdAt)
-          : []),
-        ...explorationItems
-          .filter((item) => item.status === 'completed')
-          .map((item) => item.completedAt ?? item.startedAt),
-      ];
-
-      setDiagnosisCount(completedDates.length);
-
-      if (completedDates.length > 0) {
-        const latest = completedDates.reduce((a, b) =>
-          new Date(a) > new Date(b) ? a : b
-        );
-
-        setLastDiagnosisDate(
-          new Date(latest).toLocaleDateString('ko-KR', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })
-        );
-      }
-
-      if (sessionList.status === 'fulfilled') {
-        setSessions(
-          [...sessionList.value].sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() -
-              new Date(a.createdAt).getTime()
-          )
-        );
-      }
+            return { ...favorite, major: null };
+          }
+        }));
+        if (alive) setFavorites(items.filter((item) => item !== null));
+      } finally { if (alive) setFavoritesLoading(false); }
     };
-
-    load();
+    void loadFavorites().catch(() => undefined);
+    return () => { alive = false; };
   }, []);
+
+  useEffect(() => {
+    if (history.phase !== 'READY') return;
+    let alive = true;
+    void getDashboardSummary().then((value) => {
+      if (alive) setSummaryState({ revision: history.revision, value });
+    }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [history.phase, history.revision]);
 
   const handleDeleteFavorite = async (favoriteId: number) => {
     setDeletingId(favoriteId);
-
     try {
       await deleteFavorite(favoriteId);
-      setFavorites((prev) =>
-        prev.filter((favorite) => favorite.id !== favoriteId)
-      );
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
-  const handleDeleteSession = async () => {
-    if (!sessionToDelete) return;
-
-    setDeletingSessionId(sessionToDelete.id);
-
-    try {
-      await deleteSession(sessionToDelete.id);
-
-      setSessions((prev) => {
-        const next = prev.filter(
-          (session) => session.id !== sessionToDelete.id
-        );
-        const maxPage = Math.max(
-          1,
-          Math.ceil(next.length / SESSIONS_PER_PAGE)
-        );
-
-        setSessionPage((page) => Math.min(page, maxPage));
-        return next;
-      });
-
-      setSessionToDelete(null);
-    } finally {
-      setDeletingSessionId(null);
-    }
+      setFavorites((prev) => prev.filter((favorite) => favorite.id !== favoriteId));
+    } finally { setDeletingId(null); }
   };
 
   const handleWithdraw = async () => {
@@ -263,7 +148,7 @@ const MyPage = () => {
         <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="bg-white p-8 rounded-[14px] shadow-[0px_20px_40px_rgba(10,25,47,0.06)] hover:-translate-y-1 transition-transform">
             <span className="material-symbols-outlined text-secondary text-3xl mb-4 block">analytics</span>
-            <p className="text-sm font-medium text-on-surface-variant mb-1">누적 진단 횟수</p>
+            <p className="text-sm font-medium text-on-surface-variant mb-1">{diagnosisCountLabel}</p>
             <h3 className="text-3xl font-extrabold">
               {diagnosisCount ?? '-'}
               <span className="text-lg font-normal ml-1">회</span>
@@ -373,186 +258,7 @@ const MyPage = () => {
             )}
           </section>
 
-          <section>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-primary-container">진단 이력</h2>
-
-              {history.length > 0 && (
-                <span className="text-sm text-on-surface-variant">
-                  총 <span className="font-bold text-on-surface">{history.length}</span>건
-                </span>
-              )}
-            </div>
-
-            {history.length === 0 ? (
-              <div className="bg-white rounded-2xl p-12 text-center text-on-surface-variant">
-                <span className="material-symbols-outlined text-4xl mb-3 block text-outline">assignment</span>
-                <p className="font-medium">진단 기록이 없습니다.</p>
-                <button
-                  onClick={() => navigate(diagnosisEntryPath)}
-                  className="mt-4 text-sm font-bold text-secondary"
-                >
-                  진단 시작하기 →
-                </button>
-              </div>
-            ) : (() => {
-              const totalPages = Math.ceil(history.length / SESSIONS_PER_PAGE);
-              const paged = history.slice(
-                (sessionPage - 1) * SESSIONS_PER_PAGE,
-                sessionPage * SESSIONS_PER_PAGE
-              );
-
-              return (
-                <>
-                  <div className="space-y-3">
-                    {paged.map((row) => {
-                      const statusMap = {
-                        in_progress: { label: '진행 중', cls: 'bg-yellow-100 text-yellow-700' },
-                        completed: { label: '완료', cls: 'bg-green-100 text-green-700' },
-                        abandoned: { label: '중단', cls: 'bg-surface-container text-on-surface-variant' },
-                      } as const;
-
-                      const isExploration = row.kind === 'exploration';
-                      const status = isExploration ? row.exploration.status : row.legacy.status;
-                      const { label, cls } = statusMap[status] ?? statusMap.abandoned;
-
-                      const date = new Date(row.date).toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      });
-
-                      const title = isExploration
-                        ? `전공 탐색 진단 #${row.exploration.sessionId}`
-                        : `진단 #${row.legacy.id}`;
-
-                      const resume = isExploration
-                        ? () => navigate(`/diagnosis/exploration/session/${row.exploration.sessionId}`)
-                        : () => navigate('/diagnosis');
-
-                      const openResult = isExploration
-                        ? () => navigate(`/analysis/exploration/${row.exploration.sessionId}`)
-                        : () => navigate(
-                            isExplorationEnabled
-                              ? '/analysis/dashboard?view=legacy'
-                              : '/analysis/dashboard'
-                          );
-
-                      // 백엔드 결과가 AVAILABLE인 경우에만 결과 링크를 표시한다.
-                      // 기존 Mock 응답은 resultAvailability가 없으므로 resultId로 판단한다.
-                      const canOpenResult = isExploration
-                        ? row.exploration.resultAvailability === undefined
-                          ? row.exploration.resultId !== null
-                          : row.exploration.resultAvailability === 'AVAILABLE'
-                        : true;
-
-                      return (
-                        <div key={row.key} className="bg-white rounded-2xl px-5 py-4 shadow-sm flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-4 min-w-0">
-                            <span className="material-symbols-outlined text-on-surface-variant shrink-0">
-                              {isExploration ? 'explore' : 'assignment'}
-                            </span>
-
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-on-surface truncate">{title}</p>
-                              <p className="text-xs text-on-surface-variant mt-0.5">
-                                {date}
-                                {isExplorationEnabled && (
-                                  <span className="ml-2 font-semibold text-secondary">
-                                    {isExploration ? '탐색형' : '이전 방식'}
-                                  </span>
-                                )}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${cls}`}>
-                              {label}
-                            </span>
-
-                            {status === 'in_progress' && (
-                              <button
-                                onClick={resume}
-                                className="px-3 py-1.5 bg-primary-container text-white text-xs font-bold rounded-lg hover:opacity-90 transition-opacity"
-                              >
-                                이어하기
-                              </button>
-                            )}
-
-                            {status === 'completed' && canOpenResult && (
-                              <button
-                                onClick={openResult}
-                                className="px-3 py-1.5 bg-surface-container text-on-surface text-xs font-bold rounded-lg hover:bg-surface-container-high transition-colors"
-                              >
-                                결과 보기
-                              </button>
-                            )}
-
-                            {status === 'completed' && isExploration && !canOpenResult && (
-                              <span
-                                className="text-xs text-on-surface-variant"
-                                title="이 회차의 결과를 사용할 수 없습니다."
-                              >
-                                결과 확인 불가
-                              </span>
-                            )}
-
-                            {row.kind === 'legacy' && (
-                              <button
-                                onClick={() => setSessionToDelete(row.legacy)}
-                                disabled={deletingSessionId === row.legacy.id}
-                                className="p-1.5 rounded-lg text-on-surface-variant/40 hover:text-error hover:bg-error-container/20 transition-colors disabled:opacity-40"
-                                title="진단 삭제"
-                              >
-                                <span className="material-symbols-outlined text-[18px]">
-                                  {deletingSessionId === row.legacy.id ? 'hourglass_empty' : 'delete'}
-                                </span>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-1 mt-6">
-                      <button
-                        onClick={() => setSessionPage((p) => p - 1)}
-                        disabled={sessionPage === 1}
-                        className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-[20px]">chevron_left</span>
-                      </button>
-
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <button
-                          key={page}
-                          onClick={() => setSessionPage(page)}
-                          className={`w-9 h-9 rounded-lg text-sm font-bold transition-colors ${
-                            page === sessionPage
-                              ? 'bg-primary-container text-white'
-                              : 'text-on-surface-variant hover:bg-surface-container'
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
-
-                      <button
-                        onClick={() => setSessionPage((p) => p + 1)}
-                        disabled={sessionPage === totalPages}
-                        className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-[20px]">chevron_right</span>
-                      </button>
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </section>
+          <DiagnosisHistoryPanel history={history} />
         </div>
 
         <aside>
@@ -616,39 +322,6 @@ const MyPage = () => {
 
       {showPasswordModal && (
         <PasswordChangeModal onClose={() => setShowPasswordModal(false)} />
-      )}
-
-      {sessionToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
-            <div className="w-14 h-14 rounded-full bg-error-container flex items-center justify-center mx-auto mb-4">
-              <span className="material-symbols-outlined text-error text-2xl">delete</span>
-            </div>
-
-            <h3 className="text-lg font-bold text-on-surface mb-2">진단 삭제</h3>
-            <p className="text-sm text-on-surface-variant mb-6">
-              진단 #{sessionToDelete.id}의 모든 답변과 결과가 삭제됩니다. 복구할 수 없습니다.
-            </p>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setSessionToDelete(null)}
-                disabled={deletingSessionId !== null}
-                className="flex-1 py-3 rounded-lg border border-outline-variant/30 font-bold hover:bg-surface-container-low transition-all disabled:opacity-50"
-              >
-                취소
-              </button>
-
-              <button
-                onClick={handleDeleteSession}
-                disabled={deletingSessionId !== null}
-                className="flex-1 py-3 rounded-lg bg-error text-white font-bold hover:bg-error/90 transition-all disabled:opacity-50"
-              >
-                {deletingSessionId !== null ? '삭제 중...' : '삭제'}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {showDeleteConfirm && (

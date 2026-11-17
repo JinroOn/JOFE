@@ -380,3 +380,133 @@ test('preparation responses render as the original answers without becoming conf
   assert.doesNotMatch(html, /이렇게 확인해보세요|CAUTION_MATH|PREP-1/);
   assert.equal(renderToStaticMarkup(React.createElement(Responses, { responses: [] })), '');
 });
+
+const historyFixture = require('./fixtures/diagnosis-history.cjs');
+function historyApi(get, legacy, mock) {
+  return compile('src/api/history.ts', {
+    './axios': { __esModule: true, default: { get } },
+    './diagnosis': { getDiagnosisSessions: legacy },
+    '../config/features': { isExplorationMock: Boolean(mock) },
+    './explorationMock': mock ?? {},
+  });
+}
+
+test('history API forwards only allowed query keys and preserves the opaque server cursor', async () => {
+  let request;
+  const api = historyApi(async (url, config) => { request = { url, params: config.params }; return { data: historyFixture.page(historyFixture.items) }; });
+  const result = await api.getDiagnosisHistorySessions({ type: 'ALL', status: 'completed', limit: 5,
+    cursor: historyFixture.cursor, userId: 999, runMode: 'PUBLIC', offset: 5 });
+  assert.equal(request.url, '/exploration/v1/history/sessions');
+  assert.equal(Object.keys(request.params).sort().join(','), 'cursor,limit,status,type');
+  assert.equal(request.params.cursor, historyFixture.cursor);
+  assert.equal(result.items[0].type, 'EXPLORATION_V1');
+  assert.equal(result.items[1].type, 'LEGACY');
+});
+
+test('unified history keeps server order and uses one history endpoint instead of merging legacy rows', async () => {
+  let legacyCalls = 0;
+  const api = historyApi(async () => ({ data: historyFixture.page(historyFixture.items) }), async () => { legacyCalls++; return []; });
+  const result = await api.loadInitialDiagnosisHistory(true, 5);
+  assert.equal(result.source, 'unified');
+  assert.equal(JSON.stringify(result.items.map((item) => item.key)), JSON.stringify(historyFixture.items.map((item) => item.key)));
+  assert.equal(legacyCalls, 0);
+});
+
+test('disabled or unavailable exploration falls back to legacy history only', async () => {
+  const session = historyFixture.legacySession(4);
+  for (const error of [null, { response: { status: 404 } }, { response: { status: 503, data: { code: 'NO_ACTIVE_CATALOG' } } }]) {
+    let unifiedCalls = 0;
+    const api = historyApi(async () => { unifiedCalls++; throw error; }, async () => [session]);
+    const result = await api.loadInitialDiagnosisHistory(error !== null, 5);
+    assert.equal(result.source, 'legacy');
+    assert.equal(result.items[0].type, 'LEGACY');
+    assert.equal(result.hasMore, false);
+    assert.equal(unifiedCalls, error === null ? 0 : 1);
+  }
+});
+
+test('network, authentication and integrity errors never silently erase exploration history', async () => {
+  const failures = [new Error('Network Error'), { response: { status: 401 } }, { response: { status: 500 } },
+    { response: { status: 503, data: { code: 'CATALOG_INTEGRITY_ERROR' } } }];
+  for (const failure of failures) {
+    let legacyCalls = 0;
+    const api = historyApi(async () => { throw failure; }, async () => { legacyCalls++; return []; });
+    await assert.rejects(api.loadInitialDiagnosisHistory(true, 5), (error) => error === failure);
+    assert.equal(legacyCalls, 0);
+  }
+});
+
+test('history navigation follows server actions and never follows API links', () => {
+  const { historyActionPath, historyUnavailableMessage } = compile('src/utils/diagnosisHistory.ts');
+  assert.equal(historyActionPath(historyFixture.items[0]), '/analysis/exploration/11');
+  assert.equal(historyActionPath(historyFixture.items[1]), '/analysis/dashboard?view=legacy&resultId=101');
+  assert.equal(historyActionPath(historyFixture.items[5]), '/diagnosis');
+  assert.equal(historyActionPath(historyFixture.items[6]), '/diagnosis/exploration/session/16');
+  assert.equal(historyActionPath({ ...historyFixture.items[0], nextAction: 'NONE' }), null);
+  for (const item of historyFixture.items.slice(2, 5)) {
+    assert.equal(historyActionPath(item), null);
+    assert.ok(historyUnavailableMessage(item));
+  }
+  assert.equal(historyUnavailableMessage(historyFixture.items[5]), null);
+});
+
+test('history renders mixed IDs and distinct unavailable result states without result buttons', () => {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const Panel = compile('src/pages/MyPage/components/DiagnosisHistoryPanel.tsx', {
+    'react-router-dom': { useNavigate: () => () => undefined },
+    '../../../api/diagnosis': {},
+    '../../../config/features': { isExplorationEnabled: true },
+    '../../../utils/diagnosisHistory': compile('src/utils/diagnosisHistory.ts'),
+  }).default;
+  const html = renderToStaticMarkup(React.createElement(Panel, { history: {
+    items: historyFixture.items, phase: 'READY', hasMore: false, source: 'unified',
+  } }));
+  assert.match(html, /전공 탐색 진단 #11/);
+  assert.match(html, /이전 방식 진단 #11/);
+  assert.match(html, /저장된 결과가 없어요/);
+  assert.match(html, /결과가 여러 개/);
+  assert.match(html, /결과 자료를 확인할 수 없어/);
+  assert.equal((html.match(/>결과 보기<|>결과 보기\s*<|>\s*결과 보기\s*</g) ?? []).length, 2);
+  assert.doesNotMatch(html, /DO_NOT_NAVIGATE/);
+});
+
+function pagedHistoryMock() {
+  const sessions = {};
+  const put = (id, startedAt, status = 'completed') => {
+    sessions[id] = { session: { sessionId: id, resultId: status === 'completed' ? id + 100 : null, status, stage: 2, startedAt },
+      completedAt: Date.parse(startedAt), issued: [] };
+  };
+  put(1, '2026-11-17T10:00:00Z'); put(2, '2026-11-17T12:00:00Z');
+  put(3, '2026-11-17T12:00:00Z'); put(4, '2026-11-16T10:00:00Z', 'in_progress');
+  const mock = compile('src/api/explorationMock.ts', {
+    './explorationMockMajors': compile('src/api/explorationMockMajors.ts'),
+  }, { localStorage: { getItem: () => JSON.stringify({ sessions }) }, setTimeout: (fn) => { fn(); return 0; } });
+  return { mock, put };
+}
+
+test('mock history preserves time/id order and cursor fences exclude new and backdated insertions', async () => {
+  const { mock, put } = pagedHistoryMock();
+  const first = await mock.historySessions({ limit: 2 });
+  assert.equal(first.items.map((row) => row.sessionId).join(','), '3,2');
+  assert.equal(first.hasMore, true);
+  put(5, '2026-11-17T13:00:00Z'); put(6, '2026-11-15T10:00:00Z');
+  const second = await mock.historySessions({ limit: 2, cursor: first.nextCursor });
+  assert.equal(second.items.map((row) => row.sessionId).join(','), '1,4');
+  assert.equal(second.hasMore, false);
+  assert.equal(second.nextCursor, null);
+  assert.equal(second.items[1].nextAction, 'RESUME');
+});
+
+test('mock history rejects invalid and cross-filter cursors and keeps legacy filtering empty', async () => {
+  const { mock } = pagedHistoryMock();
+  const page = await mock.historySessions({ limit: 2 });
+  for (const query of [{ limit: 0 }, { limit: 101 }, { cursor: 'invalid' }, { limit: 1, cursor: page.nextCursor },
+    { type: 'LEGACY', limit: 2, cursor: page.nextCursor }]) {
+    await assert.rejects(mock.historySessions(query), (error) => error.response.status === 400);
+  }
+  assert.equal((await mock.historySessions({ type: 'LEGACY' })).items.length, 0);
+  const pending = await mock.historySessions({ status: 'in_progress' });
+  assert.equal(pending.items.length, 1);
+  assert.equal(pending.items[0].resultAvailability, 'NOT_COMPLETED');
+});
