@@ -15,7 +15,7 @@ import DiagnosisLoading from './pages/Diagnosis/Loading';
 import DiagnosisQuiz from './pages/Diagnosis/Quiz';
 import DiagnosisTendency from './pages/Diagnosis/Tendency';
 import ExplorationIntro from './pages/Diagnosis/Exploration/Intro';
-import ExplorationQuestion from './pages/Diagnosis/Exploration/Question';
+import ExplorationQuestion from './pages/Diagnosis/Exploration/QuestionWithPresentation';
 import ExplorationResult from './pages/Analysis/ExplorationResult';
 import ExplorationCompare from './pages/Analysis/ExplorationCompare';
 import ExplorationActivities from './pages/Analysis/ExplorationActivities';
