@@ -119,6 +119,7 @@ interface MockSession {
   queue: string[];
   adjustPending: boolean;
   mutations: Record<string, SaveAnswerResponse>;
+  abandonMutations?: Record<string, { expectedRevision: number; response: ExplorationSession }>;
   completedAt?: number;
   support?: {
     purpose: SupportPurpose;
@@ -197,6 +198,7 @@ const getMock = (db: MockDb, sessionId: number) => {
 
 const checkRevision = (s: MockSession, expected: number) => {
   if (s.session.status === 'completed') throw fail(409, 'SESSION_ALREADY_COMPLETED');
+  if (s.session.status === 'abandoned') throw fail(409, 'SESSION_ABANDONED');
   if (s.session.revision !== expected) throw fail(409, 'STALE_REVISION');
 };
 
@@ -223,6 +225,10 @@ const nextActionOf = (s: MockSession) => {
 export const startSession = () =>
   delay((): ExplorationSession => {
     const db = load();
+    const existing = Object.values(db.sessions).find((s) => s.session.status === 'in_progress');
+    if (existing) throw { response: { status: 409, data: {
+      code: 'EXPLORATION_IN_PROGRESS', existingSessionId: existing.session.sessionId,
+    } } };
     const sessionId = ++db.seq;
     const session: ExplorationSession = {
       sessionId,
@@ -253,6 +259,23 @@ export const getSession = (sessionId: number) =>
       progress: progressOf(s),
       nextAction: s.session.status === 'completed' ? 'COMPLETE' : nextActionOf(s),
     };
+  });
+
+export const abandonSession = (sessionId: number, expectedRevision: number, mutationId: string) =>
+  delay((): ExplorationSession => {
+    if (!mutationId.trim()) throw fail(400, 'INVALID_REQUEST');
+    const db = load();
+    const s = getMock(db, sessionId);
+    const previous = s.abandonMutations?.[mutationId];
+    if (previous) {
+      if (previous.expectedRevision !== expectedRevision) throw fail(409, 'IDEMPOTENCY_CONFLICT');
+      return previous.response;
+    }
+    checkRevision(s, expectedRevision);
+    s.session = { ...s.session, status: 'abandoned', revision: s.session.revision + 1 };
+    s.abandonMutations = { ...s.abandonMutations, [mutationId]: { expectedRevision, response: { ...s.session } } };
+    save(db);
+    return s.session;
   });
 
 export const listSessions = () =>
