@@ -128,6 +128,7 @@ const DiagnosisQuiz = () => {
         const objectiveAnswerMap: Record<number, string | null> = {};
         const essayAnswerMap: Record<number, string> = {};
 
+        // 객관식은 실제 시험 문항 ID를 기준으로 완료 여부를 판별합니다.
         inProgress?.examAnswers?.forEach((answer) => {
           const questionIndex = qs.findIndex((question) => question.id === answer.examQuestionId);
 
@@ -137,10 +138,18 @@ const DiagnosisQuiz = () => {
           }
         });
 
+        // 서술형 답변은 실제 퀴즈 서술형 문항에만 연결합니다.
+        // 과거 기본 정보 화면에서 포부를 questionNo: 1로
+        // 저장한 경우에도 1번 객관식을 완료 처리하지 않습니다.
         inProgress?.essayAnswers?.forEach((answer) => {
           const questionIndex = answer.questionNo - 1;
+          const quizQuestion = qs[questionIndex];
 
-          if (questionIndex >= 0 && questionIndex < qs.length && answer.answerText?.trim()) {
+          if (
+            quizQuestion &&
+            isEssayQuestion(quizQuestion) &&
+            answer.answerText?.trim()
+          ) {
             completed.add(questionIndex);
             essayAnswerMap[questionIndex] = answer.answerText;
           }
@@ -510,8 +519,7 @@ const DiagnosisQuiz = () => {
                 <p className="text-xs font-bold text-secondary-container mb-2">TIP</p>
                 <p className="text-xs leading-relaxed text-white">
                   한 문제만으로 결과가 결정되지 않습니다.
-                  <br />
-                  여러 문항을 종합해 해석합니다.
+                  <br /> 여러 문항을 종합해 해석합니다.
                 </p>
               </div>
             </aside>

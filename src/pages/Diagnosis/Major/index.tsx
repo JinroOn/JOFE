@@ -6,7 +6,6 @@ import {
   createSession,
   updateSession,
   deleteSession,
-  createEssayAnswer,
 } from '../../../api/diagnosis';
 import type { DiagnosisSession } from '../../../types/diagnosis';
 
@@ -239,7 +238,7 @@ const DiagnosisMajor = () => {
     }
   };
 
-  // 다음 단계로: 필수 항목 확인 → 세션 저장 + 포부(서술형) 등록 후 성향 진단으로 이동
+  // 다음 단계로: 포부는 inputSnapshot에만 저장하고, 퀴즈 서술형 답변을 생성하지 않습니다.
   const handleNext = async () => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     setError(null);
@@ -250,10 +249,7 @@ const DiagnosisMajor = () => {
     if (!(await confirmNewDiagnosis())) return;
     setSubmitting(true);
     try {
-      const id = await persistSession('in_progress');
-      if (aspiration.trim()) {
-        await createEssayAnswer({ diagnosisSessionId: id, questionNo: 1, answerText: aspiration });
-      }
+      await persistSession('in_progress');
       navigate('/diagnosis/tendency');
     } catch {
       setError('저장에 실패했습니다. 다시 시도해 주세요.');
@@ -423,7 +419,7 @@ const DiagnosisMajor = () => {
                         className={`px-[22px] py-3 rounded-full border-2 text-sm font-medium transition-all ${
                           active
                             ? 'border-secondary bg-secondary-container/10 text-secondary'
-                            : 'border-surface-container-high text-on-surface hover:bg-surface-container-low'
+                            : 'border-surface-container-high hover:bg-surface-container-low'
                         }`}
                       >
                         {label}
