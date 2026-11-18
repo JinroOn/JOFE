@@ -275,6 +275,11 @@ export const toExplorationResult = (
     resultVersion: dto.resultVersion,
     createdAt: dto.completedAt,
 
+     // 추가: 백엔드의 후보 반응 정보를 그대로 유지
+    ...(dto.presentation
+    ? { presentation: dto.presentation }
+    : {}),
+
     groups: dto.groups.map((group) => ({
       groupCode: group.groupCode,
       name: group.name ?? '',

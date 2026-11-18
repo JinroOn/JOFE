@@ -106,6 +106,9 @@ const ResultView = ({
       .map((major) => [major.majorCode, major.name]),
   );
 
+  // 추가: 백엔드에서 이미 전달된 후보 반응 정보 사용
+  const presentation = result.presentation;
+
   const [selected, setSelected] = useState<string[]>([]);
   const [compareHint, setCompareHint] = useState(false);
 
@@ -190,6 +193,70 @@ const ResultView = ({
             <p key={note}>{note}</p>
           ))}
         </div>
+      )}
+
+      {/* 추가: 사용자가 제출한 후보 반응을 읽기 전용으로 표시 */}
+      {presentation?.source === 'USER_REPORTED' && (
+        <section
+          aria-labelledby="candidate-reaction-title"
+          className="mb-8 rounded-brand border border-outline-variant/30 bg-surface-container-lowest p-5 sm:p-6"
+        >
+          <h2
+            id="candidate-reaction-title"
+            className="text-lg font-bold text-primary-container mb-3"
+          >
+            내가 표시한 후보 반응
+          </h2>
+
+          <p className="text-sm text-on-surface-variant leading-relaxed mb-4">
+            검사 중에 선택한 반응이에요.
+            이 반응은 후보를 보여주는 방식에 활용되며,
+            추천 점수나 순위를 변경하지는 않아요.
+          </p>
+
+          {(presentation.unexpected?.length ?? 0) === 0 &&
+          (presentation.unfamiliar?.length ?? 0) === 0 ? (
+            <p className="text-sm text-on-surface-variant">
+              별도로 선택한 후보 반응이 없습니다.
+            </p>
+          ) : (
+            <dl className="space-y-4">
+              <div>
+                <dt className="text-sm font-semibold text-secondary mb-1">
+                  예상과 달랐던 후보
+                </dt>
+
+                <dd className="text-sm text-primary-container leading-relaxed break-words">
+                  {presentation.unexpected?.length
+                    ? presentation.unexpected
+                        .map(
+                          (code) =>
+                            majorNames.get(code) ?? code,
+                        )
+                        .join(' · ')
+                    : '선택 없음'}
+                </dd>
+              </div>
+
+              <div>
+                <dt className="text-sm font-semibold text-secondary mb-1">
+                  아직 낯설었던 후보
+                </dt>
+
+                <dd className="text-sm text-primary-container leading-relaxed break-words">
+                  {presentation.unfamiliar?.length
+                    ? presentation.unfamiliar
+                        .map(
+                          (code) =>
+                            majorNames.get(code) ?? code,
+                        )
+                        .join(' · ')
+                    : '선택 없음'}
+                </dd>
+              </div>
+            </dl>
+          )}
+        </section>
       )}
 
       {result.groups.length > 0 && (

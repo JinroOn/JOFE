@@ -1,15 +1,24 @@
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import {
+  Navigate,
+  useNavigate,
+  useParams,
+} from 'react-router-dom';
 import { isExplorationMock } from '../../../../config/features';
 import useExplorationStore from '../../../../store/useExplorationStore';
-import { ABSTAIN_OPTION_CODES } from '../../../../types/exploration';
-import type { ExplorationOption } from '../../../../types/exploration';
+import {
+  ABSTAIN_OPTION_CODES,
+} from '../../../../types/exploration';
+import type {
+  ExplorationOption,
+} from '../../../../types/exploration';
 import MockBanner from '../components/MockBanner';
 import StageStepper from './components/StageStepper';
 import SaveStatus from './components/SaveStatus';
 
-const isAbstain = (code: string) => (ABSTAIN_OPTION_CODES as readonly string[]).includes(code);
+const isAbstain = (code: string) =>
+  (ABSTAIN_OPTION_CODES as readonly string[]).includes(code);
 
 const Panel = ({ children }: { children: ReactNode }) => (
   <div className="bg-surface-container-lowest rounded-brand border border-outline-variant/20 p-6 sm:p-10 text-center cloud-shadow">
@@ -19,6 +28,7 @@ const Panel = ({ children }: { children: ReactNode }) => (
 
 const primaryBtn =
   'min-h-[44px] px-8 py-3 rounded-lg bg-primary-container text-white font-bold motion-safe:transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:hover:scale-100';
+
 const secondaryBtn =
   'min-h-[44px] px-6 py-3 rounded-lg border border-outline-variant text-primary-container font-semibold bg-surface-container-lowest';
 
@@ -33,18 +43,25 @@ const ExplorationQuestion = () => {
   const { load } = s;
 
   useEffect(() => {
-    if (Number.isFinite(id) && loadedId !== id) void load(id);
+    if (Number.isFinite(id) && loadedId !== id) {
+      void load(id);
+    }
   }, [id, loadedId, load]);
 
   const current = s.issued[s.cursor];
   const currentIssuedId = current?.question.issuedId;
 
-  // 새 질문이 나오면 포커스를 질문 제목으로 옮긴다
   useEffect(() => {
-    if (s.phase === 'ANSWERING' && currentIssuedId !== undefined) titleRef.current?.focus();
+    if (
+      s.phase === 'ANSWERING' &&
+      currentIssuedId !== undefined
+    ) {
+      titleRef.current?.focus();
+    }
   }, [currentIssuedId, s.phase]);
 
-  const exit = () => navigate('/diagnosis/exploration');
+  const exit = () =>
+    navigate('/diagnosis/exploration');
 
   const wrap = (children: ReactNode) => (
     <div className="min-h-screen bg-surface">
@@ -58,16 +75,33 @@ const ExplorationQuestion = () => {
   if (!Number.isFinite(id)) {
     return wrap(
       <Panel>
-        <p className="text-primary-container font-bold mb-4">검사 주소가 올바르지 않아요.</p>
-        <button type="button" className={primaryBtn} onClick={exit}>검사 안내로</button>
+        <p className="text-primary-container font-bold mb-4">
+          검사 주소가 올바르지 않아요.
+        </p>
+        <button
+          type="button"
+          className={primaryBtn}
+          onClick={exit}
+        >
+          검사 안내로
+        </button>
       </Panel>,
     );
   }
 
-  if (s.phase === 'IDLE' || s.phase === 'STARTING' || s.phase === 'RESUMING') {
+  if (
+    s.phase === 'IDLE' ||
+    s.phase === 'STARTING' ||
+    s.phase === 'RESUMING'
+  ) {
     return wrap(
       <Panel>
-        <p className="text-on-surface-variant" role="status">저장된 검사를 불러오는 중이에요…</p>
+        <p
+          className="text-on-surface-variant"
+          role="status"
+        >
+          저장된 검사를 불러오는 중이에요…
+        </p>
       </Panel>,
     );
   }
@@ -77,21 +111,40 @@ const ExplorationQuestion = () => {
       s.errorCode === 'SESSION_ABANDONED'
         ? '중단된 검사예요. 이 검사는 더 이상 이어할 수 없어요.'
         : s.errorCode === 'NOT_FOUND'
-        ? '검사를 찾을 수 없어요.'
-        : s.errorCode === 'INVALID_INPUT'
-          ? '검사 요청 정보가 올바르지 않아요. 검사 안내로 돌아가 다시 시작해주세요.'
-          : s.errorCode === 'NO_ACTIVE_CATALOG'
-            ? '지금은 검사를 진행할 수 없어요. 잠시 후 다시 시도해주세요.'
-            : '검사를 불러오지 못했어요. 연결 상태를 확인하고 다시 시도해주세요.';
+          ? '검사를 찾을 수 없어요.'
+          : s.errorCode === 'INVALID_INPUT'
+            ? '검사 요청 정보가 올바르지 않아요. 검사 안내로 돌아가 다시 시작해주세요.'
+            : s.errorCode === 'NO_ACTIVE_CATALOG'
+              ? '지금은 검사를 진행할 수 없어요. 잠시 후 다시 시도해주세요.'
+              : '검사를 불러오지 못했어요. 연결 상태를 확인하고 다시 시도해주세요.';
 
     return wrap(
       <Panel>
-        <p role="alert" className="text-primary-container font-bold mb-6">{message}</p>
+        <p
+          role="alert"
+          className="text-primary-container font-bold mb-6"
+        >
+          {message}
+        </p>
+
         <div className="flex flex-wrap justify-center gap-2">
           {s.errorCode !== 'SESSION_ABANDONED' && (
-            <button type="button" className={primaryBtn} onClick={() => void load(id)}>다시 시도</button>
+            <button
+              type="button"
+              className={primaryBtn}
+              onClick={() => void load(id)}
+            >
+              다시 시도
+            </button>
           )}
-          <button type="button" className={secondaryBtn} onClick={exit}>검사 안내로</button>
+
+          <button
+            type="button"
+            className={secondaryBtn}
+            onClick={exit}
+          >
+            검사 안내로
+          </button>
         </div>
       </Panel>,
     );
@@ -100,53 +153,116 @@ const ExplorationQuestion = () => {
   if (s.phase === 'STAGE_NOTICE' && s.notice) {
     return wrap(
       <>
-        {s.session && <div className="mb-8"><StageStepper stage={s.session.stage} /></div>}
+        {s.session && (
+          <div className="mb-8">
+            <StageStepper stage={s.session.stage} />
+          </div>
+        )}
+
         <Panel>
-          <h1 className="text-xl sm:text-2xl font-bold text-primary-container mb-3">{s.notice.title}</h1>
-          <p className="text-sm sm:text-base text-on-surface-variant leading-relaxed mb-6">{s.notice.description}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-primary-container mb-3">
+            {s.notice.title}
+          </h1>
+
+          <p className="text-sm sm:text-base text-on-surface-variant leading-relaxed mb-6">
+            {s.notice.description}
+          </p>
+
           <p className="inline-block text-xs font-semibold text-secondary bg-secondary-container/15 rounded-full px-4 py-1.5 mb-8">
             추가 질문 최대 {s.notice.expectedMaxQuestions}개 · 자동 저장
           </p>
+
           <div className="flex flex-wrap justify-center gap-2">
-            <button type="button" className={primaryBtn} onClick={() => void s.continueAfterNotice()}>
+            <button
+              type="button"
+              className={primaryBtn}
+              onClick={() =>
+                void s.continueAfterNotice()
+              }
+            >
               이어서 답하기
             </button>
-            <button type="button" className={secondaryBtn} onClick={exit}>나중에 이어하기</button>
+
+            <button
+              type="button"
+              className={secondaryBtn}
+              onClick={exit}
+            >
+              나중에 이어하기
+            </button>
           </div>
         </Panel>
       </>,
     );
   }
 
-  if (s.phase === 'READY_TO_COMPLETE' || s.phase === 'COMPLETING') {
-    const completing = s.phase === 'COMPLETING';
+  if (
+    s.phase === 'READY_TO_COMPLETE' ||
+    s.phase === 'COMPLETING'
+  ) {
+    const completing =
+      s.phase === 'COMPLETING';
+
     return wrap(
       <Panel>
-        <h1 className="text-xl sm:text-2xl font-bold text-primary-container mb-3">모든 질문에 답했어요</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-primary-container mb-3">
+          모든 질문에 답했어요
+        </h1>
+
         <p className="text-sm text-on-surface-variant mb-8 leading-relaxed">
-          결과를 만들면 이 검사의 답변은 더 이상 바꿀 수 없어요.
+          결과를 만들면 이 검사의 답변은 더 이상
+          바꿀 수 없어요.
         </p>
+
         <div className="mb-4 text-left">
-          <SaveStatus saveState={s.saveState} onRetry={() => void s.retry()} onReload={() => void s.reloadLatest()} onExit={exit} />
+          <SaveStatus
+            saveState={s.saveState}
+            onRetry={() => void s.retry()}
+            onReload={() => void s.reloadLatest()}
+            onExit={exit}
+          />
         </div>
-        <button type="button" className={primaryBtn} disabled={completing} onClick={() => void s.complete()}>
-          {completing ? '결과를 만드는 중…' : '결과 만들기'}
+
+        <button
+          type="button"
+          className={primaryBtn}
+          disabled={completing}
+          onClick={() => void s.complete()}
+        >
+          {completing
+            ? '결과를 만드는 중…'
+            : '결과 만들기'}
         </button>
       </Panel>,
     );
   }
 
-  // 완료된 회차는 결과 화면에서 보여준다 (결과 생성 대기 포함)
   if (s.phase === 'RESULT_READY') {
-    return <Navigate to={`/analysis/exploration/${id}`} replace />;
+    return (
+      <Navigate
+        to={`/analysis/exploration/${id}`}
+        replace
+      />
+    );
   }
 
   if (!current || !s.session || !s.progress) {
     return wrap(
       <Panel>
-        <p className="text-on-surface-variant" role="status">다음 질문을 준비하는 중이에요…</p>
+        <p
+          className="text-on-surface-variant"
+          role="status"
+        >
+          다음 질문을 준비하는 중이에요…
+        </p>
+
         <div className="mt-4 text-left">
-          <SaveStatus saveState={s.saveState} onRetry={() => void s.retry()} onReload={() => void s.reloadLatest()} onExit={exit} />
+          <SaveStatus
+            saveState={s.saveState}
+            onRetry={() => void s.retry()}
+            onReload={() => void s.reloadLatest()}
+            onExit={exit}
+          />
         </div>
       </Panel>,
     );
@@ -154,26 +270,74 @@ const ExplorationQuestion = () => {
 
   const { question } = current;
   const saving = s.saveState === 'SAVING';
+
   const selectedCode =
-    s.pending && s.pending.issuedId === question.issuedId ? s.pending.optionCode : current.answerCode;
-  const sorted = [...question.options].sort((a, b) => a.order - b.order);
-  const mainOptions = sorted.filter((o) => !isAbstain(o.code));
-  const abstainOptions = sorted.filter((o) => isAbstain(o.code));
-  const stageIssued = s.issued.filter((i) => i.stage === s.session!.stage);
-  const posInStage = stageIssued.findIndex((i) => i.question.issuedId === question.issuedId);
-  const hasPrev = stageIssued.slice(0, posInStage).some((i) => i.effective);
+    s.pending &&
+    s.pending.issuedId === question.issuedId
+      ? s.pending.optionCode
+      : current.answerCode;
+
+  const sorted = [...question.options].sort(
+    (a, b) => a.order - b.order,
+  );
+
+  const mainOptions = sorted.filter(
+    (option) => !isAbstain(option.code),
+  );
+
+  const abstainOptions = sorted.filter(
+    (option) => isAbstain(option.code),
+  );
+
+  const stageIssued = s.issued.filter(
+    (item) => item.stage === s.session!.stage,
+  );
+
+  const posInStage = stageIssued.findIndex(
+    (item) =>
+      item.question.issuedId === question.issuedId,
+  );
+
+  const hasPrev = stageIssued
+    .slice(0, posInStage)
+    .some((item) => item.effective);
+
+  // 변경: 이미 나온 유효 문항 중 아직 답하지 않은 수.
+  // 분기 변경으로 제외된 문항은 세지 않습니다.
+  const activeIssued = stageIssued.filter(
+    (item) => item.effective,
+  );
+
+  const currentUnanswered = activeIssued.filter(
+    (item) => item.answerCode === null,
+  ).length;
+
+  // remainingMax는 현재 미답 문항 수가 아니라
+  // 앞으로 추가 발급할 수 있는 최대 질문 수입니다.
+  const additionalPossible = Math.max(
+    0,
+    s.progress.remainingMax,
+  );
+
   const titleId = `q-${question.issuedId}`;
 
-  const renderOption = (o: ExplorationOption, subtle: boolean) => {
-    const checked = selectedCode === o.code;
+  const renderOption = (
+    option: ExplorationOption,
+    subtle: boolean,
+  ) => {
+    const checked =
+      selectedCode === option.code;
+
     return (
       <button
-        key={o.code}
+        key={option.code}
         type="button"
         role="radio"
         aria-checked={checked}
         disabled={saving}
-        onClick={() => void s.select(o.code)}
+        onClick={() =>
+          void s.select(option.code)
+        }
         className={`w-full min-h-[44px] flex items-center gap-3 text-left rounded-xl border-2 px-4 py-3 motion-safe:transition-colors disabled:cursor-wait ${
           checked
             ? 'border-secondary bg-secondary/5'
@@ -185,15 +349,31 @@ const ExplorationQuestion = () => {
         <span
           aria-hidden="true"
           className={`flex-none w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-            checked ? 'border-secondary' : 'border-outline'
+            checked
+              ? 'border-secondary'
+              : 'border-outline'
           }`}
         >
-          {checked && <span className="w-2.5 h-2.5 rounded-full bg-secondary" />}
+          {checked && (
+            <span className="w-2.5 h-2.5 rounded-full bg-secondary" />
+          )}
         </span>
-        <span className={`text-sm sm:text-base ${checked ? 'font-bold text-secondary' : 'text-primary-container'}`}>
-          {o.text}
+
+        <span
+          className={`text-sm sm:text-base ${
+            checked
+              ? 'font-bold text-secondary'
+              : 'text-primary-container'
+          }`}
+        >
+          {option.text}
         </span>
-        {checked && <span className="sr-only">(선택됨)</span>}
+
+        {checked && (
+          <span className="sr-only">
+            (선택됨)
+          </span>
+        )}
       </button>
     );
   };
@@ -204,28 +384,67 @@ const ExplorationQuestion = () => {
         <StageStepper stage={s.session.stage} />
       </div>
 
-      <p className="text-xs sm:text-sm text-on-surface-variant mb-4">
-        {s.progress.stage}단계 {s.progress.answered}개 완료 · 최대 {s.progress.remainingMax}개 남음
-      </p>
+      {/* 완료 수, 현재 미답 수, 추가 출제 가능 수를 구분 */}
+      <div
+        role="status"
+        aria-live="polite"
+        className="mb-4 text-xs sm:text-sm text-on-surface-variant space-y-1"
+      >
+        <p>
+          {s.progress.stage}단계 ·{' '}
+          {s.progress.answered}개 완료 ·{' '}
+          현재 질문 {currentUnanswered}개 남음
+        </p>
+
+        {additionalPossible > 0 && (
+          <p>
+            앞으로 최대 {additionalPossible}개 질문이
+            더 나올 수 있어요.
+          </p>
+        )}
+      </div>
 
       {s.adjustedNotice && (
-        <div role="status" className="flex items-start justify-between gap-3 rounded-brand bg-secondary-container/15 px-4 py-3 mb-4 text-sm text-secondary">
-          <span>앞선 답변에 따라 다음 질문이 조정되었습니다.</span>
-          <button type="button" onClick={s.dismissAdjusted} className="min-h-[44px] min-w-[44px] -my-3 -mr-2 text-secondary" aria-label="안내 닫기">
-            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">close</span>
+        <div
+          role="status"
+          className="flex items-start justify-between gap-3 rounded-brand bg-secondary-container/15 px-4 py-3 mb-4 text-sm text-secondary"
+        >
+          <span>
+            앞선 답변에 따라 다음 질문이 조정되었습니다.
+          </span>
+
+          <button
+            type="button"
+            onClick={s.dismissAdjusted}
+            className="min-h-[44px] min-w-[44px] -my-3 -mr-2 text-secondary"
+            aria-label="안내 닫기"
+          >
+            <span
+              className="material-symbols-outlined text-[18px]"
+              aria-hidden="true"
+            >
+              close
+            </span>
           </button>
         </div>
       )}
 
       {s.affectedCount > 0 && (
-        <p role="status" className="rounded-brand bg-surface-container-low px-4 py-3 mb-4 text-sm text-on-surface-variant">
-          답변을 바꿔서 이후 질문 {s.affectedCount}개가 현재 결과에 쓰이지 않게 되었어요.
+        <p
+          role="status"
+          className="rounded-brand bg-surface-container-low px-4 py-3 mb-4 text-sm text-on-surface-variant"
+        >
+          답변을 바꿔서 이후 질문 {s.affectedCount}개가
+          현재 결과에 쓰이지 않게 되었어요.
         </p>
       )}
 
       <section className="bg-surface-container-lowest rounded-brand border border-outline-variant/20 p-5 sm:p-8 cloud-shadow">
         <fieldset>
-          <legend className="sr-only">{question.text}</legend>
+          <legend className="sr-only">
+            {question.text}
+          </legend>
+
           <h1
             id={titleId}
             ref={titleRef}
@@ -234,14 +453,31 @@ const ExplorationQuestion = () => {
           >
             {question.text}
           </h1>
-          <div role="radiogroup" aria-labelledby={titleId} className="space-y-2">
-            {mainOptions.map((o) => renderOption(o, false))}
+
+          <div
+            role="radiogroup"
+            aria-labelledby={titleId}
+            className="space-y-2"
+          >
+            {mainOptions.map((option) =>
+              renderOption(option, false),
+            )}
           </div>
+
           {abstainOptions.length > 0 && (
             <div className="mt-6">
-              <p className="text-xs font-semibold text-on-surface-variant mb-2">판단이 어렵다면</p>
-              <div role="radiogroup" aria-label="판단이 어려울 때 고르는 답" className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {abstainOptions.map((o) => renderOption(o, true))}
+              <p className="text-xs font-semibold text-on-surface-variant mb-2">
+                판단이 어렵다면
+              </p>
+
+              <div
+                role="radiogroup"
+                aria-label="판단이 어려울 때 고르는 답"
+                className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+              >
+                {abstainOptions.map((option) =>
+                  renderOption(option, true),
+                )}
               </div>
             </div>
           )}
@@ -249,35 +485,66 @@ const ExplorationQuestion = () => {
       </section>
 
       <div className="mt-4">
-        <SaveStatus saveState={s.saveState} onRetry={() => void s.retry()} onReload={() => void s.reloadLatest()} onExit={exit} />
+        <SaveStatus
+          saveState={s.saveState}
+          onRetry={() => void s.retry()}
+          onReload={() => void s.reloadLatest()}
+          onExit={exit}
+        />
       </div>
 
-      {/* 답을 고르면 저장 후 바로 다음 질문으로 넘어가므로 '다음' 버튼은 두지 않는다 */}
       <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <button type="button" className={secondaryBtn} onClick={s.goPrev} disabled={!hasPrev || saving}>
+        <button
+          type="button"
+          className={secondaryBtn}
+          onClick={s.goPrev}
+          disabled={!hasPrev || saving}
+        >
           ← 이전 질문
         </button>
+
         {current.answerCode && !s.pending && (
-          <p className="text-xs text-on-surface-variant">답을 바꾸거나, 같은 답을 다시 누르면 다음 질문으로 넘어가요.</p>
+          <p className="text-xs text-on-surface-variant">
+            답을 바꾸거나, 같은 답을 다시 누르면
+            다음 질문으로 넘어가요.
+          </p>
         )}
       </div>
 
-      {stageIssued.some((i) => i.answerCode !== null || !i.effective) && (
+      {stageIssued.some(
+        (item) =>
+          item.answerCode !== null ||
+          !item.effective,
+      ) && (
         <details className="mt-8 text-sm">
           <summary className="cursor-pointer min-h-[44px] flex items-center text-on-surface-variant font-semibold">
             이번 단계 답변 기록
           </summary>
+
           <ol className="mt-2 space-y-2">
-            {stageIssued.map((i, n) => (
-              <li key={i.question.issuedId} className="rounded-lg bg-surface-container-low px-4 py-3">
-                <p className={i.effective ? 'text-primary-container' : 'text-on-surface-variant line-through'}>
-                  {n + 1}. {i.question.text}
+            {stageIssued.map((item, index) => (
+              <li
+                key={item.question.issuedId}
+                className="rounded-lg bg-surface-container-low px-4 py-3"
+              >
+                <p
+                  className={
+                    item.effective
+                      ? 'text-primary-container'
+                      : 'text-on-surface-variant line-through'
+                  }
+                >
+                  {index + 1}. {item.question.text}
                 </p>
+
                 <p className="text-xs text-on-surface-variant mt-1">
-                  {!i.effective
+                  {!item.effective
                     ? '현재 결과에 미사용'
-                    : i.answerCode
-                      ? i.question.options.find((o) => o.code === i.answerCode)?.text
+                    : item.answerCode
+                      ? item.question.options.find(
+                          (option) =>
+                            option.code === item.answerCode,
+                        )?.text
                       : '아직 답하지 않음'}
                 </p>
               </li>
