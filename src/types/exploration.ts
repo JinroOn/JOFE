@@ -260,6 +260,12 @@ export interface ExplorationResult {
   nextActivities: ExplorationActivity[];
   recheckAxes: RecheckAxis[];
   notes: string[];
+   // 추가: 검사 중 제출한 후보 반응
+  presentation?: {
+    source: 'NOT_COLLECTED' | 'USER_REPORTED';
+    unexpected: string[];
+    unfamiliar: string[];
+  };
   // 백엔드가 결과와 함께 내려주는 값. mock 응답에는 없다.
   capabilities?: ExplorationCapabilities;
   activityAvailability?: ActivityAvailability;
@@ -316,6 +322,7 @@ export interface BackendExplorationResult {
     reasonCodes?: string[];
     majors?: BackendExplorationMajor[];
   }[];
+  presentation?: ExplorationResult['presentation'];
   majors: BackendExplorationMajor[];
   cautions: (ExplorationCaution | ExplorationPreparationResponse)[];
   preparationResponses?: ExplorationPreparationResponse[];
