@@ -3,6 +3,7 @@ import type { FormEvent, KeyboardEvent, ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   askExplorationConsultation,
+  cancelExplorationConsultationMessage,
   createMutationId,
   openExplorationConsultation,
   toExplorationErrorCode,
@@ -40,7 +41,23 @@ const suggestionsFor = (result: ExplorationResult) => {
 interface PendingQuestion {
   content: string;
   id: string;
+  // 서버에 남아 있던 질문(상담을 다시 열 때 pendingRequest 로 옴)이면 취소에 쓸 키가 있다
+  retryKey?: string;
 }
+
+// 백엔드 ConsultationMessageService 가 주는 실패를 사용자 문장으로 옮긴다
+const sendErrorMessage = (code: ExplorationErrorCode) => {
+  switch (code) {
+    case 'CONSULTATION_GENERATION_UNAVAILABLE':
+      return '지금은 AI 답변을 만들 수 없어요. 질문은 그대로 남아 있어요. 잠시 후 다시 보내보세요.';
+    case 'CONSULTATION_BUSY':
+      return '앞선 질문의 답변을 아직 만들고 있어요. 잠시 후 다시 보내주세요.';
+    case 'NETWORK':
+      return '인터넷 연결이 끊겨 답변을 받지 못했어요. 질문은 그대로 남아 있어요.';
+    default:
+      return '답변을 받지 못했어요. 질문은 그대로 남아 있어요.';
+  }
+};
 
 const ExplorationAsk = () => {
   const { sessionId } = useParams();
@@ -56,7 +73,8 @@ const ExplorationAsk = () => {
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState<PendingQuestion | null>(null);
   const [sending, setSending] = useState(false);
-  const [sendFailed, setSendFailed] = useState(false);
+  const [sendError, setSendError] = useState<ExplorationErrorCode | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,6 +86,10 @@ const ExplorationAsk = () => {
         setConsultationId(res.consultationId);
         setMessages(res.messages);
         setOpenError(null);
+        // 답변이 오기 전에 화면을 떠났던 질문을 다시 보여준다
+        const left = res.pendingRequest;
+        setPending(left ? { content: left.content, id: createMutationId(), retryKey: left.retryKey } : null);
+        setSendError(null);
       })
       .catch((e) => alive && setOpenError(toExplorationErrorCode(e)));
     return () => {
@@ -84,15 +106,31 @@ const ExplorationAsk = () => {
     if (consultationId === null) return;
     setPending(question);
     setSending(true);
-    setSendFailed(false);
+    setSendError(null);
     try {
       const res = await askExplorationConsultation(consultationId, question.content, question.id);
       setMessages((prev) => [...prev, res.userMessage, res.assistantMessage]);
       setPending(null);
-    } catch {
-      setSendFailed(true);
+    } catch (e) {
+      setSendError(toExplorationErrorCode(e));
     } finally {
       setSending(false);
+    }
+  };
+
+  // 서버에 남은 질문은 취소한 뒤 입력창으로 돌려준다. 실패하면 상담을 다시 읽어 실제 상태를 보여준다.
+  const cancelLeftQuestion = async (question: PendingQuestion) => {
+    if (consultationId === null || !question.retryKey || cancelling) return;
+    setCancelling(true);
+    try {
+      await cancelExplorationConsultationMessage(consultationId, question.retryKey);
+      setDraft(question.content);
+      setPending(null);
+      setSendError(null);
+    } catch {
+      setOpenAttempt((n) => n + 1);
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -191,9 +229,31 @@ const ExplorationAsk = () => {
                 답변을 정리하고 있어요…
               </p>
             )}
-            {sendFailed && pending && (
+            {!sending && pending?.retryKey && (
+              <div role="status" className="ml-11 rounded-lg bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
+                <p className="mb-2">이 질문의 답변이 아직 오지 않았어요.</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOpenAttempt((n) => n + 1)}
+                    className="min-h-[44px] px-4 rounded-lg bg-primary-container text-white text-sm font-bold"
+                  >
+                    답변 확인하기
+                  </button>
+                  <button
+                    type="button"
+                    disabled={cancelling}
+                    onClick={() => void cancelLeftQuestion(pending)}
+                    className="min-h-[44px] px-4 rounded-lg border border-outline-variant text-sm font-semibold text-primary-container bg-surface-container-lowest disabled:opacity-50"
+                  >
+                    질문 취소하고 고쳐 쓰기
+                  </button>
+                </div>
+              </div>
+            )}
+            {sendError && pending && !pending.retryKey && (
               <div role="alert" className="ml-11 rounded-lg bg-error-container px-4 py-3 text-sm text-on-error-container">
-                <p className="mb-2">답변을 받지 못했어요. 질문은 그대로 남아 있어요.</p>
+                <p className="mb-2">{sendErrorMessage(sendError)}</p>
                 <div className="flex flex-wrap gap-2">
                   <button type="button" onClick={() => void send(pending)} className="min-h-[44px] px-4 rounded-lg bg-primary-container text-white text-sm font-bold">
                     다시 보내기
@@ -203,7 +263,7 @@ const ExplorationAsk = () => {
                     onClick={() => {
                       setDraft(pending.content);
                       setPending(null);
-                      setSendFailed(false);
+                      setSendError(null);
                     }}
                     className="min-h-[44px] px-4 rounded-lg border border-outline-variant text-sm font-semibold text-primary-container bg-surface-container-lowest"
                   >

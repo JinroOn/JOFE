@@ -2,9 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
+  cancelExplorationPlan,
   createExplorationPlan,
+  ensurePlanSupport,
   getExplorationPlan,
   listExplorationPlans,
+  retryExplorationPlan,
   toExplorationErrorCode,
 } from '../../../api/exploration';
 import { isExplorationMock } from '../../../config/features';
@@ -20,6 +23,48 @@ const STATUS_LABEL: Record<PlanStatus, string> = {
 };
 
 const MAX_INTERVAL_MS = 5_000;
+
+// 백엔드 계획 실패 코드(ExplorationPlanStore)를 사용자 문장으로 옮긴다. 모르는 코드는 일반 문구로 둔다.
+const failureReason = (code: string | null | undefined) => {
+  switch (code) {
+    case 'CANCELLED':
+      return '만들기를 취소했어요.';
+    case 'EVIDENCE_UNAVAILABLE':
+      return '이 전공은 계획에 쓸 수 있는 확인된 자료가 아직 부족해요.';
+    case 'MODEL_DECLINED':
+    case 'OUTPUT_INVALID':
+    case 'INVALID_RESPONSE':
+      return '만든 계획이 안내 기준에 맞지 않아 보여드리지 않았어요.';
+    case 'ATTEMPTS_EXHAUSTED':
+      return '여러 번 시도했지만 만들지 못했어요.';
+    case 'LEASE_EXPIRED':
+    case 'TRANSIENT':
+      return '만드는 도중 연결이 끊겼어요.';
+    default:
+      return '잠시 문제가 생겨 만들지 못했어요.';
+  }
+};
+
+const createErrorMessage = (error: unknown) => {
+  switch (toExplorationErrorCode(error)) {
+    case 'PLAN_GENERATION_UNAVAILABLE':
+      return '지금은 계획 만들기를 쓸 수 없어요. 나중에 다시 시도해주세요.';
+    case 'PLAN_TARGET_UNAVAILABLE':
+      return '이 결과로는 계획을 만들 수 없어요.';
+    case 'INVALID_INPUT':
+    case 'TARGET_MAJOR_NOT_IN_RESULT':
+    case 'TARGET_MAJOR_REQUIRED':
+      return '이 결과에 있는 전공으로만 계획을 만들 수 있어요.';
+    case 'STALE_REVISION':
+    case 'PLAN_SUPPORT_REQUIRED':
+    case 'SUPPORT_TARGET_MISMATCH':
+      return '다른 화면에서 결과 후 선택이 바뀌었어요. 다시 시도해주세요.';
+    case 'NETWORK':
+      return '인터넷 연결을 확인한 뒤 다시 시도해주세요.';
+    default:
+      return '계획 만들기를 요청하지 못했어요. 잠시 후 다시 시도해주세요.';
+  }
+};
 
 const Shell = ({ children }: { children: ReactNode }) => (
   <div className="min-h-screen bg-surface">
@@ -88,6 +133,8 @@ const ExplorationPlanPage = () => {
   const [selectedMajor, setSelectedMajor] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [planActing, setPlanActing] = useState(false);
+  const [planActionError, setPlanActionError] = useState<string | null>(null);
   const { plan, error: planError, reload: reloadPlan } = usePlan(planId);
 
   useEffect(() => {
@@ -108,18 +155,47 @@ const ExplorationPlanPage = () => {
     setCreating(true);
     setCreateError(null);
     try {
-      const res = await createExplorationPlan(resultId, majorCode, null);
+      // 백엔드는 결과 후 지원이 PLAN·BOTH 이고 목표 전공이 같을 때만 계획을 받는다
+      const support = await ensurePlanSupport(resultId, majorCode);
+      const res = await createExplorationPlan(resultId, majorCode, support.supportRevision);
       setListVersion((v) => v + 1);
       if (res.planId === planId) reloadPlan();
       else openPlan(res.planId);
     } catch (e) {
-      setCreateError(
-        toExplorationErrorCode(e) === 'INVALID_INPUT'
-          ? '이 결과에 있는 전공으로만 계획을 만들 수 있어요.'
-          : '계획 만들기를 요청하지 못했어요. 잠시 후 다시 시도해주세요.',
-      );
+      setCreateError(createErrorMessage(e));
     } finally {
       setCreating(false);
+    }
+  };
+
+  const retryPlan = async (pid: number) => {
+    if (planActing) return;
+    setPlanActing(true);
+    setPlanActionError(null);
+    try {
+      await retryExplorationPlan(pid);
+      setListVersion((v) => v + 1);
+      reloadPlan();
+    } catch (e) {
+      setPlanActionError(createErrorMessage(e));
+    } finally {
+      setPlanActing(false);
+    }
+  };
+
+  const cancelPlan = async (pid: number) => {
+    if (planActing) return;
+    setPlanActing(true);
+    setPlanActionError(null);
+    try {
+      await cancelExplorationPlan(pid);
+    } catch {
+      // 이미 끝났거나 취소된 경우에도 아래 재조회가 실제 상태를 보여준다
+      setPlanActionError('취소하지 못했어요. 계획 상태를 다시 불러왔어요.');
+    } finally {
+      setPlanActing(false);
+      setListVersion((v) => v + 1);
+      reloadPlan();
     }
   };
 
@@ -222,6 +298,9 @@ const ExplorationPlanPage = () => {
               {createError && (
                 <p role="alert" className="mt-3 text-sm text-error">{createError}</p>
               )}
+              <p className="mt-3 text-xs text-on-surface-variant leading-relaxed">
+                계획을 만들면 결과 후 질문의 목표 전공도 이 전공으로 맞춰져요.
+              </p>
               <button
                 type="button"
                 disabled={!selectedMajor || creating || Boolean(selectedMajor && existingFor(selectedMajor))}
@@ -255,19 +334,45 @@ const ExplorationPlanPage = () => {
                 <p className="mt-2 text-sm text-on-surface-variant">
                   {plan ? `${plan.majorName} 계획을 만들고 있어요. 이 화면을 나가도 계속 만들어져요.` : '계획을 불러오는 중이에요…'}
                 </p>
+                {plan && (
+                  <button
+                    type="button"
+                    disabled={planActing}
+                    onClick={() => void cancelPlan(plan.planId)}
+                    className="mt-4 min-h-[44px] px-4 rounded-lg border border-outline-variant/40 text-sm font-semibold text-primary-container disabled:opacity-50"
+                  >
+                    만들기 취소
+                  </button>
+                )}
               </div>
+            )}
+            {planActionError && (
+              <p role="alert" className="mt-3 text-sm text-error">{planActionError}</p>
             )}
             {plan?.status === 'FAILED' && (
               <div role="alert" className="rounded-brand bg-error-container px-5 py-4 text-sm text-on-error-container">
-                <p className="mb-3">{plan.majorName} 계획을 만들지 못했어요. 검사 결과는 그대로 남아 있어요.</p>
-                <button
-                  type="button"
-                  disabled={creating}
-                  onClick={() => void create(plan.majorCode)}
-                  className="min-h-[44px] px-4 rounded-lg bg-primary-container text-white text-sm font-bold disabled:opacity-50"
-                >
-                  계획만 다시 만들기
-                </button>
+                <p className="mb-1">{plan.majorName} 계획을 만들지 못했어요. 검사 결과는 그대로 남아 있어요.</p>
+                <p className="mb-3">{failureReason(plan.failureCode)}</p>
+                {plan.retryable ? (
+                  <button
+                    type="button"
+                    disabled={planActing}
+                    onClick={() => void retryPlan(plan.planId)}
+                    className="min-h-[44px] px-4 rounded-lg bg-primary-container text-white text-sm font-bold disabled:opacity-50"
+                  >
+                    이 계획 다시 시도
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={creating}
+                    onClick={() => void create(plan.majorCode)}
+                    className="min-h-[44px] px-4 rounded-lg bg-primary-container text-white text-sm font-bold disabled:opacity-50"
+                  >
+                    계획 새로 만들기
+                  </button>
+                )}
+                {createError && <p className="mt-3">{createError}</p>}
               </div>
             )}
             {plan?.status === 'READY' && <PlanDetail plan={plan} />}
