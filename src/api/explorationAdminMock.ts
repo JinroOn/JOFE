@@ -1,6 +1,9 @@
 import type {
   CatalogAction,
   CatalogActivation,
+  CatalogActivityContent,
+  CatalogActivityDetail,
+  CatalogActivitySummary,
   CatalogActivationRequest,
   CatalogArchiveRequest,
   CatalogContentStatus,
@@ -9,11 +12,13 @@ import type {
   CatalogReview,
   CatalogReviewKind,
   CatalogReviewRequest,
+  CatalogReviewTargetType,
   CatalogSummary,
   CatalogTargetType,
 } from '../types/explorationAdmin';
 
-const STORAGE_KEY = 'jinroon.exploration.adminMock.v2';
+// v3: 활동 카탈로그에 활동 목록이 생겼다. 이전 저장본에는 활동이 없어 키를 올린다
+const STORAGE_KEY = 'jinroon.exploration.adminMock.v3';
 const CURRENT_ADMIN_ID = 1;
 
 interface MockCatalog extends Omit<
@@ -23,7 +28,22 @@ interface MockCatalog extends Omit<
   reviews: CatalogReview[];
   activations: CatalogActivation[];
   questions: CatalogQuestion[];
+  activities?: MockActivity[];
 }
+
+interface MockActivity extends Omit<CatalogActivitySummary, 'contentStatus' | 'implementationReviewStatus' | 'domainReviewStatus'> {
+  contentStatus: CatalogContentStatus;
+  implementationReviewStatus: string | null;
+  domainReviewStatus: string | null;
+  content: CatalogActivityContent;
+  reviews: CatalogReview[];
+}
+
+// 검토 기록을 받을 수 있는 대상(카탈로그 또는 활동 한 건)의 공통 모양
+type Reviewable = Pick<
+  MockCatalog,
+  'version' | 'contentHash' | 'contentStatus' | 'implementationReviewStatus' | 'domainReviewStatus' | 'reviews'
+>;
 
 const QUESTIONS: CatalogQuestion[] = [
   {
@@ -240,6 +260,76 @@ const makeMockCatalog = (
   };
 };
 
+const makeMockActivity = (
+  targetId: number,
+  activityCode: string,
+  majorCode: string | null,
+  majorName: string | null,
+  title: string,
+  kind: string,
+  approved: boolean,
+): MockActivity => {
+  const version = '0.2.0';
+  const contentHash = `mock${targetId.toString(16).padStart(8, '0')}`;
+  return {
+    targetType: 'ACTIVITY',
+    targetId,
+    activityCode,
+    version,
+    majorCode,
+    title,
+    kind,
+    contentHash,
+    contentStatus: approved ? 'REVIEWED' : 'DRAFT',
+    implementationReviewStatus: approved ? 'APPROVED_FOR_IMPLEMENTATION' : 'PENDING',
+    domainReviewStatus: approved ? 'APPROVED' : 'PENDING',
+    content: {
+      activity_id: activityCode,
+      version,
+      title,
+      kind,
+      major_code: majorCode,
+      major_name: majorName ?? undefined,
+      steps: ['공식 소개 자료 확인', '확인한 사실과 궁금한 점 나누기', '더 알아볼 질문 2개 적기'],
+      artifacts: ['확인표', '질문 2개'],
+      alternative: '인터넷이 어려우면 활동지의 자료로 질문만 작성한다.',
+      allowed_use: 'AUTHORING_REVIEW_ONLY',
+      score_effect: 'NONE',
+      requirements: { materials: ['종이 또는 메모 도구'], paid_tools: false, external_account: false, coding_experience: false },
+      sources: [
+        {
+          source_id: 'SRC-MOCK-01',
+          title: 'Mock 공식 교과과정',
+          url: 'https://example.com/courses',
+          publisher: 'Mock 대학교',
+          role: 'MAJOR_CONNECTION_EVIDENCE',
+          checked_on: '2026-11-14',
+          verified_claim: '관련 과목이 공식 목록에 있음',
+        },
+      ],
+      body_markdown: `## ${activityCode} — ${title}\n\nMock 활동 본문입니다. 실제 본문은 백엔드 활동 카탈로그에서 옵니다.`,
+    },
+    reviews: approved
+      ? [
+          makeReview(targetId * 100 + 1, version, contentHash, 'IMPLEMENTATION', 'APPROVED_FOR_IMPLEMENTATION'),
+          makeReview(targetId * 100 + 2, version, contentHash, 'DOMAIN', 'APPROVED'),
+        ]
+      : [],
+  };
+};
+
+const MOCK_ACTIVITY_ROWS: [string, string | null, string | null, string, string][] = [
+  ['DRAFT-CS-01', 'MAJOR_ROW_133', '컴퓨터공학과', '학과에서 배우는 세 가지 주제 확인하기', 'INFORMATION'],
+  ['DRAFT-CS-02', 'MAJOR_ROW_133', '컴퓨터공학과', '도서 예약 규칙을 작은 시스템으로 설계하기', 'SMALL_TASK'],
+  ['DRAFT-BIO-01', 'MAJOR_ROW_045', '생명과학과', '관찰 기록을 돌아보고 다음 활동 정하기', 'REFLECTION_AND_NEXT_STEP'],
+  ['GENERAL-01', null, null, '관심 전공의 공식 소개 글 비교하기', 'INFORMATION'],
+];
+
+const mockActivities = (catalogId: number, approved: boolean) =>
+  MOCK_ACTIVITY_ROWS.map(([code, majorCode, majorName, title, kind], index) =>
+    makeMockActivity(catalogId * 100 + index + 1, code, majorCode, majorName, title, kind, approved && index !== 2),
+  );
+
 const SEED: MockCatalog[] = [
   makeMockCatalog(
     'CATALOG',
@@ -318,28 +408,34 @@ const SEED: MockCatalog[] = [
     '2026-11-08T03:00:00',
     false,
   ),
-  makeMockCatalog(
-    'ACTIVITY_CATALOG',
-    1,
-    'ACTIVITY_CATALOG',
-    'MOCK_ACTIVITY_V1_0',
-    'ACTIVE',
-    'b8f3d6a1c4e9',
-    14,
-    '2026-10-01T03:00:00',
-    true,
-  ),
-  makeMockCatalog(
-    'ACTIVITY_CATALOG',
-    2,
-    'ACTIVITY_CATALOG',
-    'MOCK_ACTIVITY_V1_1',
-    'DRAFT',
-    'c9a4e7b2d5f8',
-    15,
-    '2026-11-10T03:00:00',
-    false,
-  ),
+  {
+    ...makeMockCatalog(
+      'ACTIVITY_CATALOG',
+      1,
+      'ACTIVITY_CATALOG',
+      'MOCK_ACTIVITY_V1_0',
+      'ACTIVE',
+      'b8f3d6a1c4e9',
+      MOCK_ACTIVITY_ROWS.length,
+      '2026-10-01T03:00:00',
+      true,
+    ),
+    activities: mockActivities(1, true),
+  },
+  {
+    ...makeMockCatalog(
+      'ACTIVITY_CATALOG',
+      2,
+      'ACTIVITY_CATALOG',
+      'MOCK_ACTIVITY_V1_1',
+      'DRAFT',
+      'c9a4e7b2d5f8',
+      MOCK_ACTIVITY_ROWS.length,
+      '2026-11-10T03:00:00',
+      false,
+    ),
+    activities: mockActivities(2, false),
+  },
 ];
 
 const clone = <T,>(value: T): T =>
@@ -411,7 +507,7 @@ const findCatalog = (
 };
 
 const latestReview = (
-  catalog: MockCatalog,
+  catalog: Reviewable,
   kind: CatalogReviewKind,
 ) =>
   [...catalog.reviews]
@@ -424,7 +520,7 @@ const latestReview = (
 
 // 개발 단계 승인 여부 확인
 const developmentApproved = (
-  catalog: MockCatalog,
+  catalog: Reviewable,
 ) =>
   catalog.implementationReviewStatus ===
     'APPROVED_FOR_IMPLEMENTATION' &&
@@ -600,7 +696,7 @@ const toSummary = (
   };
 };
 
-const toTarget = (catalog: MockCatalog) => ({
+const toTarget = (catalog: Reviewable & { targetType: CatalogReviewTargetType; targetId: number }) => ({
   targetType: catalog.targetType,
   targetId: catalog.targetId,
   version: catalog.version,
@@ -665,18 +761,57 @@ export const getCatalog = (
     };
   });
 
-// 검토 기록
+const findActivity = (list: MockCatalog[], activityId: number) => {
+  for (const catalog of list) {
+    const activity = catalog.activities?.find((item) => item.targetId === activityId);
+    if (activity) return { catalog, activity };
+  }
+  throw fail(404, 'NOT_FOUND');
+};
+
+const toActivitySummary = (activity: MockActivity): CatalogActivitySummary => ({
+  targetType: 'ACTIVITY',
+  targetId: activity.targetId,
+  activityCode: activity.activityCode,
+  version: activity.version,
+  majorCode: activity.majorCode,
+  title: activity.title,
+  kind: activity.kind,
+  contentHash: activity.contentHash,
+  contentStatus: activity.contentStatus,
+  implementationReviewStatus: activity.implementationReviewStatus ?? 'PENDING',
+  domainReviewStatus: activity.domainReviewStatus ?? 'PENDING',
+});
+
+// 활동 목록 (백엔드처럼 activity_code 순)
+export const listActivities = (catalogId: number) =>
+  delay((): CatalogActivitySummary[] => {
+    const catalog = findCatalog(load(), 'ACTIVITY_CATALOG', catalogId);
+    return [...(catalog.activities ?? [])]
+      .sort((a, b) => a.activityCode.localeCompare(b.activityCode) || a.targetId - b.targetId)
+      .map(toActivitySummary);
+  });
+
+// 활동 상세
+export const getActivity = (catalogId: number, activityId: number) =>
+  delay((): CatalogActivityDetail => {
+    const catalog = findCatalog(load(), 'ACTIVITY_CATALOG', catalogId);
+    const activity = catalog.activities?.find((item) => item.targetId === activityId);
+    if (!activity) throw fail(404, 'NOT_FOUND');
+    return { activity: toActivitySummary(activity), content: activity.content, reviews: activity.reviews };
+  });
+
+// 검토 기록 (카탈로그 또는 활동 한 건)
 export const review = (
   request: CatalogReviewRequest,
 ) =>
   delay(() => {
     const list = load();
 
-    const catalog = findCatalog(
-      list,
-      request.targetType,
-      request.targetId,
-    );
+    const catalog: Reviewable & { targetType: CatalogReviewTargetType; targetId: number } =
+      request.targetType === 'ACTIVITY'
+        ? findActivity(list, request.targetId).activity
+        : findCatalog(list, request.targetType, request.targetId);
 
     if (!request.evidenceReference.trim()) {
       throw fail(400, 'INVALID_INPUT');

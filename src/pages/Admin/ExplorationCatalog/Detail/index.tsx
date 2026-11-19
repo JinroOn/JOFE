@@ -9,8 +9,11 @@ import type {
   CatalogTargetType,
 } from '../../../../types/explorationAdmin';
 
+import ActivityTable from '../components/ActivityTable';
 import CatalogActions from '../components/CatalogActions';
+import ReviewHistory from '../components/ReviewHistory';
 import StatusBadge from '../components/StatusBadge';
+import { formatDateTime, reviewStatusLabel } from '../components/adminLabels';
 
 const STAGE_LABEL: Record<string, string> = {
   STAGE_1: '1단계',
@@ -35,49 +38,9 @@ const TYPE_LABEL: Record<string, string> = {
   ACTIVITY_CATALOG: '활동 자료',
 };
 
-const REVIEW_KIND_LABEL: Record<string, string> = {
-  IMPLEMENTATION: '구현 검토',
-  DOMAIN: '내용 검토',
-  PILOT: '시범 운영 검토',
-  RELEASE: '공개 출시 검토',
-};
-
-const DECISION_LABEL: Record<string, string> = {
-  APPROVED_FOR_IMPLEMENTATION: '구현 승인',
-  APPROVED: '승인',
-  REJECTED: '반려',
-};
-
 const ACTION_LABEL: Record<string, string> = {
   ACTIVATE: '사용 시작',
   ARCHIVE: '보관',
-};
-
-const formatDateTime = (
-  value: string | null | undefined,
-) => {
-  if (!value) return '-';
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return '-';
-
-  return date.toLocaleString('ko-KR');
-};
-
-const reviewStatusLabel = (
-  value: string | null | undefined,
-) => {
-  if (!value) return '미검토';
-
-  const labels: Record<string, string> = {
-    APPROVED_FOR_IMPLEMENTATION: '구현 승인',
-    APPROVED: '승인',
-    REJECTED: '반려',
-    NOT_APPLICABLE: '해당 없음',
-  };
-
-  return labels[value] ?? value;
 };
 
 const isCatalogTargetType = (
@@ -536,86 +499,18 @@ const ExplorationCatalogDetail = () => {
             </section>
           )}
 
-          {!isQuestionCatalog && (
+          {catalog.targetType === 'ACTIVITY_CATALOG' && (
+            <ActivityTable catalogId={catalog.targetId} />
+          )}
+
+          {!isQuestionCatalog && catalog.targetType !== 'ACTIVITY_CATALOG' && (
             <div className="mb-10 rounded-[14px] bg-surface-container-low px-5 py-4 text-sm text-on-surface-variant">
               이 자료 유형에는 별도의 문항 목록이 없습니다.
               검토 및 활성화 이력을 확인할 수 있습니다.
             </div>
           )}
 
-          {/* 검토 이력 */}
-          <section className="mb-10">
-            <h3 className="text-lg font-bold text-primary mb-4">
-              검토 이력
-              <span className="ml-2 text-sm font-normal text-on-surface-variant">
-                {detail.reviews.length}건
-              </span>
-            </h3>
-
-            <div className="space-y-3">
-              {detail.reviews.map((review) => (
-                <div
-                  key={review.reviewId}
-                  className="rounded-[14px] border border-outline-variant/20 bg-surface-container-lowest p-5"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <strong className="text-sm text-primary">
-                      {REVIEW_KIND_LABEL[review.reviewKind] ??
-                        review.reviewKind}
-                    </strong>
-
-                    <span
-                      className={`text-xs font-bold ${
-                        review.decision === 'REJECTED'
-                          ? 'text-error'
-                          : 'text-secondary'
-                      }`}
-                    >
-                      {DECISION_LABEL[review.decision] ??
-                        review.decision}
-                    </span>
-                  </div>
-
-                  <div className="mt-3 space-y-1 text-sm text-on-surface-variant">
-                    <p>검토자 ID: {review.reviewerId}</p>
-
-                    <p>검토 범위: {review.scope}</p>
-
-                    <p>
-                      검토 시각:{' '}
-                      {formatDateTime(review.reviewedAt)}
-                    </p>
-
-                    <p>
-                      검토 대상 버전: {review.targetVersion}
-                    </p>
-
-                    <p className="break-all">
-                      검토 근거: {review.evidenceReference}
-                    </p>
-
-                    <p
-                      className={
-                        review.matchesCurrentContent
-                          ? 'text-secondary'
-                          : 'text-error'
-                      }
-                    >
-                      {review.matchesCurrentContent
-                        ? '현재 자료와 일치하는 검토 기록'
-                        : '현재 자료와 다른 이전 버전의 검토 기록'}
-                    </p>
-                  </div>
-                </div>
-              ))}
-
-              {detail.reviews.length === 0 && (
-                <p className="py-8 text-center text-sm text-on-surface-variant">
-                  아직 검토 이력이 없습니다.
-                </p>
-              )}
-            </div>
-          </section>
+          <ReviewHistory reviews={detail.reviews} />
 
           {/* 활성화 및 보관 이력 */}
           <section className="mb-10">
