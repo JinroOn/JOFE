@@ -95,7 +95,8 @@ const ResultView = ({
   const canShare = caps?.sharingAvailable ?? true;
   const canActivities =
     result.activityAvailability !== 'UNAVAILABLE';
-  const canAsk = isExplorationMock;
+  // 백엔드에 상담 가용성 값이 아직 없어(JinroOn/JOBE#122) 없으면 열어 두고, 생성이 꺼져 있으면 상담 화면이 안내한다
+  const canAsk = caps?.consultationAvailable ?? true;
 
   const notes = result.notes ?? [];
   const recheckAxes = result.recheckAxes ?? [];

@@ -37,6 +37,8 @@ import type {
   SupportAnswerResponse,
   SupportPurpose,
   SupportSession,
+  SupportSelection,
+  SupportState,
 } from '../types/exploration';
 import type { DashboardResultRef, DashboardSummary } from '../types/dashboard';
 import type { DiagnosisHistoryItem, DiagnosisHistoryPage, DiagnosisHistoryQuery } from '../types/history';
@@ -113,6 +115,8 @@ const NOTICES: Partial<Record<ExplorationStage, StageNotice>> = {
   },
 };
 
+type MockPlan = ExplorationPlan & { requestedAt: number; willFail: boolean; cancelled?: boolean };
+
 interface MockSession {
   session: ExplorationSession;
   issued: IssuedQuestionState[];
@@ -123,6 +127,7 @@ interface MockSession {
   completedAt?: number;
   support?: {
     purpose: SupportPurpose;
+    targetMajorCode?: string | null;
     revision: number;
     issued: IssuedQuestion[];
     answers: Record<number, string>;
@@ -132,7 +137,7 @@ interface MockSession {
     messages: ExplorationChatMessage[];
     mutations: Record<string, ExplorationAskResponse>;
   };
-  plans?: (ExplorationPlan & { requestedAt: number; willFail: boolean })[];
+  plans?: MockPlan[];
   share?: { token: string; createdAtMs: number; expiresAtMs: number; disabled: boolean };
 }
 
@@ -855,6 +860,47 @@ export const saveSupportAnswer = (
     return res;
   });
 
+// 백엔드 GET /results/{id}/support 와 같은 모양. 아직 선택 전이면 initialized=false, revision 0.
+const toSupportState = (resultId: number, sup: MockSession['support']): SupportState => ({
+  resultId,
+  initialized: !!sup,
+  supportRevision: sup?.revision ?? 0,
+  purpose: sup?.purpose ?? null,
+  targetMajorCode: sup?.targetMajorCode ?? null,
+  allowedPurposes: ['PLAN', 'ACTIVITY', 'BOTH'],
+});
+
+export const getSupport = (resultId: number) =>
+  delay((): SupportState => toSupportState(resultId, findByResult(load(), resultId).support));
+
+export const selectSupport = (
+  resultId: number,
+  selection: SupportSelection,
+  expectedSupportRevision: number,
+) =>
+  delay((): SupportState => {
+    const db = load();
+    const s = findByResult(db, resultId);
+    if ((s.support?.revision ?? 0) !== expectedSupportRevision) throw fail(409, 'STALE_REVISION');
+    if (selection.purpose !== 'ACTIVITY' && !selection.targetMajorCode) throw fail(422, 'TARGET_MAJOR_REQUIRED');
+    if (!s.support) {
+      s.support = {
+        purpose: selection.purpose,
+        targetMajorCode: selection.targetMajorCode,
+        revision: 1,
+        issued: SUPPORT_QUESTIONS.map((q) => toIssued(q, ++db.issuedSeq)),
+        answers: {},
+        mutations: {},
+      };
+    } else {
+      s.support.purpose = selection.purpose;
+      s.support.targetMajorCode = selection.targetMajorCode;
+      s.support.revision += 1;
+    }
+    save(db);
+    return toSupportState(resultId, s.support);
+  });
+
 // D-21: 시간·비용·접근 제약이 있으면 무료·온라인·혼자 하는 활동으로 교체
 const personalize = (sup: MockSession['support']) => {
   const answerOf = (qid: string) => {
@@ -1042,6 +1088,14 @@ export const openConsultation = (resultId: number) =>
     return { consultationId: CONSULTATION_BASE + s.session.sessionId, resultId, messages: s.consultation.messages };
   });
 
+// mock 은 답변을 바로 만들어 대기 중 질문이 남지 않는다. 취소는 항상 성공으로 둔다.
+export const cancelConsultationMessage = (consultationId: number, retryKey: string) =>
+  delay((): { status: 'CANCELLED' } => {
+    void consultationId;
+    void retryKey;
+    return { status: 'CANCELLED' };
+  });
+
 export const ask = (consultationId: number, content: string, clientMutationId: string) =>
   new Promise<ExplorationAskResponse>((resolve, reject) => {
     setTimeout(() => {
@@ -1122,12 +1176,21 @@ const buildWeeks = (name: string, majorCode: string): PlanWeek[] => {
   return [...info, ...basic, ...small];
 };
 
-const planStatusOf = (plan: ExplorationPlan & { requestedAt: number; willFail: boolean }): PlanStatus => {
+const planStatusOf = (plan: MockPlan): PlanStatus => {
+  if (plan.cancelled) return 'FAILED';
   if (Date.now() - plan.requestedAt < PLAN_GENERATING_MS) return 'GENERATING';
   return plan.willFail ? 'FAILED' : 'READY';
 };
 
-const publicPlan = (plan: ExplorationPlan & { requestedAt: number; willFail: boolean }): ExplorationPlan => {
+// 백엔드처럼 취소된 계획은 재시도할 수 없고, 중단된 생성만 같은 계획으로 다시 시도할 수 있다.
+const planFailureOf = (plan: MockPlan) => {
+  if (planStatusOf(plan) !== 'FAILED') return { failureCode: null, retryable: false };
+  return plan.cancelled
+    ? { failureCode: 'CANCELLED', retryable: false }
+    : { failureCode: 'LEASE_EXPIRED', retryable: true };
+};
+
+const publicPlan = (plan: MockPlan): ExplorationPlan => {
   const status = planStatusOf(plan);
   return {
     planId: plan.planId,
@@ -1136,6 +1199,8 @@ const publicPlan = (plan: ExplorationPlan & { requestedAt: number; willFail: boo
     majorName: plan.majorName,
     status,
     createdAt: plan.createdAt,
+    ...planFailureOf(plan),
+    nextRetryAt: null,
     supportRevision: plan.supportRevision,
     weeks: status === 'READY' ? plan.weeks : [],
     sources: status === 'READY' ? plan.sources : [],
@@ -1155,25 +1220,21 @@ export const createPlan = (resultId: number, majorCode: string, supportRevision:
     const db = load();
     const s = findByResult(db, resultId);
     const card = buildResult(s).groups.flatMap((g) => g.majors).find((m) => m.majorCode === majorCode);
-    if (!card) throw fail(422, 'INVALID_REQUEST');
+    if (!card) throw fail(422, 'TARGET_MAJOR_NOT_IN_RESULT');
+    // 백엔드 validateTarget 과 같은 순서로 결과 후 지원 상태를 검사한다
+    if (!s.support || s.support.purpose === 'ACTIVITY') throw fail(409, 'PLAN_SUPPORT_REQUIRED');
+    if (s.support.targetMajorCode !== majorCode) throw fail(409, 'SUPPORT_TARGET_MISMATCH');
+    if (supportRevision !== null && supportRevision !== s.support.revision) throw fail(409, 'STALE_REVISION');
     s.plans = s.plans ?? [];
-    // 같은 전공의 실패한 계획은 새로 만들지 않고 그 계획만 다시 생성한다
-    const failed = s.plans.find((p) => p.majorCode === majorCode && planStatusOf(p) === 'FAILED');
     const now = Date.now();
-    if (failed) {
-      failed.requestedAt = now;
-      failed.willFail = shouldFail();
-      save(db);
-      return publicPlan(failed);
-    }
-    const plan = {
+    const plan: MockPlan = {
       planId: PLAN_BASE + ++db.issuedSeq,
       resultId,
       majorCode,
       majorName: card.name,
       status: 'GENERATING' as PlanStatus,
       createdAt: new Date(now).toISOString(),
-      supportRevision,
+      supportRevision: s.support.revision,
       weeks: buildWeeks(card.name, majorCode),
       sources: [
         { kind: 'RESULT_SNAPSHOT' as const, title: `검사 결과 스냅샷 (결과 ${resultId})`, version: 'MOCK_RESULT_V0' },
@@ -1193,24 +1254,50 @@ export const listPlans = (resultId: number) =>
     const s = findByResult(load(), resultId);
     return (s.plans ?? [])
       .map((p) => publicPlan(p))
-      .map(({ planId, resultId: rid, majorCode, majorName, status, createdAt }) => ({
+      .map(({ planId, resultId: rid, majorCode, majorName, status, createdAt, failureCode, retryable, nextRetryAt }) => ({
         planId,
         resultId: rid,
         majorCode,
         majorName,
         status,
         createdAt,
+        failureCode,
+        retryable,
+        nextRetryAt,
       }))
       .sort((a, b) => b.planId - a.planId);
   });
 
-export const getPlan = (planId: number) =>
+const findPlan = (db: MockDb, planId: number) => {
+  const plan = Object.values(db.sessions)
+    .flatMap((s) => s.plans ?? [])
+    .find((p) => p.planId === planId);
+  if (!plan) throw fail(404, 'RESOURCE_NOT_FOUND');
+  return plan;
+};
+
+export const getPlan = (planId: number) => delay((): ExplorationPlan => publicPlan(findPlan(load(), planId)));
+
+export const retryPlan = (planId: number) =>
   delay((): ExplorationPlan => {
-    const plan = Object.values(load().sessions)
-      .flatMap((s) => s.plans ?? [])
-      .find((p) => p.planId === planId);
-    if (!plan) throw fail(404, 'RESOURCE_NOT_FOUND');
+    const db = load();
+    const plan = findPlan(db, planId);
+    if (planFailureOf(plan).retryable) {
+      plan.requestedAt = Date.now();
+      plan.willFail = shouldFail();
+      save(db);
+    }
     return publicPlan(plan);
+  });
+
+export const cancelPlan = (planId: number) =>
+  delay((): { status: 'CANCELLED' } => {
+    const db = load();
+    const plan = findPlan(db, planId);
+    if (planStatusOf(plan) === 'READY') throw fail(409, 'PLAN_ALREADY_COMPLETED');
+    plan.cancelled = true;
+    save(db);
+    return { status: 'CANCELLED' };
   });
 
 // ---- 결과 공유 ----

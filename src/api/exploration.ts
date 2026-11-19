@@ -30,7 +30,9 @@ import type {
   SharedExplorationResult,
   SupportAnswerResponse,
   SupportPurpose,
+  SupportSelection,
   SupportSession,
+  SupportState,
 } from '../types/exploration';
 
 const BASE = '/exploration/v1';
@@ -472,6 +474,81 @@ export const saveExplorationSupportAnswer = (
         )
         .then((r) => r.data);
 
+// 백엔드 응답에는 문항·버전 정보도 있지만 계획 화면은 목적·목표·revision 만 쓴다.
+interface BackendSupportState {
+  resultId: number;
+  initialized: boolean;
+  supportRevision: number;
+  purpose?: SupportPurpose | null;
+  targetMajorCode?: string | null;
+  allowedPurposes?: SupportPurpose[];
+}
+
+const toSupportState = (data: BackendSupportState): SupportState => ({
+  resultId: data.resultId,
+  initialized: data.initialized,
+  supportRevision: data.supportRevision,
+  purpose: data.purpose ?? null,
+  targetMajorCode: data.targetMajorCode ?? null,
+  allowedPurposes: data.allowedPurposes ?? [],
+});
+
+export const getExplorationSupport = (resultId: number) =>
+  isExplorationMock
+    ? mock.getSupport(resultId)
+    : api
+        .get<BackendSupportState>(`${BASE}/results/${resultId}/support`)
+        .then((r) => toSupportState(r.data));
+
+// 백엔드 SupportRequests.Select — expectedSupportRevision 이 필수다.
+export const selectExplorationSupport = (
+  resultId: number,
+  selection: SupportSelection,
+  expectedSupportRevision: number,
+) =>
+  isExplorationMock
+    ? mock.selectSupport(resultId, selection, expectedSupportRevision)
+    : api
+        .post<BackendSupportState>(
+          `${BASE}/results/${resultId}/support`,
+          { ...selection, expectedSupportRevision },
+          idem(),
+        )
+        .then((r) => toSupportState(r.data));
+
+// 계획을 만들려면 결과 후 지원이 PLAN·BOTH 이고 목표 전공이 같아야 한다.
+// 이미 활동 지원(ACTIVITY·BOTH)을 쓰고 있으면 BOTH 로 바꿔 활동 쪽 선택을 지우지 않는다.
+// 다른 기기에서 먼저 바꿨으면(STALE_REVISION) 한 번만 다시 읽어 맞춘다.
+export const ensurePlanSupport = async (
+  resultId: number,
+  majorCode: string,
+): Promise<SupportState> => {
+  for (let attempt = 0; ; attempt += 1) {
+    const current = await getExplorationSupport(resultId);
+    const planReady =
+      (current.purpose === 'PLAN' || current.purpose === 'BOTH') &&
+      current.targetMajorCode === majorCode;
+    if (planReady) return current;
+
+    const purpose: SupportPurpose =
+      current.purpose === 'ACTIVITY' || current.purpose === 'BOTH'
+        ? 'BOTH'
+        : 'PLAN';
+    try {
+      return await selectExplorationSupport(
+        resultId,
+        { purpose, targetMajorCode: majorCode },
+        current.supportRevision,
+      );
+    } catch (error) {
+      if (attempt === 0 && toExplorationErrorCode(error) === 'STALE_REVISION') {
+        continue;
+      }
+      throw error;
+    }
+  }
+};
+
 // 같은 결과의 상담이 있으면 이어서 연다고 가정한다
 export const openExplorationConsultation = (resultId: number) =>
   isExplorationMock
@@ -499,7 +576,20 @@ export const askExplorationConsultation = (
         )
         .then((r) => r.data);
 
-// 04 문서 요청은 supportRevision만 있어 선택 전공을 담을 majorCode를 가정해 추가했다
+// 답변이 오지 않은 채 남은 질문을 취소한다. retryKey 는 상담 응답의 pendingRequest 에서 온다.
+export const cancelExplorationConsultationMessage = (
+  consultationId: number,
+  retryKey: string,
+) =>
+  isExplorationMock
+    ? mock.cancelConsultationMessage(consultationId, retryKey)
+    : api
+        .delete<{ status: 'CANCELLED' }>(
+          `${BASE}/consultations/${consultationId}/messages/${encodeURIComponent(retryKey)}`,
+        )
+        .then((r) => r.data);
+
+// 백엔드는 majorCode 와 supportRevision 두 키만 받는다. 먼저 ensurePlanSupport 로 지원을 맞춰야 한다.
 export const createExplorationPlan = (
   resultId: number,
   majorCode: string,
@@ -529,6 +619,21 @@ export const getExplorationPlan = (planId: number) =>
     ? mock.getPlan(planId)
     : api
         .get<ExplorationPlan>(`${BASE}/plans/${planId}`)
+        .then((r) => r.data);
+
+// retryable 인 계획만 같은 계획으로 다시 생성한다. 취소·확정 실패는 새 계획을 만들어야 한다.
+export const retryExplorationPlan = (planId: number) =>
+  isExplorationMock
+    ? mock.retryPlan(planId)
+    : api
+        .post<ExplorationPlan>(`${BASE}/plans/${planId}/retry`, {})
+        .then((r) => r.data);
+
+export const cancelExplorationPlan = (planId: number) =>
+  isExplorationMock
+    ? mock.cancelPlan(planId)
+    : api
+        .delete<{ status: 'CANCELLED' }>(`${BASE}/plans/${planId}/generation`)
         .then((r) => r.data);
 
 // 공유 상태 조회

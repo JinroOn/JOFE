@@ -245,6 +245,8 @@ export interface ExplorationCapabilities {
   supportAvailable: boolean;
   planAvailable: boolean;
   sharingAvailable: boolean;
+  // 백엔드에 아직 없는 값이다(JinroOn/JOBE#122 요청). 없으면 버튼을 열어 두고 503 을 화면에서 안내한다.
+  consultationAvailable?: boolean;
 }
 
 export type ActivityAvailability = 'AVAILABLE' | 'UNAVAILABLE';
@@ -471,6 +473,23 @@ export interface SupportSession {
   }[];
 }
 
+// GET /results/{id}/support 응답. 아직 선택하지 않았으면 initialized=false, supportRevision=0 이다.
+// 계획 생성은 purpose 가 PLAN·BOTH 이고 targetMajorCode 가 계획 전공과 같아야 허용된다
+// (백엔드 ResultContextService.validateTarget, JOBE 5fe7fab 기준).
+export interface SupportState {
+  resultId: number;
+  initialized: boolean;
+  supportRevision: number;
+  purpose: SupportPurpose | null;
+  targetMajorCode: string | null;
+  allowedPurposes: SupportPurpose[];
+}
+
+export interface SupportSelection {
+  purpose: SupportPurpose;
+  targetMajorCode: string | null;
+}
+
 export interface SupportAnswerResponse {
   supportRevision: number;
   issuedId: number;
@@ -504,10 +523,20 @@ export interface ExplorationChatMessage {
   evidenceStatus: EvidenceStatus | null;
 }
 
+// 답변 생성이 끝나지 않은 채 남은 질문. 상담을 다시 열 때만 온다.
+// status 는 백엔드 생성 작업 상태(QUEUED·RUNNING·FAILED 등)를 그대로 옮긴 값이라 문자열로 둔다.
+export interface ConsultationPendingRequest {
+  retryKey: string;
+  content: string;
+  status: string;
+  nextRetryAt: string | null;
+}
+
 export interface ExplorationConsultation {
   consultationId: number;
   resultId: number;
   messages: ExplorationChatMessage[];
+  pendingRequest?: ConsultationPendingRequest | null;
 }
 
 export interface ExplorationAskResponse {
@@ -536,6 +565,11 @@ export interface ExplorationPlanSummary {
   majorName: string;
   status: PlanStatus;
   createdAt: string;
+  // FAILED 일 때 사유. 백엔드가 생성 작업 실패 코드를 그대로 준다.
+  failureCode?: string | null;
+  // true 면 같은 계획을 POST /plans/{id}/retry 로 다시 시도할 수 있다.
+  retryable?: boolean;
+  nextRetryAt?: string | null;
 }
 
 export interface ExplorationPlan extends ExplorationPlanSummary {
@@ -630,6 +664,15 @@ export type ExplorationErrorCode =
   | 'MAJOR_NOT_IN_RESULT'
   | 'COMPARISON_TARGET_UNAVAILABLE'
   | 'NO_ACTIVE_CATALOG'
+  | 'PLAN_SUPPORT_REQUIRED'
+  | 'SUPPORT_TARGET_MISMATCH'
+  | 'PLAN_TARGET_UNAVAILABLE'
+  | 'TARGET_MAJOR_NOT_IN_RESULT'
+  | 'TARGET_MAJOR_REQUIRED'
+  | 'PLAN_GENERATION_UNAVAILABLE'
+  | 'CONSULTATION_BUSY'
+  | 'CONSULTATION_GENERATION_UNAVAILABLE'
+  | 'CONSULTATION_ALREADY_COMPLETED'
   | 'NETWORK'
   | 'UNKNOWN';
 
