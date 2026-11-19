@@ -25,7 +25,7 @@ function client(handlers) {
     calls.push({ method, url, body, config });
     return handlers[method](url, body, config, calls);
   };
-  const api = { get: record('get'), post: record('post'), delete: record('delete') };
+  const api = { get: record('get'), post: record('post'), put: record('put'), delete: record('delete') };
   const mod = compile('src/api/exploration.ts', {
     './axios': { __esModule: true, default: api, publicApi: {} },
     '../config/features': { isExplorationMock: false }, './explorationMock': {},
@@ -34,6 +34,66 @@ function client(handlers) {
 }
 
 const supportView = (over = {}) => ({ resultId: 3, initialized: false, supportRevision: 0, allowedPurposes: ['PLAN', 'ACTIVITY', 'BOTH'], ...over });
+
+const issued = (issuedId, questionId, extra = {}) => ({
+  question: { issuedId, questionId, text: questionId, options: [] },
+  effective: true,
+  answerApplicable: false,
+  answerCode: null,
+  ...extra,
+});
+
+test('activity support starts at revision zero and reuses existing activity support on resume', async () => {
+  const started = supportView({ initialized: true, purpose: 'ACTIVITY', supportRevision: 1, issued: [issued(1, 'ACTIVITY-REPORT-01')] });
+  const { mod, calls } = client({
+    get: async () => ({ data: calls.length === 1 ? supportView() : started }),
+    post: async () => ({ data: started }),
+  });
+  assert.equal((await mod.startExplorationActivitySupport(3)).issuedQuestions[0].issuedId, 1);
+  assert.equal(JSON.stringify(calls[1].body), '{"purpose":"ACTIVITY","targetMajorCode":null,"expectedSupportRevision":0}');
+  assert.equal((await mod.startExplorationActivitySupport(3)).supportRevision, 1);
+  assert.deepEqual(calls.map(({ method }) => method), ['get', 'post', 'get']);
+});
+
+test('activity selection preserves the latest plan target and exposes only effective activity answers', async () => {
+  const { mod, calls } = client({
+    get: async () => {
+      const revision = calls.length === 1 ? 4 : 5;
+      return { data: supportView({ initialized: true, purpose: 'PLAN', supportRevision: revision, targetMajorCode: `M${revision}` }) };
+    },
+    post: async () => {
+      if (calls.length === 2) throw failure(409, 'STALE_REVISION');
+      return { data: supportView({
+        initialized: true, purpose: 'BOTH', supportRevision: 6, targetMajorCode: 'M5',
+        issued: [
+          issued(1, 'READINESS-INFO-01'),
+          issued(2, 'ACTIVITY-READ-01', { effective: false }),
+          issued(3, 'ACTIVITY-PROJECT-01', { answerApplicable: true, answerCode: 'TRY' }),
+          issued(4, 'ACTIVITY-REPORT-01', { answerCode: 'OLD' }),
+        ],
+      }) };
+    },
+  });
+  const support = await mod.startExplorationActivitySupport(3);
+  assert.equal(JSON.stringify(calls[3].body), '{"purpose":"BOTH","targetMajorCode":"M5","expectedSupportRevision":5}');
+  assert.equal(JSON.stringify(support.issuedQuestions.map(({ issuedId }) => issuedId)), '[3,4]');
+  assert.equal(JSON.stringify(support.answers), '[{"issuedId":3,"optionCode":"TRY"}]');
+});
+
+test('activity answer sends the backend revision field and reads the full updated support view', async () => {
+  const { mod, calls } = client({
+    put: async () => ({ data: supportView({
+      initialized: true, purpose: 'ACTIVITY', supportRevision: 8,
+      issued: [issued(3, 'ACTIVITY-REPORT-01', { answerApplicable: true, answerCode: 'TRY' })],
+    }) }),
+  });
+  const updated = await mod.saveExplorationSupportAnswer(3, 3, { optionCode: 'TRY', expectedSupportRevision: 7, clientMutationId: 'answer-3' });
+  assert.equal(calls[0].url, '/exploration/v1/results/3/support/answers/3');
+  assert.equal(JSON.stringify(calls[0].body), '{"optionCode":"TRY","expectedSupportRevision":7,"clientMutationId":"answer-3"}');
+  assert.equal(calls[0].config.headers['Idempotency-Key'], 'answer-3');
+  assert.equal(updated.supportRevision, 8);
+  assert.equal(updated.answers[0].optionCode, 'TRY');
+});
 
 test('no support yet: selects PLAN with the target and expectedSupportRevision before the plan', async () => {
   const { mod, calls } = client({

@@ -34,7 +34,6 @@ import type {
   SharedExplorationResult,
   ShareStatus,
   StageNotice,
-  SupportAnswerResponse,
   SupportPurpose,
   SupportSession,
   SupportSelection,
@@ -131,7 +130,7 @@ interface MockSession {
     revision: number;
     issued: IssuedQuestion[];
     answers: Record<number, string>;
-    mutations: Record<string, SupportAnswerResponse>;
+    mutations: Record<string, { supportRevision: number }>;
   };
   consultation?: {
     messages: ExplorationChatMessage[];
@@ -815,49 +814,25 @@ const toSupportSession = (resultId: number, sup: NonNullable<MockSession['suppor
   answers: Object.entries(sup.answers).map(([issuedId, optionCode]) => ({ issuedId: Number(issuedId), optionCode })),
 });
 
-export const startSupport = (resultId: number, purpose: SupportPurpose) =>
-  delay((): SupportSession => {
-    const db = load();
-    const s = findByResult(db, resultId);
-    if (!s.support) {
-      s.support = {
-        purpose,
-        revision: 1,
-        issued: SUPPORT_QUESTIONS.map((q) => toIssued(q, ++db.issuedSeq)),
-        answers: {},
-        mutations: {},
-      };
-      save(db);
-    }
-    return toSupportSession(resultId, s.support);
-  });
-
 export const saveSupportAnswer = (
   resultId: number,
   issuedId: number,
-  body: { optionCode: string; expectedRevision: number; clientMutationId: string },
+  body: { optionCode: string; expectedSupportRevision: number; clientMutationId: string },
 ) =>
-  delay((): SupportAnswerResponse => {
+  delay((): SupportSession => {
     const db = load();
     const sup = findByResult(db, resultId).support;
     if (!sup) throw fail(404, 'RESOURCE_NOT_FOUND');
-    const replay = sup.mutations[body.clientMutationId];
-    if (replay) return replay;
-    if (sup.revision !== body.expectedRevision) throw fail(409, 'STALE_REVISION');
+    if (sup.mutations[body.clientMutationId]) return toSupportSession(resultId, sup);
+    if (sup.revision !== body.expectedSupportRevision) throw fail(409, 'STALE_REVISION');
     const q = sup.issued.find((i) => i.issuedId === issuedId);
     if (!q) throw fail(404, 'RESOURCE_NOT_FOUND');
     if (!q.options.some((o) => o.code === body.optionCode)) throw fail(422, 'OPTION_NOT_ISSUED');
     sup.answers[issuedId] = body.optionCode;
     sup.revision += 1;
-    const res: SupportAnswerResponse = {
-      supportRevision: sup.revision,
-      issuedId,
-      optionCode: body.optionCode,
-      remaining: sup.issued.filter((i) => !sup.answers[i.issuedId]).length,
-    };
-    sup.mutations[body.clientMutationId] = res;
+    sup.mutations[body.clientMutationId] = { supportRevision: sup.revision };
     save(db);
-    return res;
+    return toSupportSession(resultId, sup);
   });
 
 // 백엔드 GET /results/{id}/support 와 같은 모양. 아직 선택 전이면 initialized=false, revision 0.
@@ -868,6 +843,8 @@ const toSupportState = (resultId: number, sup: MockSession['support']): SupportS
   purpose: sup?.purpose ?? null,
   targetMajorCode: sup?.targetMajorCode ?? null,
   allowedPurposes: ['PLAN', 'ACTIVITY', 'BOTH'],
+  issuedQuestions: sup?.issued ?? [],
+  answers: sup ? toSupportSession(resultId, sup).answers : [],
 });
 
 export const getSupport = (resultId: number) =>
@@ -882,7 +859,6 @@ export const selectSupport = (
     const db = load();
     const s = findByResult(db, resultId);
     if ((s.support?.revision ?? 0) !== expectedSupportRevision) throw fail(409, 'STALE_REVISION');
-    if (selection.purpose !== 'ACTIVITY' && !selection.targetMajorCode) throw fail(422, 'TARGET_MAJOR_REQUIRED');
     if (!s.support) {
       s.support = {
         purpose: selection.purpose,

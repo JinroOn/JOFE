@@ -28,7 +28,6 @@ import type {
   SaveAnswerRequest,
   SaveAnswerResponse,
   SharedExplorationResult,
-  SupportAnswerResponse,
   SupportPurpose,
   SupportSelection,
   SupportSession,
@@ -440,58 +439,31 @@ export const getExplorationActivities = (resultId: number) =>
         )
         .then((r) => r.data);
 
-// 이미 시작한 결과 후 질문이 있으면 같은 회차를 돌려받는다고 가정한다
-export const startExplorationSupport = (
-  resultId: number,
-  purpose: SupportPurpose,
-) =>
-  isExplorationMock
-    ? mock.startSupport(resultId, purpose)
-    : api
-        .post<SupportSession>(
-          `${BASE}/results/${resultId}/support`,
-          { purpose },
-          idem(),
-        )
-        .then((r) => r.data);
-
-export const saveExplorationSupportAnswer = (
-  resultId: number,
-  issuedId: number,
-  body: {
-    optionCode: string;
-    expectedRevision: number;
-    clientMutationId: string;
-  },
-) =>
-  isExplorationMock
-    ? mock.saveSupportAnswer(resultId, issuedId, body)
-    : api
-        .put<SupportAnswerResponse>(
-          `${BASE}/results/${resultId}/support/answers/${issuedId}`,
-          body,
-          idem(body.clientMutationId),
-        )
-        .then((r) => r.data);
-
-// 백엔드 응답에는 문항·버전 정보도 있지만 계획 화면은 목적·목표·revision 만 쓴다.
-interface BackendSupportState {
-  resultId: number;
-  initialized: boolean;
-  supportRevision: number;
-  purpose?: SupportPurpose | null;
-  targetMajorCode?: string | null;
-  allowedPurposes?: SupportPurpose[];
+interface BackendSupportState extends Omit<SupportState, 'issuedQuestions' | 'answers'> {
+  issued?: {
+    question: SupportSession['issuedQuestions'][number];
+    effective: boolean;
+    answerApplicable: boolean;
+    answerCode: string | null;
+  }[];
 }
 
-const toSupportState = (data: BackendSupportState): SupportState => ({
-  resultId: data.resultId,
-  initialized: data.initialized,
-  supportRevision: data.supportRevision,
-  purpose: data.purpose ?? null,
-  targetMajorCode: data.targetMajorCode ?? null,
-  allowedPurposes: data.allowedPurposes ?? [],
-});
+const toSupportState = ({ issued = [], ...data }: BackendSupportState): SupportState => {
+  // BOTH에는 계획 준비도 문항도 있으므로 활동 문항만 활동 화면에 전달한다.
+  const activity = issued.filter(({ effective, question }) =>
+    effective && question.questionId.startsWith('ACTIVITY-'),
+  );
+  return {
+    ...data,
+    purpose: data.purpose ?? null,
+    targetMajorCode: data.targetMajorCode ?? null,
+    allowedPurposes: data.allowedPurposes ?? [],
+    issuedQuestions: activity.map(({ question }) => question),
+    answers: activity.flatMap(({ question, answerApplicable, answerCode }) =>
+      answerApplicable && answerCode !== null ? [{ issuedId: question.issuedId, optionCode: answerCode }] : [],
+    ),
+  };
+};
 
 export const getExplorationSupport = (resultId: number) =>
   isExplorationMock
@@ -513,6 +485,38 @@ export const selectExplorationSupport = (
           `${BASE}/results/${resultId}/support`,
           { ...selection, expectedSupportRevision },
           idem(),
+        )
+        .then((r) => toSupportState(r.data));
+
+export const startExplorationActivitySupport = async (resultId: number): Promise<SupportState> => {
+  for (let attempt = 0; ; attempt += 1) {
+    const current = await getExplorationSupport(resultId);
+    if (current.purpose === 'ACTIVITY' || current.purpose === 'BOTH') return current;
+
+    const selection: SupportSelection = current.purpose === 'PLAN'
+      ? { purpose: 'BOTH', targetMajorCode: current.targetMajorCode }
+      : { purpose: 'ACTIVITY', targetMajorCode: null };
+    try {
+      return await selectExplorationSupport(resultId, selection, current.supportRevision);
+    } catch (error) {
+      if (attempt === 0 && toExplorationErrorCode(error) === 'STALE_REVISION') continue;
+      throw error;
+    }
+  }
+};
+
+export const saveExplorationSupportAnswer = (
+  resultId: number,
+  issuedId: number,
+  body: { optionCode: string; expectedSupportRevision: number; clientMutationId: string },
+) =>
+  isExplorationMock
+    ? mock.saveSupportAnswer(resultId, issuedId, body)
+    : api
+        .put<BackendSupportState>(
+          `${BASE}/results/${resultId}/support/answers/${issuedId}`,
+          body,
+          idem(body.clientMutationId),
         )
         .then((r) => toSupportState(r.data));
 

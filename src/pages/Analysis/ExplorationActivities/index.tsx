@@ -531,11 +531,7 @@ const ExplorationActivities = () => {
                   <SupportPanel
                     key={resultId}
                     resultId={resultId}
-                    personalized={
-                      typeof current.value.supportRevision ===
-                        'number' &&
-                      current.value.supportRevision > 0
-                    }
+                    personalized={current.value.nextActivities.some((activity) => activity.preferenceApplied)}
                     onChanged={() =>
                       setVersion((previous) => previous + 1)
                     }
