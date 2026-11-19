@@ -466,7 +466,7 @@ export interface SupportSession {
   resultId: number;
   purpose: SupportPurpose;
   supportRevision: number;
-  issuedQuestions: IssuedQuestion[];
+  issuedQuestions: Pick<IssuedQuestion, 'issuedId' | 'questionId' | 'text' | 'options'>[];
   answers: {
     issuedId: number;
     optionCode: string;
@@ -476,7 +476,7 @@ export interface SupportSession {
 // GET /results/{id}/support 응답. 아직 선택하지 않았으면 initialized=false, supportRevision=0 이다.
 // 계획 생성은 purpose 가 PLAN·BOTH 이고 targetMajorCode 가 계획 전공과 같아야 허용된다
 // (백엔드 ResultContextService.validateTarget, JOBE 5fe7fab 기준).
-export interface SupportState {
+export interface SupportState extends Pick<SupportSession, 'issuedQuestions' | 'answers'> {
   resultId: number;
   initialized: boolean;
   supportRevision: number;
@@ -488,13 +488,6 @@ export interface SupportState {
 export interface SupportSelection {
   purpose: SupportPurpose;
   targetMajorCode: string | null;
-}
-
-export interface SupportAnswerResponse {
-  supportRevision: number;
-  issuedId: number;
-  optionCode: string;
-  remaining: number;
 }
 
 // AI 상담

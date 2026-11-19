@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   createMutationId,
   saveExplorationSupportAnswer,
-  startExplorationSupport,
+  startExplorationActivitySupport,
   toExplorationErrorCode,
 } from '../../../../api/exploration';
 import type { ExplorationErrorCode, SupportSession } from '../../../../types/exploration';
@@ -13,30 +13,29 @@ interface SupportPanelProps {
   onChanged: () => void;
 }
 
-type Mode = 'IDLE' | 'LOADING' | 'ANSWERING' | 'DONE';
+type Mode = 'IDLE' | 'LOADING' | 'ANSWERING' | 'DONE' | 'UNAVAILABLE';
 
 // 결과 후 선택 질문(탐색 활동 선호). 응답은 활동만 바꾸고 추천 전공·순서는 바꾸지 않는다.
 const SupportPanel = ({ resultId, personalized, onChanged }: SupportPanelProps) => {
   const [mode, setMode] = useState<Mode>(personalized ? 'DONE' : 'IDLE');
-  const [support, setSupport] = useState<SupportSession | null>(null);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [support, setSupport] = useState<Pick<SupportSession, 'supportRevision' | 'issuedQuestions' | 'answers'> | null>(null);
   const [index, setIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<ExplorationErrorCode | null>(null);
   const [pending, setPending] = useState<{ issuedId: number; optionCode: string; id: string } | null>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
 
-  const start = async (fromBeginning: boolean) => {
+  const start = async () => {
     setMode('LOADING');
     setError(null);
+    setPending(null);
     try {
-      const res = await startExplorationSupport(resultId, 'ACTIVITY');
-      const map = Object.fromEntries(res.answers.map((a) => [a.issuedId, a.optionCode]));
+      const res = await startExplorationActivitySupport(resultId);
       setSupport(res);
-      setAnswers(map);
-      const firstOpen = res.issuedQuestions.findIndex((q) => !map[q.issuedId]);
-      setIndex(fromBeginning || firstOpen === -1 ? 0 : firstOpen);
-      setMode('ANSWERING');
+      const answered = new Set(res.answers.map(({ issuedId }) => issuedId));
+      const firstOpen = res.issuedQuestions.findIndex(({ issuedId }) => !answered.has(issuedId));
+      setIndex(Math.max(firstOpen, 0));
+      setMode(res.issuedQuestions.length ? 'ANSWERING' : 'UNAVAILABLE');
     } catch (e) {
       setError(toExplorationErrorCode(e));
       setMode(personalized ? 'DONE' : 'IDLE');
@@ -56,13 +55,13 @@ const SupportPanel = ({ resultId, personalized, onChanged }: SupportPanelProps) 
     try {
       const res = await saveExplorationSupportAnswer(resultId, target.issuedId, {
         optionCode: target.optionCode,
-        expectedRevision: support.supportRevision,
+        expectedSupportRevision: support.supportRevision,
         clientMutationId: target.id,
       });
       setPending(null);
-      setSupport({ ...support, supportRevision: res.supportRevision });
-      setAnswers((prev) => ({ ...prev, [res.issuedId]: res.optionCode }));
-      if (index + 1 < support.issuedQuestions.length) setIndex(index + 1);
+      setSupport(res);
+      const savedIndex = res.issuedQuestions.findIndex(({ issuedId }) => issuedId === target.issuedId);
+      if (savedIndex >= 0 && savedIndex + 1 < res.issuedQuestions.length) setIndex(savedIndex + 1);
       else {
         setMode('DONE');
         onChanged();
@@ -82,9 +81,19 @@ const SupportPanel = ({ resultId, personalized, onChanged }: SupportPanelProps) 
   };
 
   const finishEarly = () => {
+    setPending(null);
+    setError(null);
     setMode('DONE');
     onChanged();
   };
+
+  if (mode === 'UNAVAILABLE') {
+    return (
+      <p role="status" className="rounded-brand bg-surface-container-low p-5 sm:p-6 text-sm text-on-surface-variant">
+        이 결과에서 추가로 답할 활동 맞춤 질문이 없어요.
+      </p>
+    );
+  }
 
   if (mode === 'IDLE' || mode === 'DONE') {
     return (
@@ -93,8 +102,7 @@ const SupportPanel = ({ resultId, personalized, onChanged }: SupportPanelProps) 
           {mode === 'DONE' ? '내 상황에 맞춘 활동이에요' : '내 상황에 맞게 활동 바꾸기'}
         </h2>
         <p className="text-sm text-on-surface-variant leading-relaxed mb-4">
-          시간·비용·장소와 해보고 싶은 방식을 알려주면 활동을 바꿔드려요. 최대 5개 질문이고, 답해도 추천 전공과
-          순서는 바뀌지 않아요.
+          해보고 싶은 활동 방식을 알려주면 추천 활동에 반영해요. 질문은 원하는 만큼 답할 수 있어요.
         </p>
         {error && (
           <p role="alert" className="text-sm text-error mb-3">
@@ -103,10 +111,10 @@ const SupportPanel = ({ resultId, personalized, onChanged }: SupportPanelProps) 
         )}
         <button
           type="button"
-          onClick={() => void start(mode === 'DONE')}
+          onClick={() => void start()}
           className="min-h-[44px] px-5 py-2.5 rounded-lg bg-primary-container text-white text-sm font-bold"
         >
-          {mode === 'DONE' ? '답변 다시 고르기' : '질문에 답하기'}
+          {mode === 'DONE' ? '답변 확인하기' : '질문에 답하기'}
         </button>
       </section>
     );
@@ -120,7 +128,8 @@ const SupportPanel = ({ resultId, personalized, onChanged }: SupportPanelProps) 
     );
   }
 
-  const selected = pending?.issuedId === question.issuedId ? pending.optionCode : answers[question.issuedId];
+  const savedAnswer = support.answers.find(({ issuedId }) => issuedId === question.issuedId)?.optionCode;
+  const selected = pending?.issuedId === question.issuedId ? pending.optionCode : savedAnswer;
   const options = [...question.options].sort((a, b) => a.order - b.order);
   const titleId = `support-q-${question.issuedId}`;
 
@@ -167,7 +176,7 @@ const SupportPanel = ({ resultId, personalized, onChanged }: SupportPanelProps) 
                 : '답변을 저장하지 못했어요. 고른 답은 그대로 남아 있어요.'}
             </p>
             {error === 'STALE_REVISION' ? (
-              <button type="button" onClick={() => void start(false)} className="min-h-[44px] px-4 rounded-lg bg-primary-container text-white text-sm font-bold">
+              <button type="button" onClick={() => void start()} className="min-h-[44px] px-4 rounded-lg bg-primary-container text-white text-sm font-bold">
                 최신 상태 불러오기
               </button>
             ) : (
