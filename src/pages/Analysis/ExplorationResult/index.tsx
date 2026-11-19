@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import api from '../../../api/axios';
 import { isExplorationMock } from '../../../config/features';
 import useExplorationResult from '../../../hooks/useExplorationResult';
-import type { ActivityKind, ExplorationResult } from '../../../types/exploration';
+import type {
+  ActivityKind,
+  ExplorationResult,
+} from '../../../types/exploration';
 import MockBanner from '../../Diagnosis/Exploration/components/MockBanner';
 import GroupCard from './components/GroupCard';
 import CandidateBrowser from './components/CandidateBrowser';
@@ -69,6 +73,16 @@ const StatusPanel = ({
 // 백엔드 비교 API는 전공 2개를 비교한다.
 const COMPARE_MAX = 2;
 
+// 전체 후보 API에서 이름을 조회할 때 필요한 필드만 사용합니다.
+// 기존 CandidateBrowser의 타입이나 구현은 변경하지 않습니다.
+interface CandidateNamesResponse {
+  resultId: number;
+  items: {
+    majorCode: string;
+    name: string;
+  }[];
+}
+
 interface ResultViewProps {
   result: ExplorationResult;
   onExit: () => void;
@@ -95,20 +109,115 @@ const ResultView = ({
   const canShare = caps?.sharingAvailable ?? true;
   const canActivities =
     result.activityAvailability !== 'UNAVAILABLE';
-  // 백엔드에 상담 가용성 값이 아직 없어(JinroOn/JOBE#122) 없으면 열어 두고, 생성이 꺼져 있으면 상담 화면이 안내한다
+
+  // PR #149: 백엔드 상담 가용성 설정을 유지합니다.
   const canAsk = caps?.consultationAvailable ?? true;
 
   const notes = result.notes ?? [];
   const recheckAxes = result.recheckAxes ?? [];
 
-  const majorNames = new Map(
-    result.groups
-      .flatMap((group) => group.majors)
-      .map((major) => [major.majorCode, major.name]),
+  // 최종 결과의 첫 화면 전공 이름
+  const majorNames = useMemo(
+    () =>
+      new Map(
+        result.groups
+          .flatMap((group) => group.majors)
+          .map((major) => [major.majorCode, major.name]),
+      ),
+    [result.groups],
   );
 
-  // 추가: 백엔드에서 이미 전달된 후보 반응 정보 사용
   const presentation = result.presentation;
+
+  // 추가: 전체 후보 API에서 조회한 이름을 회차별로 보관합니다.
+  const [candidateNames, setCandidateNames] = useState<{
+    resultId: number;
+    names: Record<string, string>;
+  } | null>(null);
+
+  useEffect(() => {
+    // MOCK 화면이나 반응을 제출하지 않은 결과에서는 조회하지 않습니다.
+    if (
+      isExplorationMock ||
+      presentation?.source !== 'USER_REPORTED'
+    ) {
+      return;
+    }
+
+    const reactionCodes = [
+      ...(presentation.unexpected ?? []),
+      ...(presentation.unfamiliar ?? []),
+    ];
+
+    // 이미 첫 화면 결과에 모든 이름이 있으면 추가 조회하지 않습니다.
+    const hasUnknownName = reactionCodes.some(
+      (code) => !majorNames.has(code),
+    );
+
+    if (!hasUnknownName) return;
+
+    let active = true;
+
+    // 이름이 누락된 반응이 있을 때만 전체 후보 목록을 조회합니다.
+    void api
+      .get<CandidateNamesResponse>(
+        `/exploration/v1/results/${result.resultId}/candidates`,
+      )
+      .then(({ data }) => {
+        if (
+          !active ||
+          data.resultId !== result.resultId ||
+          !Array.isArray(data.items)
+        ) {
+          return;
+        }
+
+        const names: Record<string, string> = {};
+
+        for (const item of data.items) {
+          if (
+            typeof item.majorCode === 'string' &&
+            typeof item.name === 'string' &&
+            item.name.trim().length > 0
+          ) {
+            names[item.majorCode] = item.name.trim();
+          }
+        }
+
+        setCandidateNames({
+          resultId: result.resultId,
+          names,
+        });
+      })
+      .catch(() => {
+        // 전체 후보 조회 실패 시 기존 결과 화면은 유지합니다.
+        // 조회할 수 없는 이름은 내부 코드 대신 "다른 후보"로 표시합니다.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    result.resultId,
+    majorNames,
+    presentation?.source,
+    presentation?.unexpected,
+    presentation?.unfamiliar,
+  ]);
+
+  // 수정: 첫 화면 이름 → 전체 후보 이름 → 안전한 안내 문구 순서
+  const getReactionMajorName = (code: string): string => {
+    const firstScreenName = majorNames.get(code);
+
+    const fullCandidateName =
+      candidateNames?.resultId === result.resultId
+        ? candidateNames.names[code]
+        : undefined;
+
+    const name = firstScreenName || fullCandidateName;
+
+    return name?.trim() || '다른 후보';
+  };
 
   const [selected, setSelected] = useState<string[]>([]);
   const [compareHint, setCompareHint] = useState(false);
@@ -196,7 +305,7 @@ const ResultView = ({
         </div>
       )}
 
-      {/* 추가: 사용자가 제출한 후보 반응을 읽기 전용으로 표시 */}
+      {/* 후보 반응은 점수나 순위를 변경하지 않는 읽기 전용 정보입니다. */}
       {presentation?.source === 'USER_REPORTED' && (
         <section
           aria-labelledby="candidate-reaction-title"
@@ -230,10 +339,7 @@ const ResultView = ({
                 <dd className="text-sm text-primary-container leading-relaxed break-words">
                   {presentation.unexpected?.length
                     ? presentation.unexpected
-                        .map(
-                          (code) =>
-                            majorNames.get(code) ?? code,
-                        )
+                        .map(getReactionMajorName)
                         .join(' · ')
                     : '선택 없음'}
                 </dd>
@@ -247,10 +353,7 @@ const ResultView = ({
                 <dd className="text-sm text-primary-container leading-relaxed break-words">
                   {presentation.unfamiliar?.length
                     ? presentation.unfamiliar
-                        .map(
-                          (code) =>
-                            majorNames.get(code) ?? code,
-                        )
+                        .map(getReactionMajorName)
                         .join(' · ')
                     : '선택 없음'}
                 </dd>
