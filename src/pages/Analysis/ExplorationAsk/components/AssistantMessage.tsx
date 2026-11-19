@@ -31,9 +31,12 @@ const AssistantMessage = ({ message }: { message: ExplorationChatMessage }) => {
             {line}
           </p>
         ))}
-        <p className="mt-3 text-[11px] leading-relaxed text-on-surface-variant">
-          이 설명은 검사 결과와 등록된 전공 정보를 바탕으로 생성되었습니다.
-        </p>
+        {/* 근거 없이 답하지 않은 응답(INSUFFICIENT, sources 0개)에 "자료를 바탕으로 생성"이라고 쓰지 않는다 */}
+        {message.sources.length > 0 && (
+          <p className="mt-3 text-[11px] leading-relaxed text-on-surface-variant">
+            이 설명은 검사 결과와 등록된 전공 정보를 바탕으로 생성되었습니다.
+          </p>
+        )}
         {message.sources.length > 0 && (
           <details className="mt-2 text-xs">
             <summary className="cursor-pointer min-h-[32px] flex items-center font-semibold text-secondary">
