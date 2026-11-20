@@ -37,6 +37,7 @@ import AdminMajorManage from './pages/Admin/MajorManage';
 import AdminNoticeManage from './pages/Admin/NoticeManage';
 import AdminExplorationCatalog from './pages/Admin/ExplorationCatalog';
 import AdminExplorationCatalogDetail from './pages/Admin/ExplorationCatalog/Detail';
+import AdminExplorationCatalogActivityDetail from './pages/Admin/ExplorationCatalog/ActivityDetail';
 import SharedResult from './pages/Analysis/SharedResult';
 import ErrorPage from './pages/Error';
 import SessionModal from './pages/Auth/components/SessionModal';
@@ -137,6 +138,10 @@ const AppLayout = () => {
               <>
                 <Route path="exploration-catalogs" element={<AdminExplorationCatalog />} />
                 <Route path="exploration-catalogs/:catalogId" element={<AdminExplorationCatalogDetail />} />
+                <Route
+                  path="exploration-catalogs/:catalogId/activities/:activityId"
+                  element={<AdminExplorationCatalogActivityDetail />}
+                />
               </>
             )}
           </Route>

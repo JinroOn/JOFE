@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "node --test scripts/test-api-contract.cjs scripts/test-score-visibility.cjs scripts/test-exploration-abandon.cjs scripts/test-exploration-plan-support.cjs",
+    "test": "node --test scripts/test-api-contract.cjs scripts/test-score-visibility.cjs scripts/test-exploration-abandon.cjs scripts/test-exploration-plan-support.cjs scripts/test-exploration-admin-activities.cjs",
     "test:comparison-ui": "node scripts/check-exploration-comparison.cjs",
     "test:history-ui": "node scripts/check-history-ui.cjs",
     "test:history-dev": "node scripts/check-history-ui.cjs --dev",

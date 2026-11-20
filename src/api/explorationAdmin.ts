@@ -5,6 +5,8 @@ import * as mock from './explorationAdminMock';
 import type {
   CatalogSummary,
   CatalogDetail,
+  CatalogActivitySummary,
+  CatalogActivityDetail,
   CatalogTargetType,
   CatalogReviewRequest,
   CatalogActivationRequest,
@@ -37,7 +39,32 @@ export const getExplorationCatalog = (
         )
         .then((response) => response.data);
 
-// 카탈로그 검토
+// 활동 카탈로그에 속한 활동 목록
+export const getExplorationCatalogActivities = (
+  catalogId: number,
+) =>
+  isExplorationMock
+    ? mock.listActivities(catalogId)
+    : api
+        .get<CatalogActivitySummary[]>(
+          `${BASE}/ACTIVITY_CATALOG/${catalogId}/activities`,
+        )
+        .then((response) => response.data);
+
+// 활동 한 건의 본문과 검토 이력
+export const getExplorationCatalogActivity = (
+  catalogId: number,
+  activityId: number,
+) =>
+  isExplorationMock
+    ? mock.getActivity(catalogId, activityId)
+    : api
+        .get<CatalogActivityDetail>(
+          `${BASE}/ACTIVITY_CATALOG/${catalogId}/activities/${activityId}`,
+        )
+        .then((response) => response.data);
+
+// 카탈로그·활동 검토
 export const reviewExplorationCatalog = (
   request: CatalogReviewRequest,
 ) =>

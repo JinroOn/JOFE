@@ -10,7 +10,7 @@ import { toExplorationErrorCode } from '../../../../api/exploration';
 
 import type {
   CatalogAction,
-  CatalogSummary,
+  CatalogReviewTargetType,
   CatalogReviewKind,
   CatalogReviewDecision,
   CatalogActivationScope,
@@ -35,8 +35,16 @@ const ERROR_TEXT: Record<string, string> = {
   NOT_FOUND: '대상 카탈로그를 찾을 수 없습니다.',
 };
 
+// 카탈로그 요약(CatalogSummary)을 그대로 넘기거나, 활동 한 건처럼 검토만 가능한 대상을 넘긴다
+export interface CatalogActionTarget {
+  targetType: CatalogReviewTargetType;
+  targetId: number;
+  allowedActions: CatalogAction[];
+  blockedReasons: Partial<Record<CatalogAction, string>>;
+}
+
 interface CatalogActionsProps {
-  catalog: CatalogSummary;
+  catalog: CatalogActionTarget;
   onChanged: () => void;
 }
 
@@ -98,31 +106,32 @@ const CatalogActions = ({
     setError(null);
 
     try {
-      const target = {
-        targetType: catalog.targetType,
-        targetId: catalog.targetId,
-      };
+      const { targetType, targetId } = catalog;
 
       if (pending === 'REVIEW') {
         await reviewExplorationCatalog({
-          ...target,
+          targetType,
+          targetId,
           reviewKind,
           decision,
           evidenceReference: evidenceReference.trim(),
         });
       }
 
-      if (pending === 'ACTIVATE') {
+      // 활동 한 건은 백엔드에서 활성화·보관 대상이 아니다 (활동 카탈로그 단위로만 한다)
+      if (pending === 'ACTIVATE' && targetType !== 'ACTIVITY') {
         await activateExplorationCatalog({
-          ...target,
+          targetType,
+          targetId,
           scope,
           reason: reason.trim(),
         });
       }
 
-      if (pending === 'ARCHIVE') {
+      if (pending === 'ARCHIVE' && targetType !== 'ACTIVITY') {
         await archiveExplorationCatalog({
-          ...target,
+          targetType,
+          targetId,
           reason: reason.trim(),
         });
       }
