@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import useAuthStore from './store/useAuthStore';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
@@ -46,6 +46,59 @@ const Placeholder = ({ name }: { name: string }) => (
   <div className="flex items-center justify-center min-h-[60vh] text-on-surface-variant text-lg">
     {name} 페이지 준비 중
   </div>
+);
+
+// 없는 주소에 대한 사용자용 안내 화면
+const NotFoundPage = () => (
+  <main className="w-full min-h-[60vh] flex items-center justify-center px-4 py-16">
+    <div className="w-full max-w-lg text-center">
+      <div className="mx-auto mb-6 w-20 h-20 rounded-full bg-surface-container-low flex items-center justify-center">
+        <span
+          className="material-symbols-outlined text-5xl text-secondary"
+          aria-hidden="true"
+        >
+          search_off
+        </span>
+      </div>
+
+      <p className="text-sm font-bold text-secondary mb-3">
+        404
+      </p>
+
+      <h1 className="text-2xl sm:text-3xl font-bold text-primary-container mb-4">
+        페이지를 찾을 수 없습니다
+      </h1>
+
+      <p className="text-sm sm:text-base leading-relaxed text-on-surface-variant mb-8 break-keep">
+        요청하신 페이지의 주소가 잘못되었거나
+        페이지가 이동 또는 삭제되었을 수 있습니다.
+        주소를 다시 확인해 주세요.
+      </p>
+
+      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <Link
+          to="/"
+          className="min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-primary-container text-white font-bold px-6 py-3"
+        >
+          <span
+            className="material-symbols-outlined text-xl"
+            aria-hidden="true"
+          >
+            home
+          </span>
+
+          홈으로 돌아가기
+        </Link>
+
+        <Link
+          to="/library"
+          className="min-h-[44px] inline-flex items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-lowest font-semibold text-primary-container px-6 py-3"
+        >
+          공지사항 및 자료실
+        </Link>
+      </div>
+    </div>
+  </main>
 );
 
 const AdminRedirect = ({ children }: { children: ReactNode }) => {
@@ -151,7 +204,7 @@ const AppLayout = () => {
             element={isExplorationEnabled ? <ExplorationShared /> : <Navigate to="/" replace />}
           />
           <Route path="/error" element={<ErrorPage />} />
-          <Route path="*" element={<Placeholder name="404 - 찾을 수 없는" />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </div>
       {!isAuthPage && !isMainPage && !isLoadingPage && !isChatPage && !isAdminPage && <FooterSimple />}

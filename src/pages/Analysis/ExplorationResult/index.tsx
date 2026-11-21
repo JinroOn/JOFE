@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import {
+  Link,
+  useNavigate,
+  useParams,
+} from 'react-router-dom';
+
 import api from '../../../api/axios';
 import { isExplorationMock } from '../../../config/features';
 import useExplorationResult from '../../../hooks/useExplorationResult';
 import type { ExplorationResult } from '../../../types/exploration';
+
 import MockBanner from '../../Diagnosis/Exploration/components/MockBanner';
 import GroupCard from './components/GroupCard';
 import CandidateBrowser from './components/CandidateBrowser';
@@ -108,8 +115,7 @@ const toResultActivityCard = (
     duration = getText(activity.duration);
   }
 
-  // 사용자에게 보여줄 description만 사용합니다.
-  // selectionReason은 내부 추천 사유 코드이므로 제외합니다.
+  // 내부 selectionReason은 출력하지 않습니다.
   const description = getText(activity.description);
 
   const mockOutcome = getText(activity.outcome);
@@ -180,6 +186,7 @@ const StatusPanel = ({
   </div>
 );
 
+// 백엔드 비교 API는 전공 2개를 비교합니다.
 const COMPARE_MAX = 2;
 
 interface CandidateNamesResponse {
@@ -251,10 +258,11 @@ const ResultView = ({
 
   const presentation = result.presentation;
 
-  const [candidateNames, setCandidateNames] = useState<{
-    resultId: number;
-    names: Record<string, string>;
-  } | null>(null);
+  const [candidateNames, setCandidateNames] =
+    useState<{
+      resultId: number;
+      names: Record<string, string>;
+    } | null>(null);
 
   useEffect(() => {
     if (
@@ -308,7 +316,7 @@ const ResultView = ({
         });
       })
       .catch(() => {
-        // 추가 후보 이름 조회 실패 시에도 기존 결과 유지
+        // 추가 후보 조회 실패 시 기존 결과 화면 유지
       });
 
     return () => {
@@ -359,7 +367,7 @@ const ResultView = ({
   };
 
   const startCompare = () => {
-    if (selected.length >= 2) {
+    if (selected.length >= COMPARE_MAX) {
       onCompare(selected);
     } else {
       setCompareHint(true);
@@ -378,6 +386,59 @@ const ResultView = ({
     max: COMPARE_MAX,
     onToggle: toggle,
   };
+
+  // 선택한 전공이 있으면 화면 하단에 비교 바를 표시합니다.
+  // Portal을 사용해 결과 화면의 레이아웃 영향을 받지 않습니다.
+  const floatingCompareBar =
+    canCompare && selected.length > 0
+      ? createPortal(
+          <div
+            className="fixed inset-x-0 bottom-0 z-[80] border-t border-outline-variant/30 bg-surface-container-lowest/95 backdrop-blur shadow-[0_-10px_35px_rgba(10,25,47,0.12)] px-4 py-3"
+            role="region"
+            aria-label="전공 비교 선택"
+          >
+            <div className="max-w-[880px] mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="min-w-0">
+                <p
+                  className="text-sm font-bold text-primary-container"
+                  aria-live="polite"
+                >
+                  비교에 담은 전공{' '}
+                  {selected.length}/{COMPARE_MAX}
+                </p>
+
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  {selected.length >= COMPARE_MAX
+                    ? '전공 2개를 선택했습니다. 바로 비교할 수 있어요.'
+                    : '전공 1개를 더 선택하면 비교할 수 있어요.'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelected([])}
+                  className="shrink-0 min-h-[44px] rounded-lg px-4 text-sm font-semibold text-on-surface-variant"
+                >
+                  비우기
+                </button>
+
+                <button
+                  type="button"
+                  onClick={startCompare}
+                  disabled={
+                    selected.length < COMPARE_MAX
+                  }
+                  className={`${primaryBtn} flex-1 sm:flex-none disabled:opacity-50 disabled:hover:scale-100`}
+                >
+                  두 전공 비교하기
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
 
   return (
     <>
@@ -403,9 +464,8 @@ const ResultView = ({
         {!noCandidate && (
           <p className="text-sm sm:text-base text-on-surface-variant mt-3 leading-relaxed">
             응답에서 나타난 관심·활동·공부 방식을
-            바탕으로 골랐어요. 순서는 먼저 살펴보기
-            좋은 차례일 뿐, 잘하거나 못하는 정도를
-            뜻하지 않아요.
+            바탕으로 골랐어요. 순서는 먼저 살펴보기 좋은
+            차례일 뿐, 잘하거나 못하는 정도를 뜻하지 않아요.
           </p>
         )}
       </header>
@@ -431,7 +491,7 @@ const ResultView = ({
         </div>
       )}
 
-      {/* 후보 반응 */}
+      {/* 학생이 직접 표시한 후보 반응 */}
       {presentation?.source === 'USER_REPORTED' && (
         <section
           aria-labelledby="candidate-reaction-title"
@@ -489,7 +549,7 @@ const ResultView = ({
         </section>
       )}
 
-      {/* 추천 전공 */}
+      {/* 첫 화면 추천 후보 */}
       {result.groups.length > 0 && (
         <section
           aria-labelledby="groups-title"
@@ -527,7 +587,7 @@ const ResultView = ({
         </section>
       )}
 
-      {/* 후보 더 보기 */}
+      {/* 추가 후보 */}
       {!noCandidate && (
         <CandidateBrowser
           resultId={result.resultId}
@@ -535,6 +595,7 @@ const ResultView = ({
         />
       )}
 
+      {/* 다시 확인할 관심 분야 */}
       {recheckAxes.length > 0 && (
         <section
           aria-labelledby="recheck-title"
@@ -566,7 +627,7 @@ const ResultView = ({
         </section>
       )}
 
-      {/* 주의 및 확인 사항 */}
+      {/* 탐색하면서 확인할 점 */}
       {result.cautions.length > 0 && (
         <section
           aria-labelledby="caution-title"
@@ -605,6 +666,7 @@ const ResultView = ({
                     >
                       info
                     </span>
+
                     {caution.text}
                   </p>
 
@@ -631,8 +693,7 @@ const ResultView = ({
         </section>
       )}
 
-      {result.cautionAvailability ===
-        'UNAVAILABLE' &&
+      {result.cautionAvailability === 'UNAVAILABLE' &&
         result.cautionUnavailableReason ===
           'APPROVAL_SNAPSHOT_NOT_AVAILABLE' && (
           <p
@@ -650,6 +711,7 @@ const ResultView = ({
         }
       />
 
+      {/* 활동 이용 불가 안내 */}
       {!canActivities &&
         result.activityMessage && (
           <p
@@ -660,7 +722,7 @@ const ResultView = ({
           </p>
         )}
 
-      {/* 추천 탐색 활동 */}
+      {/* 탐색 활동 */}
       {canActivities && (
         <section
           aria-labelledby="activity-title"
@@ -721,9 +783,7 @@ const ResultView = ({
 
                       {activity.duration && (
                         <>
-                          <span
-                            aria-hidden="true"
-                          >
+                          <span aria-hidden="true">
                             ·
                           </span>
                           <span>
@@ -748,6 +808,7 @@ const ResultView = ({
                         <span className="font-semibold text-primary-container">
                           {activity.outcomeLabel} ·{' '}
                         </span>
+
                         {activity.outcome}
                       </p>
                     )}
@@ -759,13 +820,12 @@ const ResultView = ({
         </section>
       )}
 
+      {/* 공유 */}
       {canShare && (
-        <SharePanel
-          resultId={result.resultId}
-        />
+        <SharePanel resultId={result.resultId} />
       )}
 
-      {/* 다음 단계 */}
+      {/* 기존 다음 단계 메뉴 */}
       <section
         aria-labelledby="next-title"
         className="rounded-brand bg-surface-container-low p-5 sm:p-6 mb-8"
@@ -831,6 +891,7 @@ const ResultView = ({
         </div>
       </section>
 
+      {/* 결과 안내 문구 유지 */}
       <p className="text-xs text-on-surface-variant leading-relaxed">
         이 결과는 능력이나 적성을 판정하거나 합격·취업
         가능성을 예측하지 않아요. 지금의 응답을 바탕으로
@@ -839,48 +900,8 @@ const ResultView = ({
         결과는 바뀌지 않고 그대로 보관돼요.
       </p>
 
-      {/* 비교 바구니 */}
-      {selected.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-outline-variant/30 bg-surface-container-lowest/95 backdrop-blur px-4 py-3">
-          <div className="max-w-[880px] mx-auto flex flex-wrap items-center justify-between gap-2">
-            <p
-              className="text-sm text-primary-container"
-              aria-live="polite"
-            >
-              비교에 담은 전공{' '}
-              {selected.length}/{COMPARE_MAX}
-
-              {selected.length < 2 && (
-                <span className="text-on-surface-variant">
-                  {' · '}
-                  1개 더 담으면 비교할 수 있어요
-                </span>
-              )}
-            </p>
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setSelected([])
-                }
-                className="min-h-[44px] px-4 text-sm font-semibold text-on-surface-variant"
-              >
-                비우기
-              </button>
-
-              <button
-                type="button"
-                onClick={startCompare}
-                disabled={selected.length < 2}
-                className={`${primaryBtn} disabled:opacity-50 disabled:hover:scale-100`}
-              >
-                비교하기
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 화면 하단에 고정되는 비교 바 */}
+      {floatingCompareBar}
     </>
   );
 };
@@ -1007,8 +1028,8 @@ const ExplorationResultPage = () => {
     );
   }
 
-  // 여기서 resultId와 기능 가용성을 상세창에 전달합니다.
-  // 현재 URL에 있는 id는 sessionId입니다.
+  // URL의 id는 sessionId이고,
+  // AI 설명 및 공유에는 결과 응답의 resultId를 사용합니다.
   const explanationAvailable =
     state.result.capabilities !== undefined &&
     'explanationAvailable' in state.result.capabilities &&
