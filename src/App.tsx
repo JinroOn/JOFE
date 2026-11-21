@@ -42,12 +42,6 @@ import SharedResult from './pages/Analysis/SharedResult';
 import ErrorPage from './pages/Error';
 import SessionModal from './pages/Auth/components/SessionModal';
 
-const Placeholder = ({ name }: { name: string }) => (
-  <div className="flex items-center justify-center min-h-[60vh] text-on-surface-variant text-lg">
-    {name} 페이지 준비 중
-  </div>
-);
-
 // 없는 주소에 대한 사용자용 안내 화면
 const NotFoundPage = () => (
   <main className="w-full min-h-[60vh] flex items-center justify-center px-4 py-16">
@@ -177,7 +171,7 @@ const AppLayout = () => {
             path="/analysis/exploration/:sessionId/plan"
             element={isExplorationEnabled ? <UserOnlyRoute><ExplorationPlan /></UserOnlyRoute> : <Navigate to="/analysis/dashboard" replace />}
           />
-          <Route path="/analysis/*" element={<UserOnlyRoute><Placeholder name="진로분석" /></UserOnlyRoute>} />
+          <Route path="/analysis/*" element={<NotFoundPage />} />
           <Route path="/library" element={<UserOnlyRoute><LibraryNotice /></UserOnlyRoute>} />
           <Route path="/library/content" element={<UserOnlyRoute><LibraryContent /></UserOnlyRoute>} />
           <Route path="/library/content/:id" element={<UserOnlyRoute><LibraryContentDetail /></UserOnlyRoute>} />
