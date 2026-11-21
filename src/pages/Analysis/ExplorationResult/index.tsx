@@ -10,6 +10,7 @@ import GroupCard from './components/GroupCard';
 import CandidateBrowser from './components/CandidateBrowser';
 import SharePanel from './components/SharePanel';
 import PreparationResponses from './components/PreparationResponses';
+import { MajorExplanationProvider } from './components/MajorDetailDialog';
 
 const ACTIVITY_LABEL: Record<
   string,
@@ -107,9 +108,8 @@ const toResultActivityCard = (
     duration = getText(activity.duration);
   }
 
-  // 수정: 사용자에게 보여줄 description만 사용합니다.
-  // selectionReason은 내부 추천 사유 코드이므로 표시하지 않습니다.
-  // body_markdown도 결과 요약 카드에서는 출력하지 않습니다.
+  // 사용자에게 보여줄 description만 사용합니다.
+  // selectionReason은 내부 추천 사유 코드이므로 제외합니다.
   const description = getText(activity.description);
 
   const mockOutcome = getText(activity.outcome);
@@ -143,7 +143,11 @@ const formatDate = (iso: string) => {
     : `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
 };
 
-const Shell = ({ children }: { children: ReactNode }) => (
+const Shell = ({
+  children,
+}: {
+  children: ReactNode;
+}) => (
   <div className="min-h-screen bg-surface">
     <div className="max-w-[880px] w-full mx-auto px-4 sm:px-8 pt-8 pb-24">
       {isExplorationMock && <MockBanner />}
@@ -304,7 +308,7 @@ const ResultView = ({
         });
       })
       .catch(() => {
-        // 후보 이름 추가 조회에 실패해도 결과 화면은 유지합니다.
+        // 추가 후보 이름 조회 실패 시에도 기존 결과 유지
       });
 
     return () => {
@@ -318,7 +322,9 @@ const ResultView = ({
     presentation?.unfamiliar,
   ]);
 
-  const getReactionMajorName = (code: string): string => {
+  const getReactionMajorName = (
+    code: string,
+  ): string => {
     const firstScreenName = majorNames.get(code);
 
     const fullCandidateName =
@@ -326,20 +332,26 @@ const ResultView = ({
         ? candidateNames.names[code]
         : undefined;
 
-    const name = firstScreenName || fullCandidateName;
+    const name =
+      firstScreenName || fullCandidateName;
 
     return name?.trim() || '다른 후보';
   };
 
-  const [selected, setSelected] = useState<string[]>([]);
-  const [compareHint, setCompareHint] = useState(false);
+  const [selected, setSelected] =
+    useState<string[]>([]);
+
+  const [compareHint, setCompareHint] =
+    useState(false);
 
   const toggle = (code: string) => {
     setCompareHint(false);
 
     setSelected((previous) =>
       previous.includes(code)
-        ? previous.filter((item) => item !== code)
+        ? previous.filter(
+            (item) => item !== code,
+          )
         : previous.length >= COMPARE_MAX
           ? previous
           : [...previous, code],
@@ -373,6 +385,7 @@ const ResultView = ({
         <p className="text-xs text-on-surface-variant mb-2">
           {formatDate(result.createdAt)} 완료한 전공 탐색 진단
           {' · '}
+
           <Link
             to="/mypage"
             className="font-semibold text-secondary underline underline-offset-2"
@@ -390,8 +403,9 @@ const ResultView = ({
         {!noCandidate && (
           <p className="text-sm sm:text-base text-on-surface-variant mt-3 leading-relaxed">
             응답에서 나타난 관심·활동·공부 방식을
-            바탕으로 골랐어요. 순서는 먼저 살펴보기 좋은
-            차례일 뿐, 잘하거나 못하는 정도를 뜻하지 않아요.
+            바탕으로 골랐어요. 순서는 먼저 살펴보기
+            좋은 차례일 뿐, 잘하거나 못하는 정도를
+            뜻하지 않아요.
           </p>
         )}
       </header>
@@ -417,6 +431,7 @@ const ResultView = ({
         </div>
       )}
 
+      {/* 후보 반응 */}
       {presentation?.source === 'USER_REPORTED' && (
         <section
           aria-labelledby="candidate-reaction-title"
@@ -474,12 +489,16 @@ const ResultView = ({
         </section>
       )}
 
+      {/* 추천 전공 */}
       {result.groups.length > 0 && (
         <section
           aria-labelledby="groups-title"
           className="mb-10"
         >
-          <h2 id="groups-title" className="sr-only">
+          <h2
+            id="groups-title"
+            className="sr-only"
+          >
             탐색 후보 전공군
           </h2>
 
@@ -494,18 +513,21 @@ const ResultView = ({
           )}
 
           <div className="space-y-4">
-            {result.groups.map((group, index) => (
-              <GroupCard
-                key={group.groupCode}
-                group={group}
-                index={index}
-                compare={compare}
-              />
-            ))}
+            {result.groups.map(
+              (group, index) => (
+                <GroupCard
+                  key={group.groupCode}
+                  group={group}
+                  index={index}
+                  compare={compare}
+                />
+              ),
+            )}
           </div>
         </section>
       )}
 
+      {/* 후보 더 보기 */}
       {!noCandidate && (
         <CandidateBrowser
           resultId={result.resultId}
@@ -544,6 +566,7 @@ const ResultView = ({
         </section>
       )}
 
+      {/* 주의 및 확인 사항 */}
       {result.cautions.length > 0 && (
         <section
           aria-labelledby="caution-title"
@@ -557,52 +580,59 @@ const ResultView = ({
           </h2>
 
           <ul className="space-y-3">
-            {result.cautions.slice(0, 2).map((caution) => (
-              <li
-                key={`${caution.majorCode ?? ''}:${caution.tagCode}`}
-                className="rounded-brand border border-outline-variant/30 bg-surface-container-lowest p-5"
-              >
-                {caution.majorCode &&
-                  majorNames.has(caution.majorCode) && (
-                    <p className="text-xs font-bold text-secondary mb-2">
-                      {majorNames.get(caution.majorCode)}
-                    </p>
-                  )}
+            {result.cautions
+              .slice(0, 2)
+              .map((caution) => (
+                <li
+                  key={`${caution.majorCode ?? ''}:${caution.tagCode}`}
+                  className="rounded-brand border border-outline-variant/30 bg-surface-container-lowest p-5"
+                >
+                  {caution.majorCode &&
+                    majorNames.has(
+                      caution.majorCode,
+                    ) && (
+                      <p className="text-xs font-bold text-secondary mb-2">
+                        {majorNames.get(
+                          caution.majorCode,
+                        )}
+                      </p>
+                    )}
 
-                <p className="flex items-start gap-2 font-semibold text-primary-container mb-2">
-                  <span
-                    className="material-symbols-outlined text-[18px] text-secondary mt-0.5"
-                    aria-hidden="true"
-                  >
-                    info
-                  </span>
-                  {caution.text}
-                </p>
-
-                {caution.checkAction ? (
-                  <p className="text-sm text-on-surface-variant leading-relaxed pl-7">
-                    <span className="font-semibold text-primary-container">
-                      이렇게 확인해보세요 ·{' '}
+                  <p className="flex items-start gap-2 font-semibold text-primary-container mb-2">
+                    <span
+                      className="material-symbols-outlined text-[18px] text-secondary mt-0.5"
+                      aria-hidden="true"
+                    >
+                      info
                     </span>
-                    {caution.checkAction}
+                    {caution.text}
                   </p>
-                ) : (
-                  caution.answerText && (
+
+                  {caution.checkAction ? (
                     <p className="text-sm text-on-surface-variant leading-relaxed pl-7">
                       <span className="font-semibold text-primary-container">
-                        내가 답한 내용 ·{' '}
+                        이렇게 확인해보세요 ·{' '}
                       </span>
-                      {caution.answerText}
+                      {caution.checkAction}
                     </p>
-                  )
-                )}
-              </li>
-            ))}
+                  ) : (
+                    caution.answerText && (
+                      <p className="text-sm text-on-surface-variant leading-relaxed pl-7">
+                        <span className="font-semibold text-primary-container">
+                          내가 답한 내용 ·{' '}
+                        </span>
+                        {caution.answerText}
+                      </p>
+                    )
+                  )}
+                </li>
+              ))}
           </ul>
         </section>
       )}
 
-      {result.cautionAvailability === 'UNAVAILABLE' &&
+      {result.cautionAvailability ===
+        'UNAVAILABLE' &&
         result.cautionUnavailableReason ===
           'APPROVAL_SNAPSHOT_NOT_AVAILABLE' && (
           <p
@@ -615,18 +645,22 @@ const ResultView = ({
         )}
 
       <PreparationResponses
-        responses={result.preparationResponses ?? []}
+        responses={
+          result.preparationResponses ?? []
+        }
       />
 
-      {!canActivities && result.activityMessage && (
-        <p
-          role="note"
-          className="rounded-brand bg-surface-container-low px-5 py-4 mb-8 text-sm text-on-surface-variant"
-        >
-          {result.activityMessage}
-        </p>
-      )}
+      {!canActivities &&
+        result.activityMessage && (
+          <p
+            role="note"
+            className="rounded-brand bg-surface-container-low px-5 py-4 mb-8 text-sm text-on-surface-variant"
+          >
+            {result.activityMessage}
+          </p>
+        )}
 
+      {/* 추천 탐색 활동 */}
       {canActivities && (
         <section
           aria-labelledby="activity-title"
@@ -662,63 +696,76 @@ const ResultView = ({
               className="rounded-brand bg-surface-container-low px-5 py-5 text-sm text-on-surface-variant"
             >
               지금 표시할 추천 활동이 없습니다.
-              활동 더 보기에서 다른 활동을 확인할 수 있어요.
+              활동 더 보기에서 다른 활동을
+              확인할 수 있어요.
             </p>
           ) : (
             <ol className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {nextActivities.map((activity, index) => (
-                <li
-                  key={`${activity.id}-${index}`}
-                  className="flex flex-col rounded-brand bg-surface-container-lowest border border-outline-variant/20 p-5 cloud-shadow"
-                >
-                  <p className="inline-flex flex-wrap items-center gap-1 text-xs font-bold text-secondary mb-2">
-                    <span
-                      className="material-symbols-outlined text-[16px]"
-                      aria-hidden="true"
-                    >
-                      {activity.icon}
-                    </span>
-
-                    <span>{activity.label}</span>
-
-                    {activity.duration && (
-                      <>
-                        <span aria-hidden="true">·</span>
-                        <span>{activity.duration}</span>
-                      </>
-                    )}
-                  </p>
-
-                  <p className="font-bold text-primary-container mb-2">
-                    {activity.title}
-                  </p>
-
-                  {/* 설명이 없으면 빈 줄도 표시하지 않습니다. */}
-                  {activity.description && (
-                    <p className="text-sm text-on-surface-variant leading-relaxed mb-3 whitespace-pre-line line-clamp-4">
-                      {activity.description}
-                    </p>
-                  )}
-
-                  {activity.outcome && (
-                    <p className="mt-auto text-xs text-on-surface-variant border-t border-outline-variant/20 pt-3">
-                      <span className="font-semibold text-primary-container">
-                        {activity.outcomeLabel} ·{' '}
+              {nextActivities.map(
+                (activity, index) => (
+                  <li
+                    key={`${activity.id}-${index}`}
+                    className="flex flex-col rounded-brand bg-surface-container-lowest border border-outline-variant/20 p-5 cloud-shadow"
+                  >
+                    <p className="inline-flex flex-wrap items-center gap-1 text-xs font-bold text-secondary mb-2">
+                      <span
+                        className="material-symbols-outlined text-[16px]"
+                        aria-hidden="true"
+                      >
+                        {activity.icon}
                       </span>
-                      {activity.outcome}
+
+                      <span>
+                        {activity.label}
+                      </span>
+
+                      {activity.duration && (
+                        <>
+                          <span
+                            aria-hidden="true"
+                          >
+                            ·
+                          </span>
+                          <span>
+                            {activity.duration}
+                          </span>
+                        </>
+                      )}
                     </p>
-                  )}
-                </li>
-              ))}
+
+                    <p className="font-bold text-primary-container mb-2">
+                      {activity.title}
+                    </p>
+
+                    {activity.description && (
+                      <p className="text-sm text-on-surface-variant leading-relaxed mb-3 whitespace-pre-line line-clamp-4">
+                        {activity.description}
+                      </p>
+                    )}
+
+                    {activity.outcome && (
+                      <p className="mt-auto text-xs text-on-surface-variant border-t border-outline-variant/20 pt-3">
+                        <span className="font-semibold text-primary-container">
+                          {activity.outcomeLabel} ·{' '}
+                        </span>
+                        {activity.outcome}
+                      </p>
+                    )}
+                  </li>
+                ),
+              )}
             </ol>
           )}
         </section>
       )}
 
       {canShare && (
-        <SharePanel resultId={result.resultId} />
+        <SharePanel
+          resultId={result.resultId}
+        />
       )}
 
+      {/* 다음 단계 */}
       <section
         aria-labelledby="next-title"
         className="rounded-brand bg-surface-container-low p-5 sm:p-6 mb-8"
@@ -784,7 +831,6 @@ const ResultView = ({
         </div>
       </section>
 
-      {/* 수정: 사용자용 안내 문구는 유지, 결과 버전만 제거 */}
       <p className="text-xs text-on-surface-variant leading-relaxed">
         이 결과는 능력이나 적성을 판정하거나 합격·취업
         가능성을 예측하지 않아요. 지금의 응답을 바탕으로
@@ -793,6 +839,7 @@ const ResultView = ({
         결과는 바뀌지 않고 그대로 보관돼요.
       </p>
 
+      {/* 비교 바구니 */}
       {selected.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-outline-variant/30 bg-surface-container-lowest/95 backdrop-blur px-4 py-3">
           <div className="max-w-[880px] mx-auto flex flex-wrap items-center justify-between gap-2">
@@ -800,11 +847,13 @@ const ResultView = ({
               className="text-sm text-primary-container"
               aria-live="polite"
             >
-              비교에 담은 전공 {selected.length}/{COMPARE_MAX}
+              비교에 담은 전공{' '}
+              {selected.length}/{COMPARE_MAX}
 
               {selected.length < 2 && (
                 <span className="text-on-surface-variant">
-                  {' · '}1개 더 담으면 비교할 수 있어요
+                  {' · '}
+                  1개 더 담으면 비교할 수 있어요
                 </span>
               )}
             </p>
@@ -812,7 +861,9 @@ const ResultView = ({
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setSelected([])}
+                onClick={() =>
+                  setSelected([])
+                }
                 className="min-h-[44px] px-4 text-sm font-semibold text-on-surface-variant"
               >
                 비우기
@@ -839,7 +890,9 @@ const ExplorationResultPage = () => {
   const navigate = useNavigate();
 
   const id = Number(sessionId);
-  const { state, retry } = useExplorationResult(id);
+
+  const { state, retry } =
+    useExplorationResult(id);
 
   const exit = () =>
     navigate('/diagnosis/exploration');
@@ -923,7 +976,10 @@ const ExplorationResultPage = () => {
 
     return (
       <Shell>
-        <StatusPanel title={title} body={body}>
+        <StatusPanel
+          title={title}
+          body={body}
+        >
           <div
             role="alert"
             className="flex flex-wrap justify-center gap-2"
@@ -951,28 +1007,46 @@ const ExplorationResultPage = () => {
     );
   }
 
+  // 여기서 resultId와 기능 가용성을 상세창에 전달합니다.
+  // 현재 URL에 있는 id는 sessionId입니다.
+  const explanationAvailable =
+    state.result.capabilities !== undefined &&
+    'explanationAvailable' in state.result.capabilities &&
+    state.result.capabilities.explanationAvailable === true;
+
   return (
     <Shell>
-      <ResultView
-        result={state.result}
-        onExit={exit}
-        onActivities={() =>
-          navigate(`/analysis/exploration/${id}/activities`)
-        }
-        onAsk={() =>
-          navigate(`/analysis/exploration/${id}/ask`)
-        }
-        onPlan={() =>
-          navigate(`/analysis/exploration/${id}/plan`)
-        }
-        onCompare={(codes) =>
-          navigate(
-            `/analysis/exploration/${id}/compare?majors=${codes
-              .map(encodeURIComponent)
-              .join(',')}`,
-          )
-        }
-      />
+      <MajorExplanationProvider
+        resultId={state.result.resultId}
+        enabled={explanationAvailable}
+      >
+        <ResultView
+          result={state.result}
+          onExit={exit}
+          onActivities={() =>
+            navigate(
+              `/analysis/exploration/${id}/activities`,
+            )
+          }
+          onAsk={() =>
+            navigate(
+              `/analysis/exploration/${id}/ask`,
+            )
+          }
+          onPlan={() =>
+            navigate(
+              `/analysis/exploration/${id}/plan`,
+            )
+          }
+          onCompare={(codes) =>
+            navigate(
+              `/analysis/exploration/${id}/compare?majors=${codes
+                .map(encodeURIComponent)
+                .join(',')}`,
+            )
+          }
+        />
+      </MajorExplanationProvider>
     </Shell>
   );
 };
