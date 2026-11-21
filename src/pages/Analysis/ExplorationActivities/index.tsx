@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+
 import {
   getExplorationActivities,
   toExplorationErrorCode,
 } from '../../../api/exploration';
+
 import { isExplorationMock } from '../../../config/features';
 import useExplorationResult from '../../../hooks/useExplorationResult';
+
 import type {
   ExplorationActivities as MockActivities,
   ExplorationErrorCode,
 } from '../../../types/exploration';
+
 import MockBanner from '../../Diagnosis/Exploration/components/MockBanner';
 import ActivityCard from './components/ActivityCard';
 import SupportPanel from './components/SupportPanel';
@@ -101,13 +105,14 @@ const isBackendActivities = (
   return Array.isArray(value.nextActivities);
 };
 
-// ------------------------------------------------------
+// -------------------------------
 // Markdown 렌더링
-// 기존 worksheet_markdown 지원을 유지하고
-// body_markdown에도 동일하게 사용합니다.
-// ------------------------------------------------------
+// worksheet_markdown, body_markdown
+// -------------------------------
 
-const renderWorksheetInline = (value: string): ReactNode[] =>
+const renderWorksheetInline = (
+  value: string,
+): ReactNode[] =>
   value
     .split(/(\*\*[^*]+\*\*|`[^`]+`)/g)
     .filter(Boolean)
@@ -143,7 +148,9 @@ const renderWorksheetInline = (value: string): ReactNode[] =>
       return part;
     });
 
-const parseTableRow = (line: string): string[] =>
+const parseTableRow = (
+  line: string,
+): string[] =>
   line
     .trim()
     .replace(/^\|/, '')
@@ -161,7 +168,9 @@ const isTableDivider = (
 
   return (
     cells.length === columnCount &&
-    cells.every((cell) => /^:?-{3,}:?$/.test(cell))
+    cells.every((cell) =>
+      /^:?-{3,}:?$/.test(cell),
+    )
   );
 };
 
@@ -185,14 +194,17 @@ const WorksheetMarkdown = ({
       continue;
     }
 
-    // 표 렌더링
+    // 표
     const headers = parseTableRow(line);
 
     if (
       line.includes('|') &&
       headers.length >= 2 &&
       index + 1 < lines.length &&
-      isTableDivider(lines[index + 1], headers.length)
+      isTableDivider(
+        lines[index + 1],
+        headers.length,
+      )
     ) {
       const key = index;
       const rows: string[][] = [];
@@ -204,7 +216,8 @@ const WorksheetMarkdown = ({
         lines[index].trim() &&
         lines[index].includes('|')
       ) {
-        const values = parseTableRow(lines[index]);
+        const values =
+          parseTableRow(lines[index]);
 
         rows.push(
           headers.map(
@@ -230,34 +243,40 @@ const WorksheetMarkdown = ({
             <table className="w-full min-w-[520px] border-collapse text-left text-sm">
               <thead className="bg-surface-container-low">
                 <tr>
-                  {headers.map((header, columnIndex) => (
-                    <th
-                      key={columnIndex}
-                      scope="col"
-                      className="min-w-[120px] border-b border-r last:border-r-0 border-outline-variant/30 px-3 py-3 align-top font-bold text-primary-container whitespace-normal break-words"
-                    >
-                      {renderWorksheetInline(header)}
-                    </th>
-                  ))}
+                  {headers.map(
+                    (header, columnIndex) => (
+                      <th
+                        key={columnIndex}
+                        scope="col"
+                        className="min-w-[120px] border-b border-r last:border-r-0 border-outline-variant/30 px-3 py-3 align-top font-bold text-primary-container whitespace-normal break-words"
+                      >
+                        {renderWorksheetInline(header)}
+                      </th>
+                    ),
+                  )}
                 </tr>
               </thead>
 
               <tbody>
-                {rows.map((row, rowIndex) => (
-                  <tr
-                    key={rowIndex}
-                    className="even:bg-surface-container-low/50"
-                  >
-                    {row.map((cell, columnIndex) => (
-                      <td
-                        key={columnIndex}
-                        className="min-w-[120px] border-b border-r last:border-r-0 border-outline-variant/20 px-3 py-3 align-top whitespace-normal break-words"
-                      >
-                        {renderWorksheetInline(cell)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+                {rows.map(
+                  (row, rowIndex) => (
+                    <tr
+                      key={rowIndex}
+                      className="even:bg-surface-container-low/50"
+                    >
+                      {row.map(
+                        (cell, columnIndex) => (
+                          <td
+                            key={columnIndex}
+                            className="min-w-[120px] border-b border-r last:border-r-0 border-outline-variant/20 px-3 py-3 align-top whitespace-normal break-words"
+                          >
+                            {renderWorksheetInline(cell)}
+                          </td>
+                        ),
+                      )}
+                    </tr>
+                  ),
+                )}
               </tbody>
             </table>
           </div>
@@ -271,15 +290,20 @@ const WorksheetMarkdown = ({
       continue;
     }
 
-    // 제목 렌더링: #, ##, ###
+    // 제목
     const heading = line.match(
       /^#{1,6}\s+(.+?)\s*$/,
     );
 
     if (heading) {
       const key = index;
-      const level = line.match(/^#+/)?.[0].length ?? 2;
-      const title = heading[1].replace(/\s+#+$/, '');
+      const level =
+        line.match(/^#+/)?.[0].length ?? 2;
+
+      const title = heading[1].replace(
+        /\s+#+$/,
+        '',
+      );
 
       if (level === 1) {
         blocks.push(
@@ -321,7 +345,9 @@ const WorksheetMarkdown = ({
 
       while (
         index < lines.length &&
-        /^[-*+]\s+/.test(lines[index].trim())
+        /^[-*+]\s+/.test(
+          lines[index].trim(),
+        )
       ) {
         items.push(
           lines[index]
@@ -337,14 +363,16 @@ const WorksheetMarkdown = ({
           key={`list-${key}`}
           className="list-disc space-y-1 pl-5"
         >
-          {items.map((item, itemIndex) => (
-            <li
-              key={itemIndex}
-              className="leading-relaxed"
-            >
-              {renderWorksheetInline(item)}
-            </li>
-          ))}
+          {items.map(
+            (item, itemIndex) => (
+              <li
+                key={itemIndex}
+                className="leading-relaxed"
+              >
+                {renderWorksheetInline(item)}
+              </li>
+            ),
+          )}
         </ul>,
       );
 
@@ -358,7 +386,9 @@ const WorksheetMarkdown = ({
 
       while (
         index < lines.length &&
-        /^\d+[.)]\s+/.test(lines[index].trim())
+        /^\d+[.)]\s+/.test(
+          lines[index].trim(),
+        )
       ) {
         items.push(
           lines[index]
@@ -374,14 +404,16 @@ const WorksheetMarkdown = ({
           key={`ordered-${key}`}
           className="list-decimal space-y-1 pl-5"
         >
-          {items.map((item, itemIndex) => (
-            <li
-              key={itemIndex}
-              className="leading-relaxed"
-            >
-              {renderWorksheetInline(item)}
-            </li>
-          ))}
+          {items.map(
+            (item, itemIndex) => (
+              <li
+                key={itemIndex}
+                className="leading-relaxed"
+              >
+                {renderWorksheetInline(item)}
+              </li>
+            ),
+          )}
         </ol>,
       );
 
@@ -440,19 +472,19 @@ const WorksheetMarkdown = ({
   );
 };
 
-// ------------------------------------------------------
-// 수정: body_markdown 중복 내용 정리
-//
-// 1. 첫 제목이 카드 제목과 같으면 제거
-// 2. 별도 필드의 진행 방법/결과물/대안과 같은 문장 제거
-// 3. 별도 항목으로 출력하는 중복 소제목 제거
-// 4. 활동 조건, 입력값, 판정 기준 등 다른 설명은 유지
-// ------------------------------------------------------
+// -------------------------------
+// body_markdown 중복 내용 정리
+// -------------------------------
 
-const normalizeForComparison = (value: string): string =>
+const normalizeForComparison = (
+  value: string,
+): string =>
   value
     .replace(/^\s*#{1,6}\s*/, '')
-    .replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '')
+    .replace(
+      /^\s*(?:[-*+]|\d+[.)])\s+/,
+      '',
+    )
     .replace(/[\s\p{P}\p{S}]/gu, '')
     .toLowerCase();
 
@@ -473,7 +505,6 @@ const getVisibleActivityBody = (
       ? activity.alternative.split(/\r?\n/)
       : [];
 
-  // 이미 카드 아래에 별도 항목으로 출력되는 내용
   const structuredLines = [
     ...steps,
     ...artifacts,
@@ -482,7 +513,9 @@ const getVisibleActivityBody = (
     .map(normalizeForComparison)
     .filter(Boolean);
 
-  const title = normalizeForComparison(activity.title);
+  const title = normalizeForComparison(
+    activity.title,
+  );
 
   const lines = activity.body_markdown
     .replace(/\r\n?/g, '\n')
@@ -497,10 +530,13 @@ const getVisibleActivityBody = (
     if (!line) {
       if (
         visibleLines.length > 0 &&
-        visibleLines[visibleLines.length - 1] !== ''
+        visibleLines[
+          visibleLines.length - 1
+        ] !== ''
       ) {
         visibleLines.push('');
       }
+
       continue;
     }
 
@@ -512,16 +548,17 @@ const getVisibleActivityBody = (
       const headingText =
         normalizeForComparison(heading[1]);
 
-      // 카드 제목과 동일한 첫 제목은 출력하지 않습니다.
-      if (firstContent && headingText === title) {
+      // 카드 제목과 동일한 첫 번째 제목 제외
+      if (
+        firstContent &&
+        headingText === title
+      ) {
         firstContent = false;
         continue;
       }
 
       firstContent = false;
 
-      // 이미 아래에서 개별 항목으로 제공하는 제목은 생략합니다.
-      // 다만 그 아래의 고유한 조건/설명은 버리지 않습니다.
       const repeatedStepHeading =
         steps.length > 0 &&
         /^(진행방법|활동방법|활동순서|활동단계)$/.test(
@@ -535,7 +572,9 @@ const getVisibleActivityBody = (
         );
 
       const repeatedAlternativeHeading =
-        alternativeLines.some((value) => value.trim()) &&
+        alternativeLines.some(
+          (value) => value.trim(),
+        ) &&
         /^(다른방법으로해보기|대안활동|다른방법)$/.test(
           headingText,
         );
@@ -554,8 +593,7 @@ const getVisibleActivityBody = (
 
     firstContent = false;
 
-    // 별도 진행 방법/결과물/대안과 같은 문장은 중복 출력하지 않습니다.
-    // 다른 문장은 제거하지 않으므로 입력값과 활동 조건을 보존합니다.
+    // 별도 필드에 있는 동일 문구만 제거
     if (
       structuredLines.includes(
         normalizeForComparison(line),
@@ -567,7 +605,9 @@ const getVisibleActivityBody = (
     visibleLines.push(current);
   }
 
-  return visibleLines.join('\n').trim();
+  return visibleLines
+    .join('\n')
+    .trim();
 };
 
 const Shell = ({
@@ -589,7 +629,8 @@ const ApprovedActivityCard = ({
   activity: ApprovedActivity;
 }) => {
   const kindLabel =
-    ACTIVITY_KIND_LABEL[activity.kind] ?? '탐색 활동';
+    ACTIVITY_KIND_LABEL[activity.kind] ??
+    '탐색 활동';
 
   const steps = Array.isArray(activity.steps)
     ? activity.steps.filter(
@@ -599,7 +640,9 @@ const ApprovedActivityCard = ({
       )
     : [];
 
-  const artifacts = Array.isArray(activity.artifacts)
+  const artifacts = Array.isArray(
+    activity.artifacts,
+  )
     ? activity.artifacts.filter(
         (artifact): artifact is string =>
           typeof artifact === 'string' &&
@@ -607,20 +650,25 @@ const ApprovedActivityCard = ({
       )
     : [];
 
-  const sources = Array.isArray(activity.sources)
+  const sources = Array.isArray(
+    activity.sources,
+  )
     ? activity.sources.filter(
         (source) =>
           source &&
           typeof source.url === 'string' &&
-          /^https?:\/\//i.test(source.url),
+          /^https?:\/\//i.test(
+            source.url,
+          ),
       )
     : [];
 
-  const bodyMarkdown = getVisibleActivityBody(
-    activity,
-    steps,
-    artifacts,
-  );
+  const bodyMarkdown =
+    getVisibleActivityBody(
+      activity,
+      steps,
+      artifacts,
+    );
 
   return (
     <article className="min-w-0 h-full rounded-brand bg-surface-container-lowest border border-outline-variant/20 p-5 sm:p-6 cloud-shadow">
@@ -629,24 +677,25 @@ const ApprovedActivityCard = ({
           {kindLabel}
         </span>
 
-        {typeof activity.duration_minutes_proposal === 'number' &&
-          activity.duration_minutes_proposal > 0 && (
+        {typeof activity.duration_minutes_proposal ===
+          'number' &&
+          activity.duration_minutes_proposal >
+            0 && (
             <span className="text-xs text-on-surface-variant">
               약 {activity.duration_minutes_proposal}분
             </span>
           )}
       </div>
 
-      {/* 카드 제목은 여기서 한 번만 출력합니다. */}
       <h3 className="text-lg font-bold text-primary-container mb-3">
         {activity.title}
       </h3>
 
-      {/* 수정: 본문도 마크다운으로 렌더링합니다. */}
-      {/* 배경/입력값/조건은 보존하고 중복된 항목만 제외합니다. */}
       {bodyMarkdown && (
         <div className="min-w-0 max-w-full mb-5">
-          <WorksheetMarkdown markdown={bodyMarkdown} />
+          <WorksheetMarkdown
+            markdown={bodyMarkdown}
+          />
         </div>
       )}
 
@@ -676,14 +725,16 @@ const ApprovedActivityCard = ({
           </h4>
 
           <ul className="list-disc list-inside space-y-1">
-            {artifacts.map((artifact, index) => (
-              <li
-                key={`${activity.activity_id}-artifact-${index}`}
-                className="text-sm text-on-surface-variant leading-relaxed"
-              >
-                {artifact}
-              </li>
-            ))}
+            {artifacts.map(
+              (artifact, index) => (
+                <li
+                  key={`${activity.activity_id}-artifact-${index}`}
+                  className="text-sm text-on-surface-variant leading-relaxed"
+                >
+                  {artifact}
+                </li>
+              ),
+            )}
           </ul>
         </section>
       )}
@@ -712,7 +763,6 @@ const ApprovedActivityCard = ({
         </div>
       )}
 
-      {/* 기록 양식에는 중복 제거를 적용하지 않습니다. */}
       {activity.worksheet_markdown && (
         <details className="mb-4 min-w-0 max-w-full rounded-lg border border-outline-variant/30">
           <summary className="min-h-[44px] flex items-center cursor-pointer px-4 py-3 text-sm font-bold text-primary-container">
@@ -721,7 +771,9 @@ const ApprovedActivityCard = ({
 
           <div className="min-w-0 max-w-full px-4 pb-4">
             <WorksheetMarkdown
-              markdown={activity.worksheet_markdown}
+              markdown={
+                activity.worksheet_markdown
+              }
             />
           </div>
         </details>
@@ -742,7 +794,8 @@ const ApprovedActivityCard = ({
                   rel="noopener noreferrer"
                   className="text-xs font-semibold text-secondary underline underline-offset-2 break-words"
                 >
-                  {source.title || source.publisher}
+                  {source.title ||
+                    source.publisher}
                 </a>
 
                 {source.publisher && (
@@ -779,9 +832,12 @@ const ExplorationActivities = () => {
     useState<ActivitiesState | null>(null);
 
   const [error, setError] =
-    useState<ExplorationErrorCode | null>(null);
+    useState<ExplorationErrorCode | null>(
+      null,
+    );
 
-  const [version, setVersion] = useState(0);
+  const [version, setVersion] =
+    useState(0);
 
   useEffect(() => {
     if (resultId === null) return;
@@ -827,7 +883,9 @@ const ExplorationActivities = () => {
         if (!alive) return;
 
         setData(null);
-        setError(toExplorationErrorCode(caught));
+        setError(
+          toExplorationErrorCode(caught),
+        );
       });
 
     return () => {
@@ -836,12 +894,22 @@ const ExplorationActivities = () => {
   }, [resultId, version]);
 
   const backToResult = () =>
-    navigate(`/analysis/exploration/${id}`);
+    navigate(
+      `/analysis/exploration/${id}`,
+    );
 
   const current =
     data?.resultId === resultId
       ? data
       : null;
+
+  // 수정: 결과 또는 활동 요청의 NOT_FOUND
+  const resultNotFound =
+    (
+      resultState.kind === 'ERROR' &&
+      resultState.code === 'NOT_FOUND'
+    ) ||
+    error === 'NOT_FOUND';
 
   const failed =
     resultState.kind === 'ERROR' ||
@@ -856,7 +924,9 @@ const ExplorationActivities = () => {
       retryResult();
     }
 
-    setVersion((previous) => previous + 1);
+    setVersion(
+      (previous) => previous + 1,
+    );
   };
 
   return (
@@ -873,7 +943,6 @@ const ExplorationActivities = () => {
           >
             arrow_back
           </span>
-
           결과로 돌아가기
         </button>
 
@@ -887,7 +956,36 @@ const ExplorationActivities = () => {
         </p>
       </header>
 
-      {failed && (
+      {/* 수정: 접근할 수 없는 결과 */}
+      {resultNotFound && (
+        <div
+          role="alert"
+          className="rounded-brand bg-surface-container-low px-5 py-5 mb-8 text-sm text-primary-container"
+        >
+          <h2 className="mb-2 text-lg font-bold">
+            결과를 찾을 수 없어요
+          </h2>
+
+          <p className="text-on-surface-variant leading-relaxed">
+            결과 주소가 올바르지 않거나
+            확인할 수 없는 결과예요.
+            내 진단 이력에서 다시 확인해 주세요.
+          </p>
+
+          <button
+            type="button"
+            onClick={() =>
+              navigate('/mypage')
+            }
+            className="mt-4 min-h-[44px] rounded-lg bg-primary-container px-4 text-sm font-bold text-white"
+          >
+            내 진단 이력 보기
+          </button>
+        </div>
+      )}
+
+      {/* 일반 오류만 재시도 제공 */}
+      {failed && !resultNotFound && (
         <div
           role="alert"
           className="rounded-brand bg-error-container px-5 py-4 text-sm text-on-error-container mb-8"
@@ -916,7 +1014,7 @@ const ExplorationActivities = () => {
         </p>
       )}
 
-      {/* 실제 백엔드에서 활동을 제공할 수 없는 경우 */}
+      {/* 실제 백엔드: 활동 안내를 제공할 수 없는 경우 */}
       {!failed &&
         current?.kind === 'BACKEND' &&
         current.value.activityAvailability ===
@@ -952,7 +1050,7 @@ const ExplorationActivities = () => {
           </section>
         )}
 
-      {/* 실제 백엔드에서 활동을 제공하는 경우 */}
+      {/* 실제 백엔드: 승인된 활동 */}
       {!failed &&
         current?.kind === 'BACKEND' &&
         current.value.activityAvailability ===
@@ -1008,7 +1106,9 @@ const ExplorationActivities = () => {
                         activity.preferenceApplied,
                     )}
                     onChanged={() =>
-                      setVersion((previous) => previous + 1)
+                      setVersion(
+                        (previous) => previous + 1,
+                      )
                     }
                   />
                 </div>
@@ -1016,124 +1116,149 @@ const ExplorationActivities = () => {
           </>
         )}
 
-      {/* 기존 MOCK 응답은 그대로 유지 */}
-      {!failed && current?.kind === 'MOCK' && (
-        <>
-          <section
-            aria-labelledby="base-title"
-            className="mb-8"
-          >
-            <h2
-              id="base-title"
-              className="text-lg font-bold text-primary-container mb-1"
+      {/* 기존 MOCK 활동 형식 유지 */}
+      {!failed &&
+        current?.kind === 'MOCK' && (
+          <>
+            <section
+              aria-labelledby="base-title"
+              className="mb-8"
             >
-              이번 주에 해볼 수 있는 활동
-            </h2>
-
-            <p
-              className="text-sm text-on-surface-variant mb-4"
-              aria-live="polite"
-            >
-              {current.value.personalizationNote ??
-                '짧은 정보 확인, 직접 해보기, 비교·질문을 하나씩 골랐어요.'}
-            </p>
-
-            <ol className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {current.value.base.map((activity) => (
-                <li key={activity.activityCode}>
-                  <ActivityCard activity={activity} />
-                </li>
-              ))}
-            </ol>
-          </section>
-
-          {resultId !== null && (
-            <div className="mb-10">
-              <SupportPanel
-                resultId={resultId}
-                personalized={current.value.personalized}
-                onChanged={() =>
-                  setVersion((previous) => previous + 1)
-                }
-              />
-            </div>
-          )}
-
-          {current.value.groups.length > 0 && (
-            <section aria-labelledby="group-title">
               <h2
-                id="group-title"
+                id="base-title"
                 className="text-lg font-bold text-primary-container mb-1"
               >
-                전공군·전공별로 더 해볼 수 있는 활동
+                이번 주에 해볼 수 있는 활동
               </h2>
 
-              <p className="text-sm text-on-surface-variant mb-4">
-                관심 가는 전공군을 펼쳐서 골라보세요.
+              <p
+                className="text-sm text-on-surface-variant mb-4"
+                aria-live="polite"
+              >
+                {current.value.personalizationNote ??
+                  '짧은 정보 확인, 직접 해보기, 비교·질문을 하나씩 골랐어요.'}
               </p>
 
-              <div className="space-y-3">
-                {current.value.groups.map(
-                  (group, index) => (
-                    <details
-                      key={group.groupCode}
-                      open={index === 0}
-                      className="group rounded-brand bg-surface-container-low"
+              <ol className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {current.value.base.map(
+                  (activity) => (
+                    <li
+                      key={activity.activityCode}
                     >
-                      <summary className="min-h-[44px] cursor-pointer list-none flex items-center justify-between gap-2 px-5 py-4 font-bold text-primary-container">
-                        {group.groupName}
-
-                        <span
-                          className="material-symbols-outlined text-[20px] group-open:rotate-180 motion-safe:transition-transform"
-                          aria-hidden="true"
-                        >
-                          expand_more
-                        </span>
-                      </summary>
-
-                      <div className="px-5 pb-5">
-                        <h3 className="text-sm font-semibold text-on-surface-variant mb-2">
-                          전공군 공통 활동
-                        </h3>
-
-                        <ul className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
-                          {group.common.map((activity) => (
-                            <li key={activity.activityCode}>
-                              <ActivityCard
-                                activity={activity}
-                                compact
-                              />
-                            </li>
-                          ))}
-                        </ul>
-
-                        <h3 className="text-sm font-semibold text-on-surface-variant mb-2">
-                          전공별 활동
-                        </h3>
-
-                        <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {group.majors.map((major) => (
-                            <li key={major.majorCode}>
-                              <p className="text-xs font-bold text-secondary mb-1">
-                                {major.name}
-                              </p>
-
-                              <ActivityCard
-                                activity={major.activity}
-                                compact
-                              />
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </details>
+                      <ActivityCard
+                        activity={activity}
+                      />
+                    </li>
                   ),
                 )}
-              </div>
+              </ol>
             </section>
-          )}
-        </>
-      )}
+
+            {resultId !== null && (
+              <div className="mb-10">
+                <SupportPanel
+                  resultId={resultId}
+                  personalized={
+                    current.value.personalized
+                  }
+                  onChanged={() =>
+                    setVersion(
+                      (previous) => previous + 1,
+                    )
+                  }
+                />
+              </div>
+            )}
+
+            {current.value.groups.length > 0 && (
+              <section aria-labelledby="group-title">
+                <h2
+                  id="group-title"
+                  className="text-lg font-bold text-primary-container mb-1"
+                >
+                  전공군·전공별로 더 해볼 수 있는 활동
+                </h2>
+
+                <p className="text-sm text-on-surface-variant mb-4">
+                  관심 가는 전공군을 펼쳐서 골라보세요.
+                </p>
+
+                <div className="space-y-3">
+                  {current.value.groups.map(
+                    (group, index) => (
+                      <details
+                        key={group.groupCode}
+                        open={index === 0}
+                        className="group rounded-brand bg-surface-container-low"
+                      >
+                        <summary className="min-h-[44px] cursor-pointer list-none flex items-center justify-between gap-2 px-5 py-4 font-bold text-primary-container">
+                          {group.groupName}
+
+                          <span
+                            className="material-symbols-outlined text-[20px] group-open:rotate-180 motion-safe:transition-transform"
+                            aria-hidden="true"
+                          >
+                            expand_more
+                          </span>
+                        </summary>
+
+                        <div className="px-5 pb-5">
+                          <h3 className="text-sm font-semibold text-on-surface-variant mb-2">
+                            전공군 공통 활동
+                          </h3>
+
+                          <ul className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+                            {group.common.map(
+                              (activity) => (
+                                <li
+                                  key={
+                                    activity.activityCode
+                                  }
+                                >
+                                  <ActivityCard
+                                    activity={activity}
+                                    compact
+                                  />
+                                </li>
+                              ),
+                            )}
+                          </ul>
+
+                          <h3 className="text-sm font-semibold text-on-surface-variant mb-2">
+                            전공별 활동
+                          </h3>
+
+                          <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {group.majors.map(
+                              (major) => (
+                                <li
+                                  key={
+                                    major.majorCode
+                                  }
+                                >
+                                  <p className="text-xs font-bold text-secondary mb-1">
+                                    {major.name}
+                                  </p>
+
+                                  <ActivityCard
+                                    activity={
+                                      major.activity
+                                    }
+                                    compact
+                                  />
+                                </li>
+                              ),
+                            )}
+                          </ul>
+                        </div>
+                      </details>
+                    ),
+                  )}
+                </div>
+              </section>
+            )}
+          </>
+        )}
     </Shell>
   );
 };
