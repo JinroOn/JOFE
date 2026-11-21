@@ -67,10 +67,19 @@ interface CandidateBrowserProps {
 }
 
 type FetchState =
-  | { resultId: number; kind: 'READY'; data: CandidateView }
-  | { resultId: number; kind: 'ERROR' };
+  | {
+      resultId: number;
+      kind: 'READY';
+      data: CandidateView;
+    }
+  | {
+      resultId: number;
+      kind: 'ERROR';
+    };
 
-const isEvidenceLevel = (value: string): value is EvidenceLevel =>
+const isEvidenceLevel = (
+  value: string,
+): value is EvidenceLevel =>
   value === 'CONFIRMED' ||
   value === 'LOW_EVIDENCE' ||
   value === 'NO_EVIDENCE';
@@ -82,7 +91,9 @@ const isReasonKind = (
   value === 'ACTIVITY' ||
   value === 'LEARNING';
 
-const toMajorCard = (item: CandidateItem): ExplorationMajorCard => ({
+const toMajorCard = (
+  item: CandidateItem,
+): ExplorationMajorCard => ({
   majorCode: item.majorCode,
   majorId: null,
   name: item.name,
@@ -104,9 +115,11 @@ const CandidateBrowser = ({
   resultId,
   compare,
 }: CandidateBrowserProps) => {
-  const [fetchState, setFetchState] = useState<FetchState | null>(null);
+  const [fetchState, setFetchState] =
+    useState<FetchState | null>(null);
   const [requestVersion, setRequestVersion] = useState(0);
   const [expanded, setExpanded] = useState(false);
+
   const [detail, setDetail] = useState<{
     major: ExplorationMajorCard;
     groupName: string;
@@ -117,7 +130,6 @@ const CandidateBrowser = ({
 
     let active = true;
 
-    // 쿼리 파라미터를 보내지 않는다.
     void api
       .get<CandidateView>(
         `/exploration/v1/results/${resultId}/candidates`,
@@ -148,7 +160,9 @@ const CandidateBrowser = ({
   if (isExplorationMock) return null;
 
   const current =
-    fetchState?.resultId === resultId ? fetchState : null;
+    fetchState?.resultId === resultId
+      ? fetchState
+      : null;
 
   if (current?.kind === 'ERROR') {
     return (
@@ -161,7 +175,9 @@ const CandidateBrowser = ({
         </p>
         <button
           type="button"
-          onClick={() => setRequestVersion((value) => value + 1)}
+          onClick={() =>
+            setRequestVersion((value) => value + 1)
+          }
           className="mt-2 min-h-[44px] text-sm font-bold text-secondary"
         >
           다시 불러오기
@@ -170,10 +186,15 @@ const CandidateBrowser = ({
     );
   }
 
-  if (!current || current.kind !== 'READY') return null;
+  if (!current || current.kind !== 'READY') {
+    return null;
+  }
 
   const view = current.data;
-  if (view.additionalCount <= 0) return null;
+
+  if (view.additionalCount <= 0) {
+    return null;
+  }
 
   const additionalItems = view.items.filter(
     (item) => !item.isFirstScreen,
@@ -194,7 +215,9 @@ const CandidateBrowser = ({
 
   const relatedBasisGroups = view.basisGroups.filter(
     (group) =>
-      group.majorCodes.some((code) => additionalCodes.has(code)),
+      group.majorCodes.some((code) =>
+        additionalCodes.has(code),
+      ),
   );
 
   return (
@@ -211,6 +234,7 @@ const CandidateBrowser = ({
             >
               더 살펴볼 수 있는 전공
             </h2>
+
             <p className="mt-1 text-sm text-on-surface-variant">
               첫 화면 {view.firstScreenCount}개 · 추가 후보{' '}
               {view.additionalCount}개 · 전체 {view.totalCount}개
@@ -221,14 +245,18 @@ const CandidateBrowser = ({
             type="button"
             aria-expanded={expanded}
             aria-controls="additional-candidate-list"
-            onClick={() => setExpanded((previous) => !previous)}
+            onClick={() =>
+              setExpanded((previous) => !previous)
+            }
             className="min-h-[44px] inline-flex items-center gap-2 rounded-lg bg-secondary px-4 py-2.5 text-sm font-bold text-white"
           >
             <span
               className="material-symbols-outlined text-[20px]"
               aria-hidden="true"
             >
-              {expanded ? 'expand_less' : 'expand_more'}
+              {expanded
+                ? 'expand_less'
+                : 'expand_more'}
             </span>
 
             {expanded
@@ -238,7 +266,10 @@ const CandidateBrowser = ({
         </div>
 
         {expanded && (
-          <div id="additional-candidate-list" className="mt-6 space-y-6">
+          <div
+            id="additional-candidate-list"
+            className="mt-6 space-y-6"
+          >
             <p className="text-sm text-on-surface-variant leading-relaxed">
               추가 후보도 검사 결과에 포함된 전공이에요.
               제시 순서는 능력이나 합격 가능성의 순위가 아닙니다.
@@ -246,7 +277,8 @@ const CandidateBrowser = ({
 
             {additionalGroups.map((group) => {
               const groupName =
-                group.name?.trim() || `전공군 ${group.groupCode}`;
+                group.name?.trim() ||
+                `전공군 ${group.groupCode}`;
 
               return (
                 <section
@@ -258,17 +290,21 @@ const CandidateBrowser = ({
                   </h3>
 
                   <p className="text-xs text-on-surface-variant mb-4">
-                    이 전공군의 추가 후보 {group.members.length}개
+                    이 전공군의 추가 후보{' '}
+                    {group.members.length}개
                   </p>
 
                   <ul className="space-y-3">
                     {group.members.map((item) => {
-                      const picked = compare.selected.includes(
-                        item.majorCode,
-                      );
+                      const picked =
+                        compare.selected.includes(
+                          item.majorCode,
+                        );
+
                       const full =
                         !picked &&
                         compare.selected.length >= compare.max;
+
                       const major = toMajorCard(item);
 
                       return (
@@ -307,9 +343,11 @@ const CandidateBrowser = ({
                                 </li>
                               ))}
                             </ul>
-                          ) : item.reasonAvailability === 'UNAVAILABLE' ? (
+                          ) : item.reasonAvailability ===
+                            'UNAVAILABLE' ? (
                             <p className="mb-3 text-sm text-on-surface-variant">
-                              이 후보의 설명 자료는 현재 제공되지 않아요.
+                              이 후보의 설명 자료는 현재
+                              제공되지 않아요.
                             </p>
                           ) : (
                             item.explanation && (
@@ -338,7 +376,9 @@ const CandidateBrowser = ({
                               aria-pressed={picked}
                               disabled={full}
                               onClick={() =>
-                                compare.onToggle(item.majorCode)
+                                compare.onToggle(
+                                  item.majorCode,
+                                )
                               }
                               className={`min-h-[44px] rounded-lg px-3 text-sm font-semibold disabled:opacity-50 ${
                                 picked
@@ -349,7 +389,7 @@ const CandidateBrowser = ({
                               {picked
                                 ? '비교에 담음'
                                 : full
-                                  ? '비교는 최대 2개'
+                                  ? `비교는 최대 ${compare.max}개`
                                   : '비교에 담기'}
                             </button>
                           </div>
@@ -375,7 +415,8 @@ const CandidateBrowser = ({
                           .map(
                             (code) =>
                               view.items.find(
-                                (item) => item.majorCode === code,
+                                (item) =>
+                                  item.majorCode === code,
                               )?.name ?? code,
                           )
                           .join(' · ')}
@@ -397,11 +438,16 @@ const CandidateBrowser = ({
         <MajorDetailDialog
           major={detail.major}
           groupName={detail.groupName}
-          picked={compare.selected.includes(detail.major.majorCode)}
+          picked={compare.selected.includes(
+            detail.major.majorCode,
+          )}
           compareFull={
-            !compare.selected.includes(detail.major.majorCode) &&
+            !compare.selected.includes(
+              detail.major.majorCode,
+            ) &&
             compare.selected.length >= compare.max
           }
+          compareMax={compare.max}
           onToggleCompare={() =>
             compare.onToggle(detail.major.majorCode)
           }
