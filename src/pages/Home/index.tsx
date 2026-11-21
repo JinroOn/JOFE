@@ -23,56 +23,56 @@ const Home = () => {
     {
       icon: 'fact_check',
       title: '단계별 전공 진단',
-      description: '단계별 질문을 통해 정밀하게 분석합니다.',
+      description: '기본 정보, 성향, 역량 문항에 차례로 답합니다.',
       iconStyle: 'bg-[#EAF5FF] text-[#087D9C]',
       path: diagnosisEntryPath,
     },
     {
       icon: 'insights',
-      title: '9개 계열 성향 분석',
-      description: '나의 학업 성향을 9가지 핵심 계열로 분류합니다.',
+      title: '9가지 성향 지표',
+      description: '둘 중 가까운 쪽을 고르는 12개 문항으로 학업 성향을 살펴봅니다.',
       iconStyle: 'bg-[#FFF4EA] text-[#FF762E]',
       path: '/diagnosis/tendency',
     },
     {
       icon: 'fitness_center',
-      title: '공통 기초 역량 분석',
-      description: '전공 학습에 필요한 기초 역량을 진단합니다.',
+      title: '공통 기초 역량 확인',
+      description: '전공 학습에 필요한 9가지 기초 역량을 문항으로 확인합니다.',
       iconStyle: 'bg-[#F0F3F8] text-[#172B46]',
       path: '/analysis/weak',
     },
     {
-      icon: 'manage_accounts',
-      title: '사용자별 맞춤 추가 진단',
-      description: '부족한 데이터 보완을 위한 개인별 맞춤 질문을 제공합니다.',
+      icon: 'event_note',
+      title: '12주 학습 로드맵',
+      description: '보완하면 좋을 역량을 바탕으로 주차별 학습 계획을 만듭니다.',
       iconStyle: 'bg-[#EAF5FF] text-[#087D9C]',
-      path: diagnosisEntryPath,
+      path: '/analysis/weak',
     },
     {
       icon: 'school',
-      title: '세부 전공 추천',
-      description: '계열을 넘어 나에게 딱 맞는 세부 전공을 제안합니다.',
+      title: '전공 탐색',
+      description: '전공별 소개와 요구 역량을 살펴보고 관심 전공으로 저장할 수 있습니다.',
       iconStyle: 'bg-[#FFF4EA] text-[#FF762E]',
       path: '/diagnosis/explore',
     },
     {
       icon: 'compare_arrows',
       title: '유사 전공 비교',
-      description: '추천된 전공들 간의 차이점을 한눈에 비교합니다.',
+      description: '전공 간 요구 역량 차이를 나란히 비교합니다.',
       iconStyle: 'bg-[#F0F3F8] text-[#172B46]',
       path: '/analysis/compare',
     },
     {
       icon: 'trending_up',
       title: '강점·준비 요소 분석',
-      description: '나의 강점과 해당 전공 진학을 위해 필요한 준비도를 분석합니다.',
+      description: '내 역량과 전공 요구 역량을 비교해 강점과 보완할 점을 보여줍니다.',
       iconStyle: 'bg-[#EAF5FF] text-[#087D9C]',
       path: '/analysis/dashboard',
     },
     {
       icon: 'support_agent',
       title: 'AI 결과 상담',
-      description: '분석 결과를 바탕으로 24시간 AI 전문가 상담이 가능합니다.',
+      description: '진단 결과에 대해 궁금한 점을 AI에게 물어볼 수 있습니다.',
       iconStyle: 'bg-[#FFF4EA] text-[#FF762E]',
       path: '/ai-chat',
     },
@@ -81,37 +81,37 @@ const Home = () => {
   const oldFeatures = [
     '정적인 문항 위주의 자기보고식 검사',
     '단순 흥미 위주의 결과 도출',
-    '취업 시장 트렌드 반영 미흡',
+    '결과가 왜 나왔는지 알기 어려움',
   ];
 
   const newFeatures = [
     '단순 흥미검사만으로 전공을 추천하지 않음',
     '성향과 역량을 함께 확인',
-    '필요한 사용자에게만 맞춤 추가 진단 제공',
-    '계열 → 전공군 → 세부 전공 순으로 탐색',
     '추천 이유와 준비 요소를 함께 제공',
+    'AI가 진단 결과를 쉽게 풀어 설명',
+    '보완할 역량에 맞춘 12주 학습 로드맵',
     '유사 전공 비교 가능',
   ];
 
   const processSteps = [
     {
       number: '01',
-      title: '공통 진단',
-      description: '성향과 기초 역량을 함께 확인합니다.',
+      title: '진단',
+      description: '기본 정보를 입력하고 성향·역량 문항에 답합니다.',
       style: 'bg-[#E9EDF2] text-[#10213A]',
     },
     {
       number: '02',
-      title: '필요한 영역 추가 확인',
+      title: '결과 확인',
       description:
-        '후보가 가진 기초 역량 확인이 더 필요한 경우에만 맞춤 질문을 추가로 받습니다.',
+        '먼저 살펴볼 전공과 추천 이유, 내 역량과 전공 요구 역량의 차이를 확인합니다.',
       style: 'bg-[#00C8E8] text-[#0D1C32]',
     },
     {
       number: '03',
-      title: '추천 근거 제공',
+      title: '학습 계획',
       description:
-        '왜 이 전공이 추천되었는지 이유와 준비 요소를 함께 확인합니다.',
+        '보완할 역량을 바탕으로 12주 학습 로드맵을 받아봅니다.',
       style: 'bg-[#0D1C32] text-white',
     },
   ];
@@ -142,9 +142,9 @@ const Home = () => {
             </h1>
 
             <p className="text-[15px] sm:text-base text-[#5B6470] leading-[1.9] mb-9 max-w-[540px] mx-auto lg:mx-0 font-body">
-              수천 개의 학과 데이터와 실시간 취업 트렌드를 AI가 분석하여,
+              성향과 역량 문항에 답하면 먼저 살펴볼 전공과 그 이유를 정리해 드려요.
               <br className="hidden sm:block" />
-              당신의 잠재력을 극대화할 최적의 학문적 경로를 제안합니다.
+              AI는 결과를 쉽게 풀어 설명하고, 합격 가능성은 판단하지 않습니다.
             </p>
 
             <div className="flex justify-center lg:justify-start">
@@ -182,7 +182,7 @@ const Home = () => {
 
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-bold text-[#172033]">
-                        실시간 전공 선호도 분석 중
+                        추천 전공과 이유를 한눈에
                       </p>
 
                       <div className="w-full max-w-[180px] h-1.5 bg-[#BCEAF0] rounded-full mt-2 overflow-hidden">
@@ -209,7 +209,7 @@ const Home = () => {
             </h2>
 
             <p className="text-sm sm:text-base text-[#68717D]">
-              단순한 추천을 넘어, 실제 데이터 기반의 커리어 로드맵을 제공합니다.
+              진단부터 결과 설명, 학습 계획까지 한곳에서 이어집니다.
             </p>
           </div>
 
@@ -252,7 +252,7 @@ const Home = () => {
             </h2>
 
             <p className="text-sm text-[#68717D]">
-              JinroOn의 AI는 더 깊고 입체적으로 당신의 미래를 예측합니다.
+              흥미 하나만 보지 않고 성향과 역량을 함께 보며, 추천 이유를 설명합니다.
             </p>
           </div>
 
