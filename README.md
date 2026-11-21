@@ -103,10 +103,10 @@ npm run build
 ## 🌐 Environment Variables
 프로젝트 루트에 `.env` 파일을 생성하고 아래 변수를 설정해 주세요.
 ```env
-VITE_API_BASE_URL=http://52.79.202.196:8080/api
+VITE_API_BASE_URL=https://52-78-58-82.sslip.io/api
 ```
 
-> 설정하지 않으면 `http://52.79.202.196:8080/api` 로 자동 연결됩니다.
+> 설정하지 않으면 `https://52-78-58-82.sslip.io/api` 로 자동 연결됩니다.
 
 ## 📋 화면 구현 현황
 
