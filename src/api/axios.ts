@@ -3,7 +3,7 @@ import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import type { AuthResponse } from '../types/auth';
 import useAuthStore from '../store/useAuthStore';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://52.79.202.196:8080/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://52-78-58-82.sslip.io/api';
 
 const instance = axios.create({ baseURL: BASE_URL, timeout: 60000 });
 export const publicApi = axios.create({ baseURL: BASE_URL, timeout: 60000 });
