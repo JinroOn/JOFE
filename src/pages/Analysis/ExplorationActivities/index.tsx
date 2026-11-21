@@ -101,9 +101,11 @@ const isBackendActivities = (
   return Array.isArray(value.nextActivities);
 };
 
-// -------------------------
-// worksheet_markdown 렌더링
-// -------------------------
+// ------------------------------------------------------
+// Markdown 렌더링
+// 기존 worksheet_markdown 지원을 유지하고
+// body_markdown에도 동일하게 사용합니다.
+// ------------------------------------------------------
 
 const renderWorksheetInline = (value: string): ReactNode[] =>
   value
@@ -183,6 +185,7 @@ const WorksheetMarkdown = ({
       continue;
     }
 
+    // 표 렌더링
     const headers = parseTableRow(line);
 
     if (
@@ -214,7 +217,10 @@ const WorksheetMarkdown = ({
       }
 
       blocks.push(
-        <div key={`table-${key}`} className="min-w-0 max-w-full">
+        <div
+          key={`table-${key}`}
+          className="min-w-0 max-w-full"
+        >
           <div
             role="region"
             aria-label="활동 기록 표"
@@ -265,6 +271,7 @@ const WorksheetMarkdown = ({
       continue;
     }
 
+    // 제목 렌더링: #, ##, ###
     const heading = line.match(
       /^#{1,6}\s+(.+?)\s*$/,
     );
@@ -307,6 +314,7 @@ const WorksheetMarkdown = ({
       continue;
     }
 
+    // 글머리표 목록
     if (/^[-*+]\s+/.test(line)) {
       const key = index;
       const items: string[] = [];
@@ -320,6 +328,7 @@ const WorksheetMarkdown = ({
             .trim()
             .replace(/^[-*+]\s+/, ''),
         );
+
         index += 1;
       }
 
@@ -329,7 +338,10 @@ const WorksheetMarkdown = ({
           className="list-disc space-y-1 pl-5"
         >
           {items.map((item, itemIndex) => (
-            <li key={itemIndex} className="leading-relaxed">
+            <li
+              key={itemIndex}
+              className="leading-relaxed"
+            >
               {renderWorksheetInline(item)}
             </li>
           ))}
@@ -339,6 +351,7 @@ const WorksheetMarkdown = ({
       continue;
     }
 
+    // 숫자 목록
     if (/^\d+[.)]\s+/.test(line)) {
       const key = index;
       const items: string[] = [];
@@ -362,7 +375,10 @@ const WorksheetMarkdown = ({
           className="list-decimal space-y-1 pl-5"
         >
           {items.map((item, itemIndex) => (
-            <li key={itemIndex} className="leading-relaxed">
+            <li
+              key={itemIndex}
+              className="leading-relaxed"
+            >
               {renderWorksheetInline(item)}
             </li>
           ))}
@@ -372,6 +388,7 @@ const WorksheetMarkdown = ({
       continue;
     }
 
+    // 일반 문단
     const paragraphKey = index;
     const paragraphLines: string[] = [];
 
@@ -423,6 +440,136 @@ const WorksheetMarkdown = ({
   );
 };
 
+// ------------------------------------------------------
+// 수정: body_markdown 중복 내용 정리
+//
+// 1. 첫 제목이 카드 제목과 같으면 제거
+// 2. 별도 필드의 진행 방법/결과물/대안과 같은 문장 제거
+// 3. 별도 항목으로 출력하는 중복 소제목 제거
+// 4. 활동 조건, 입력값, 판정 기준 등 다른 설명은 유지
+// ------------------------------------------------------
+
+const normalizeForComparison = (value: string): string =>
+  value
+    .replace(/^\s*#{1,6}\s*/, '')
+    .replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '')
+    .replace(/[\s\p{P}\p{S}]/gu, '')
+    .toLowerCase();
+
+const getVisibleActivityBody = (
+  activity: ApprovedActivity,
+  steps: string[],
+  artifacts: string[],
+): string => {
+  if (
+    typeof activity.body_markdown !== 'string' ||
+    !activity.body_markdown.trim()
+  ) {
+    return '';
+  }
+
+  const alternativeLines =
+    typeof activity.alternative === 'string'
+      ? activity.alternative.split(/\r?\n/)
+      : [];
+
+  // 이미 카드 아래에 별도 항목으로 출력되는 내용
+  const structuredLines = [
+    ...steps,
+    ...artifacts,
+    ...alternativeLines,
+  ]
+    .map(normalizeForComparison)
+    .filter(Boolean);
+
+  const title = normalizeForComparison(activity.title);
+
+  const lines = activity.body_markdown
+    .replace(/\r\n?/g, '\n')
+    .split('\n');
+
+  const visibleLines: string[] = [];
+  let firstContent = true;
+
+  for (const current of lines) {
+    const line = current.trim();
+
+    if (!line) {
+      if (
+        visibleLines.length > 0 &&
+        visibleLines[visibleLines.length - 1] !== ''
+      ) {
+        visibleLines.push('');
+      }
+      continue;
+    }
+
+    const heading = line.match(
+      /^#{1,6}\s+(.+?)\s*$/,
+    );
+
+    if (heading) {
+      const headingText =
+        normalizeForComparison(heading[1]);
+
+      // 카드 제목과 동일한 첫 제목은 출력하지 않습니다.
+      if (firstContent && headingText === title) {
+        firstContent = false;
+        continue;
+      }
+
+      firstContent = false;
+
+      // 이미 아래에서 개별 항목으로 제공하는 제목은 생략합니다.
+      // 다만 그 아래의 고유한 조건/설명은 버리지 않습니다.
+      const repeatedStepHeading =
+        steps.length > 0 &&
+        /^(진행방법|활동방법|활동순서|활동단계)$/.test(
+          headingText,
+        );
+
+      const repeatedArtifactHeading =
+        artifacts.length > 0 &&
+        /^(만들어볼결과물|결과물|제출할결과물)$/.test(
+          headingText,
+        );
+
+      const repeatedAlternativeHeading =
+        alternativeLines.some((value) => value.trim()) &&
+        /^(다른방법으로해보기|대안활동|다른방법)$/.test(
+          headingText,
+        );
+
+      if (
+        repeatedStepHeading ||
+        repeatedArtifactHeading ||
+        repeatedAlternativeHeading
+      ) {
+        continue;
+      }
+
+      visibleLines.push(current);
+      continue;
+    }
+
+    firstContent = false;
+
+    // 별도 진행 방법/결과물/대안과 같은 문장은 중복 출력하지 않습니다.
+    // 다른 문장은 제거하지 않으므로 입력값과 활동 조건을 보존합니다.
+    if (
+      structuredLines.includes(
+        normalizeForComparison(line),
+      )
+    ) {
+      continue;
+    }
+
+    visibleLines.push(current);
+  }
+
+  return visibleLines.join('\n').trim();
+};
+
 const Shell = ({
   children,
 }: {
@@ -469,6 +616,12 @@ const ApprovedActivityCard = ({
       )
     : [];
 
+  const bodyMarkdown = getVisibleActivityBody(
+    activity,
+    steps,
+    artifacts,
+  );
+
   return (
     <article className="min-w-0 h-full rounded-brand bg-surface-container-lowest border border-outline-variant/20 p-5 sm:p-6 cloud-shadow">
       <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -484,14 +637,17 @@ const ApprovedActivityCard = ({
           )}
       </div>
 
+      {/* 카드 제목은 여기서 한 번만 출력합니다. */}
       <h3 className="text-lg font-bold text-primary-container mb-3">
         {activity.title}
       </h3>
 
-      {activity.body_markdown && (
-        <p className="text-sm text-on-surface-variant leading-relaxed whitespace-pre-wrap mb-5">
-          {activity.body_markdown}
-        </p>
+      {/* 수정: 본문도 마크다운으로 렌더링합니다. */}
+      {/* 배경/입력값/조건은 보존하고 중복된 항목만 제외합니다. */}
+      {bodyMarkdown && (
+        <div className="min-w-0 max-w-full mb-5">
+          <WorksheetMarkdown markdown={bodyMarkdown} />
+        </div>
       )}
 
       {steps.length > 0 && (
@@ -556,6 +712,7 @@ const ApprovedActivityCard = ({
         </div>
       )}
 
+      {/* 기록 양식에는 중복 제거를 적용하지 않습니다. */}
       {activity.worksheet_markdown && (
         <details className="mb-4 min-w-0 max-w-full rounded-lg border border-outline-variant/30">
           <summary className="min-h-[44px] flex items-center cursor-pointer px-4 py-3 text-sm font-bold text-primary-container">
@@ -759,6 +916,7 @@ const ExplorationActivities = () => {
         </p>
       )}
 
+      {/* 실제 백엔드에서 활동을 제공할 수 없는 경우 */}
       {!failed &&
         current?.kind === 'BACKEND' &&
         current.value.activityAvailability ===
@@ -794,6 +952,7 @@ const ExplorationActivities = () => {
           </section>
         )}
 
+      {/* 실제 백엔드에서 활동을 제공하는 경우 */}
       {!failed &&
         current?.kind === 'BACKEND' &&
         current.value.activityAvailability ===
@@ -857,6 +1016,7 @@ const ExplorationActivities = () => {
           </>
         )}
 
+      {/* 기존 MOCK 응답은 그대로 유지 */}
       {!failed && current?.kind === 'MOCK' && (
         <>
           <section
