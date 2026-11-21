@@ -4,10 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import api from '../../../api/axios';
 import { isExplorationMock } from '../../../config/features';
 import useExplorationResult from '../../../hooks/useExplorationResult';
-import type {
-  ActivityKind,
-  ExplorationResult,
-} from '../../../types/exploration';
+import type { ExplorationResult } from '../../../types/exploration';
 import MockBanner from '../../Diagnosis/Exploration/components/MockBanner';
 import GroupCard from './components/GroupCard';
 import CandidateBrowser from './components/CandidateBrowser';
@@ -15,12 +12,134 @@ import SharePanel from './components/SharePanel';
 import PreparationResponses from './components/PreparationResponses';
 
 const ACTIVITY_LABEL: Record<
-  ActivityKind,
+  string,
   { text: string; icon: string }
 > = {
-  INFO_CHECK: { text: '정보 확인', icon: 'search' },
-  HANDS_ON: { text: '직접 해보기', icon: 'construction' },
-  COMPARE_ASK: { text: '비교·질문', icon: 'compare_arrows' },
+  // 실제 API 응답
+  INFORMATION: {
+    text: '정보 확인',
+    icon: 'search',
+  },
+  SMALL_TASK: {
+    text: '작은 활동',
+    icon: 'construction',
+  },
+  REFLECTION_AND_NEXT_STEP: {
+    text: '돌아보기·다음 단계',
+    icon: 'rate_review',
+  },
+
+  // 기존 MOCK 응답
+  INFO_CHECK: {
+    text: '정보 확인',
+    icon: 'search',
+  },
+  HANDS_ON: {
+    text: '직접 해보기',
+    icon: 'construction',
+  },
+  COMPARE_ASK: {
+    text: '비교·질문',
+    icon: 'compare_arrows',
+  },
+};
+
+const DEFAULT_ACTIVITY_LABEL = {
+  text: '탐색 활동',
+  icon: 'explore',
+};
+
+// 결과 페이지의 활동 카드에 필요한 데이터만 사용합니다.
+// 기존 MOCK 응답과 백엔드 승인 활동 응답을 함께 처리합니다.
+interface ResultActivityCard {
+  id: string;
+  title: string;
+  label: string;
+  icon: string;
+  duration: string;
+  description: string;
+  outcome: string;
+  outcomeLabel: string;
+}
+
+const getText = (value: unknown): string =>
+  typeof value === 'string' ? value.trim() : '';
+
+const toResultActivityCard = (
+  raw: unknown,
+  index: number,
+): ResultActivityCard | null => {
+  // 잘못된 활동 하나 때문에 전체 결과 화면이 중단되지 않게 합니다.
+  if (
+    typeof raw !== 'object' ||
+    raw === null ||
+    Array.isArray(raw)
+  ) {
+    return null;
+  }
+
+  const activity = raw as Record<string, unknown>;
+
+  const kind = getText(activity.kind);
+
+  // 알 수 없는 유형이어도 기본 아이콘과 라벨을 사용합니다.
+  const kindLabel =
+    ACTIVITY_LABEL[kind] ?? DEFAULT_ACTIVITY_LABEL;
+
+  // 실제 API는 activity_id, MOCK은 activityCode를 사용합니다.
+  const id =
+    getText(activity.activity_id) ||
+    getText(activity.activityCode) ||
+    `activity-${index}`;
+
+  const title =
+    getText(activity.title) ||
+    '제목이 등록되지 않은 탐색 활동';
+
+  // 백엔드 응답인지 구분하여 소요 시간을 올바르게 표시합니다.
+  const isBackendActivity =
+    'activity_id' in activity ||
+    'duration_minutes_proposal' in activity;
+
+  let duration = '';
+
+  if (isBackendActivity) {
+    const minutes = activity.duration_minutes_proposal;
+
+    if (
+      typeof minutes === 'number' &&
+      Number.isFinite(minutes) &&
+      minutes > 0
+    ) {
+      duration = `약 ${minutes}분`;
+    }
+  } else {
+    // 기존 MOCK 형식: "15~30분", "1~2시간" 등
+    duration = getText(activity.duration);
+  }
+
+  // MOCK description / 실제 API selectionReason, body_markdown
+  const description =
+    getText(activity.description) ||
+    getText(activity.selectionReason) ||
+    getText(activity.body_markdown);
+
+  // MOCK outcome / 실제 API example_output
+  const mockOutcome = getText(activity.outcome);
+  const backendOutput = getText(activity.example_output);
+
+  return {
+    id,
+    title,
+    label: kindLabel.text,
+    icon: kindLabel.icon,
+    duration,
+    description,
+    outcome: mockOutcome || backendOutput,
+    outcomeLabel: mockOutcome
+      ? '알게 되는 것'
+      : '예상 결과물',
+  };
 };
 
 const primaryBtn =
@@ -70,7 +189,7 @@ const StatusPanel = ({
   </div>
 );
 
-// 백엔드 비교 API는 전공 2개를 비교한다.
+// 백엔드 비교 API는 전공 2개를 비교합니다.
 const COMPARE_MAX = 2;
 
 // 전체 후보 API에서 이름을 조회할 때 필요한 필드만 사용합니다.
@@ -110,11 +229,27 @@ const ResultView = ({
   const canActivities =
     result.activityAvailability !== 'UNAVAILABLE';
 
-  // PR #149: 백엔드 상담 가용성 설정을 유지합니다.
+  // 백엔드 상담 가용성 설정 유지
   const canAsk = caps?.consultationAvailable ?? true;
 
   const notes = result.notes ?? [];
   const recheckAxes = result.recheckAxes ?? [];
+
+  // 실제/모의 활동 모두 결과 카드 형식으로 변환
+  const nextActivities = useMemo(() => {
+    if (!Array.isArray(result.nextActivities)) {
+      return [];
+    }
+
+    return result.nextActivities
+      .map((activity, index) =>
+        toResultActivityCard(activity, index),
+      )
+      .filter(
+        (activity): activity is ResultActivityCard =>
+          activity !== null,
+      );
+  }, [result.nextActivities]);
 
   // 최종 결과의 첫 화면 전공 이름
   const majorNames = useMemo(
@@ -122,14 +257,17 @@ const ResultView = ({
       new Map(
         result.groups
           .flatMap((group) => group.majors)
-          .map((major) => [major.majorCode, major.name]),
+          .map((major) => [
+            major.majorCode,
+            major.name,
+          ]),
       ),
     [result.groups],
   );
 
   const presentation = result.presentation;
 
-  // 추가: 전체 후보 API에서 조회한 이름을 회차별로 보관합니다.
+  // 전체 후보 API에서 조회한 이름을 회차별로 보관
   const [candidateNames, setCandidateNames] = useState<{
     resultId: number;
     names: Record<string, string>;
@@ -158,7 +296,7 @@ const ResultView = ({
 
     let active = true;
 
-    // 이름이 누락된 반응이 있을 때만 전체 후보 목록을 조회합니다.
+    // 이름이 누락된 반응이 있을 때만 전체 후보 목록 조회
     void api
       .get<CandidateNamesResponse>(
         `/exploration/v1/results/${result.resultId}/candidates`,
@@ -190,8 +328,7 @@ const ResultView = ({
         });
       })
       .catch(() => {
-        // 전체 후보 조회 실패 시 기존 결과 화면은 유지합니다.
-        // 조회할 수 없는 이름은 내부 코드 대신 "다른 후보"로 표시합니다.
+        // 전체 후보 조회 실패 시 기존 결과 화면 유지
       });
 
     return () => {
@@ -205,7 +342,7 @@ const ResultView = ({
     presentation?.unfamiliar,
   ]);
 
-  // 수정: 첫 화면 이름 → 전체 후보 이름 → 안전한 안내 문구 순서
+  // 첫 화면 이름 → 전체 후보 이름 → 안전한 안내 문구 순서
   const getReactionMajorName = (code: string): string => {
     const firstScreenName = majorNames.get(code);
 
@@ -225,12 +362,12 @@ const ResultView = ({
   const toggle = (code: string) => {
     setCompareHint(false);
 
-    setSelected((prev) =>
-      prev.includes(code)
-        ? prev.filter((c) => c !== code)
-        : prev.length >= COMPARE_MAX
-          ? prev
-          : [...prev, code],
+    setSelected((previous) =>
+      previous.includes(code)
+        ? previous.filter((item) => item !== code)
+        : previous.length >= COMPARE_MAX
+          ? previous
+          : [...previous, code],
     );
   };
 
@@ -363,6 +500,7 @@ const ResultView = ({
         </section>
       )}
 
+      {/* 추천 전공 후보 */}
       {result.groups.length > 0 && (
         <section
           aria-labelledby="groups-title"
@@ -395,7 +533,7 @@ const ResultView = ({
         </section>
       )}
 
-      {/* JOBE #112: 첫 화면 외 추가 후보 열람 */}
+      {/* 첫 화면 외 추가 후보 열람 */}
       {!noCandidate && (
         <CandidateBrowser
           resultId={result.resultId}
@@ -403,6 +541,7 @@ const ResultView = ({
         />
       )}
 
+      {/* 다시 확인할 관심 분야 */}
       {recheckAxes.length > 0 && (
         <section
           aria-labelledby="recheck-title"
@@ -434,6 +573,7 @@ const ResultView = ({
         </section>
       )}
 
+      {/* 탐색하면서 확인할 점 */}
       {result.cautions.length > 0 && (
         <section
           aria-labelledby="caution-title"
@@ -505,10 +645,12 @@ const ResultView = ({
           </p>
         )}
 
+      {/* 검사 중 제출한 준비 상황 응답 */}
       <PreparationResponses
         responses={result.preparationResponses ?? []}
       />
 
+      {/* 활동 이용 불가 안내 */}
       {!canActivities && result.activityMessage && (
         <p
           role="note"
@@ -518,7 +660,8 @@ const ResultView = ({
         </p>
       )}
 
-      {canActivities && result.nextActivities.length > 0 && (
+      {/* 실제 API와 MOCK을 함께 지원하는 추천 활동 */}
+      {canActivities && (
         <section
           aria-labelledby="activity-title"
           className="mb-10"
@@ -531,6 +674,7 @@ const ResultView = ({
               이번 주에 해볼 수 있는 탐색 활동
             </h2>
 
+            {/* 활동이 0개여도 상세 화면 이동 버튼은 유지 */}
             <button
               type="button"
               onClick={onActivities}
@@ -547,49 +691,75 @@ const ResultView = ({
             </button>
           </div>
 
-          <ol className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {result.nextActivities.map((activity) => (
-              <li
-                key={activity.activityCode}
-                className="flex flex-col rounded-brand bg-surface-container-lowest border border-outline-variant/20 p-5 cloud-shadow"
-              >
-                <p className="inline-flex items-center gap-1 text-xs font-bold text-secondary mb-2">
-                  <span
-                    className="material-symbols-outlined text-[16px]"
-                    aria-hidden="true"
-                  >
-                    {ACTIVITY_LABEL[activity.kind].icon}
-                  </span>
+          {nextActivities.length === 0 ? (
+            <p
+              role="status"
+              className="rounded-brand bg-surface-container-low px-5 py-5 text-sm text-on-surface-variant"
+            >
+              지금 표시할 추천 활동이 없습니다.
+              활동 더 보기에서 다른 활동을 확인할 수 있어요.
+            </p>
+          ) : (
+            <ol className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {nextActivities.map((activity, index) => (
+                <li
+                  key={`${activity.id}-${index}`}
+                  className="flex flex-col rounded-brand bg-surface-container-lowest border border-outline-variant/20 p-5 cloud-shadow"
+                >
+                  {/* 활동 유형 및 소요 시간 */}
+                  <p className="inline-flex flex-wrap items-center gap-1 text-xs font-bold text-secondary mb-2">
+                    <span
+                      className="material-symbols-outlined text-[16px]"
+                      aria-hidden="true"
+                    >
+                      {activity.icon}
+                    </span>
 
-                  {ACTIVITY_LABEL[activity.kind].text}
-                  {' · '}
-                  {activity.duration}
-                </p>
+                    <span>{activity.label}</span>
 
-                <p className="font-bold text-primary-container mb-2">
-                  {activity.title}
-                </p>
+                    {/* 시간이 없으면 구분점까지 함께 생략 */}
+                    {activity.duration && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span>{activity.duration}</span>
+                      </>
+                    )}
+                  </p>
 
-                <p className="text-sm text-on-surface-variant leading-relaxed mb-3">
-                  {activity.description}
-                </p>
+                  {/* 실제 API 또는 MOCK의 활동 제목 */}
+                  <p className="font-bold text-primary-container mb-2">
+                    {activity.title}
+                  </p>
 
-                <p className="mt-auto text-xs text-on-surface-variant border-t border-outline-variant/20 pt-3">
-                  <span className="font-semibold text-primary-container">
-                    알게 되는 것 ·{' '}
-                  </span>
-                  {activity.outcome}
-                </p>
-              </li>
-            ))}
-          </ol>
+                  {/* 설명이 있을 때만 출력 */}
+                  {activity.description && (
+                    <p className="text-sm text-on-surface-variant leading-relaxed mb-3 whitespace-pre-line line-clamp-4">
+                      {activity.description}
+                    </p>
+                  )}
+
+                  {/* 결과물/알게 되는 것 정보가 있을 때만 출력 */}
+                  {activity.outcome && (
+                    <p className="mt-auto text-xs text-on-surface-variant border-t border-outline-variant/20 pt-3">
+                      <span className="font-semibold text-primary-container">
+                        {activity.outcomeLabel} ·{' '}
+                      </span>
+                      {activity.outcome}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
         </section>
       )}
 
+      {/* 결과 공유 */}
       {canShare && (
         <SharePanel resultId={result.resultId} />
       )}
 
+      {/* 다음 단계 */}
       <section
         aria-labelledby="next-title"
         className="rounded-brand bg-surface-container-low p-5 sm:p-6 mb-8"
@@ -665,6 +835,7 @@ const ResultView = ({
         (결과 버전 {result.resultVersion})
       </p>
 
+      {/* 선택된 비교 전공 */}
       {selected.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-outline-variant/30 bg-surface-container-lowest/95 backdrop-blur px-4 py-3">
           <div className="max-w-[880px] mx-auto flex flex-wrap items-center justify-between gap-2">
