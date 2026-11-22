@@ -1,69 +1,212 @@
 import { useEffect, useState } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import {
+  Link,
+  Navigate,
+  useSearchParams,
+} from 'react-router-dom';
+
 import { getDashboardSummary } from '../../../api/dashboard';
-import { isExplorationEnabled } from '../../../config/features';
+
+import {
+  diagnosisEntryPath,
+  isExplorationEnabled,
+} from '../../../config/features';
+
 import Dashboard from '../Dashboard';
 
-type Decision =
-  | { kind: 'LOADING' }
-  | { kind: 'LEGACY' }
-  | { kind: 'EXPLORATION'; sessionId: number };
+type ResultSection =
+  | 'compare'
+  | 'activities'
+  | 'ask'
+  | 'plan';
 
-// 어떤 결과를 먼저 보여줄지는 서버가 정한다 — /dashboard/summary 의 latestResult 를 그대로 따른다.
-// 두 종류 비교, 손상된 결과 건너뛰기, 탐색형 사용 가능 여부 판정 모두 서버 몫이다. (JOFE#127)
-// 기존 결과는 ?view=legacy 로 그대로 열린다.
-const ExplorationAwareHome = () => {
-  const [decision, setDecision] = useState<Decision>({ kind: 'LOADING' });
+type Decision =
+  | {
+      kind:
+        | 'LOADING'
+        | 'EMPTY'
+        | 'UNAVAILABLE'
+        | 'ERROR';
+    }
+  | {
+      kind: 'READY';
+      sessionId: number;
+    };
+
+function resultSection(
+  value: string | null,
+): ResultSection | null {
+  return value === 'compare' ||
+    value === 'activities' ||
+    value === 'ask' ||
+    value === 'plan'
+    ? value
+    : null;
+}
+
+const ExplorationResultHome = ({
+  section,
+}: {
+  section: ResultSection | null;
+}) => {
+  const [decision, setDecision] = useState<Decision>({
+    kind: 'LOADING',
+  });
+
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    if (!isExplorationEnabled) return;
+
     let alive = true;
 
     getDashboardSummary()
       .then((summary) => {
         if (!alive) return;
-        const latest = summary.latestResult;
-        // 탐색형을 쓸 수 없으면 서버가 UNAVAILABLE과 레거시 정보만 준다.
-        if (summary.exploration === 'UNAVAILABLE' || latest?.type !== 'EXPLORATION_V1') {
-          setDecision({ kind: 'LEGACY' });
+
+        if (summary.exploration === 'UNAVAILABLE') {
+          setDecision({
+            kind: 'UNAVAILABLE',
+          });
+
           return;
         }
-        setDecision({ kind: 'EXPLORATION', sessionId: latest.sessionId });
+
+        const latest =
+          summary.latestByType.EXPLORATION_V1 ??
+          (summary.latestResult?.type === 'EXPLORATION_V1'
+            ? summary.latestResult
+            : null);
+
+        setDecision(
+          latest
+            ? {
+                kind: 'READY',
+                sessionId: latest.sessionId,
+              }
+            : {
+                kind: 'EMPTY',
+              },
+        );
       })
-      // 요약을 못 받으면 기존 결과 화면으로 연다. 탐색형 결과를 임의로 고르지는 않는다.
       .catch(() => {
-        if (alive) setDecision({ kind: 'LEGACY' });
+        if (alive) {
+          setDecision({
+            kind: 'ERROR',
+          });
+        }
       });
 
     return () => {
       alive = false;
     };
-  }, []);
+  }, [attempt]);
 
-  if (decision.kind === 'LOADING') {
+  if (
+    isExplorationEnabled &&
+    decision.kind === 'READY'
+  ) {
+    const path =
+      '/analysis/exploration/' +
+      decision.sessionId +
+      (section ? '/' + section : '');
+
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <p role="status" className="text-sm text-on-surface-variant">
-          최근 결과를 확인하고 있어요…
-        </p>
-      </div>
+      <Navigate
+        to={path}
+        replace
+      />
     );
   }
 
-  if (decision.kind === 'EXPLORATION') {
-    return <Navigate to={`/analysis/exploration/${decision.sessionId}`} replace />;
-  }
+  const unavailable =
+    !isExplorationEnabled ||
+    decision.kind === 'UNAVAILABLE';
 
-  return <Dashboard />;
+  const loading =
+    !unavailable &&
+    decision.kind === 'LOADING';
+
+  const error =
+    !unavailable &&
+    decision.kind === 'ERROR';
+
+  return (
+    <main className="min-h-[60vh] flex items-center justify-center px-4">
+      <section className="max-w-lg text-center">
+        {loading ? (
+          <p
+            role="status"
+            className="text-sm text-on-surface-variant"
+          >
+            최근 탐색 결과를 확인하고 있어요…
+          </p>
+        ) : (
+          <>
+            <h1 className="text-2xl font-bold text-primary-container">
+              {unavailable
+                ? '전공 탐색 진단을 이용할 수 없어요'
+                : error
+                  ? '탐색 결과를 불러오지 못했어요'
+                  : '전공 탐색 진단을 먼저 완료해 주세요'}
+            </h1>
+
+            <p className="mt-3 text-sm text-on-surface-variant">
+              {unavailable || error
+                ? '잠시 후 다시 확인해 주세요.'
+                : '진단을 완료하면 후보 전공을 비교하고, 활동이나 상담을 이어갈 수 있어요.'}
+            </p>
+
+            {unavailable ? (
+              <Link
+                to="/"
+                className="inline-flex mt-6 px-5 py-3 rounded-lg bg-primary-container text-white"
+              >
+                홈으로 돌아가기
+              </Link>
+            ) : error ? (
+              <button
+                type="button"
+                className="mt-6 px-5 py-3 rounded-lg bg-primary-container text-white"
+                onClick={() => {
+                  setDecision({
+                    kind: 'LOADING',
+                  });
+
+                  setAttempt(
+                    (value) => value + 1,
+                  );
+                }}
+              >
+                다시 불러오기
+              </button>
+            ) : (
+              <Link
+                to={diagnosisEntryPath}
+                className="inline-flex mt-6 px-5 py-3 rounded-lg bg-primary-container text-white"
+              >
+                전공 탐색 진단 시작하기
+              </Link>
+            )}
+          </>
+        )}
+      </section>
+    </main>
+  );
 };
 
 const ResultHome = () => {
   const [params] = useSearchParams();
 
-  if (!isExplorationEnabled || params.get('view') === 'legacy') {
+  if (params.get('view') === 'legacy') {
     return <Dashboard />;
   }
 
-  return <ExplorationAwareHome />;
+  return (
+    <ExplorationResultHome
+      section={resultSection(params.get('next'))}
+    />
+  );
 };
 
 export default ResultHome;

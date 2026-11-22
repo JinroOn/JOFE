@@ -1,18 +1,32 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
 import useAuthStore from '../../store/useAuthStore';
+
 import ProfileEditModal from './components/ProfileEditModal';
 import PasswordChangeModal from './components/PasswordChangeModal';
 import ConsentManagement from './components/ConsentManagement';
 import DiagnosisHistoryPanel from './components/DiagnosisHistoryPanel';
+
 import useDiagnosisHistory from '../../hooks/useDiagnosisHistory';
-import { getFavorites, deleteFavorite, deleteMe } from '../../api/user';
+
+import {
+  getFavorites,
+  deleteFavorite,
+  deleteMe,
+} from '../../api/user';
+
 import { getMajor } from '../../api/major';
 import { getDashboardSummary } from '../../api/dashboard';
 import { getApiErrorMessage } from '../../api/error';
+
 import type { DashboardSummary } from '../../types/dashboard';
 import type { Major } from '../../types/major';
-import { diagnosisEntryPath, isExplorationEnabled } from '../../config/features';
+
+import {
+  diagnosisEntryPath,
+  isExplorationEnabled,
+} from '../../config/features';
 
 interface FavoriteItem {
   id: number;
@@ -24,33 +38,55 @@ interface FavoriteItem {
 const MyPage = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+
   const history = useDiagnosisHistory();
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
-  const [favoritesLoading, setFavoritesLoading] = useState(true);
-  const [summaryState, setSummaryState] = useState<{
-    revision: number;
-    value: DashboardSummary;
-  } | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [withdrawing, setWithdrawing] = useState(false);
-  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+
+  const [showEditModal, setShowEditModal] =
+    useState(false);
+
+  const [showPasswordModal, setShowPasswordModal] =
+    useState(false);
+
+  const [showDeleteConfirm, setShowDeleteConfirm] =
+    useState(false);
+
+  const [favorites, setFavorites] =
+    useState<FavoriteItem[]>([]);
+
+  const [favoritesLoading, setFavoritesLoading] =
+    useState(true);
+
+  const [summaryState, setSummaryState] =
+    useState<{
+      revision: number;
+      value: DashboardSummary;
+    } | null>(null);
+
+  const [deletingId, setDeletingId] =
+    useState<number | null>(null);
+
+  const [withdrawing, setWithdrawing] =
+    useState(false);
+
+  const [withdrawError, setWithdrawError] =
+    useState<string | null>(null);
 
   const displayName = user?.nickname ?? '';
   const displayEmail = user?.email ?? '';
   const initial = displayName[0] ?? '?';
   const avatarUrl = user?.profileImageUrl ?? null;
 
-  const diagnosisCount = history.phase === 'READY'
-    ? history.items.filter((item) => item.status === 'completed').length
-    : null;
+  const diagnosisCount =
+    history.phase === 'READY'
+      ? history.items.filter(
+          (item) => item.status === 'completed',
+        ).length
+      : null;
 
-  // 이력 API는 총 건수를 주지 않으므로, 일부 페이지만 읽었을 때 누적 전체 횟수라고 표시하지 않는다.
   const diagnosisCountLabel = history.hasMore
     ? '불러온 완료 진단'
-    : history.source === 'legacy' && isExplorationEnabled
+    : history.source === 'legacy' &&
+        isExplorationEnabled
       ? '이전 방식 완료 진단'
       : '완료 진단 횟수';
 
@@ -59,17 +95,23 @@ const MyPage = () => {
       ? summaryState.value
       : null;
 
+  // 탐색 기능이 활성화되면 최신 탐색 결과를 우선합니다.
   const latest =
-    isExplorationEnabled && history.source === 'unified'
-      ? summary?.latestResult
+    isExplorationEnabled &&
+    history.source === 'unified'
+      ? summary?.latestByType.EXPLORATION_V1
       : summary?.latestByType.LEGACY;
 
   const allCompletedTimes =
     !history.hasMore && history.phase === 'READY'
       ? history.items
-          .filter((item) => item.status === 'completed')
+          .filter(
+            (item) => item.status === 'completed',
+          )
           .map((item) =>
-            new Date(item.completedAt ?? item.occurredAt).getTime(),
+            new Date(
+              item.completedAt ?? item.occurredAt,
+            ).getTime(),
           )
           .filter(Number.isFinite)
       : [];
@@ -77,11 +119,14 @@ const MyPage = () => {
   const lastDate = latest?.completedAt
     ? new Date(latest.completedAt)
     : allCompletedTimes.length
-      ? new Date(Math.max(...allCompletedTimes))
+      ? new Date(
+          Math.max(...allCompletedTimes),
+        )
       : null;
 
   const lastDiagnosisDate =
-    lastDate && Number.isFinite(lastDate.getTime())
+    lastDate &&
+    Number.isFinite(lastDate.getTime())
       ? lastDate.toLocaleDateString('ko-KR', {
           year: 'numeric',
           month: 'long',
@@ -101,14 +146,24 @@ const MyPage = () => {
             try {
               return {
                 ...favorite,
-                major: await getMajor(favorite.majorId),
+                major: await getMajor(
+                  favorite.majorId,
+                ),
               };
             } catch (error) {
               if (
-                (error as { response?: { status?: number } })
-                  ?.response?.status === 404
+                (
+                  error as {
+                    response?: {
+                      status?: number;
+                    };
+                  }
+                )?.response?.status === 404
               ) {
-                void deleteFavorite(favorite.id).catch(() => undefined);
+                void deleteFavorite(
+                  favorite.id,
+                ).catch(() => undefined);
+
                 return null;
               }
 
@@ -121,7 +176,11 @@ const MyPage = () => {
         );
 
         if (alive) {
-          setFavorites(items.filter((item) => item !== null));
+          setFavorites(
+            items.filter(
+              (item) => item !== null,
+            ),
+          );
         }
       } finally {
         if (alive) {
@@ -130,7 +189,9 @@ const MyPage = () => {
       }
     };
 
-    void loadFavorites().catch(() => undefined);
+    void loadFavorites().catch(
+      () => undefined,
+    );
 
     return () => {
       alive = false;
@@ -156,16 +217,24 @@ const MyPage = () => {
     return () => {
       alive = false;
     };
-  }, [history.phase, history.revision]);
+  }, [
+    history.phase,
+    history.revision,
+  ]);
 
-  const handleDeleteFavorite = async (favoriteId: number) => {
+  const handleDeleteFavorite = async (
+    favoriteId: number,
+  ) => {
     setDeletingId(favoriteId);
 
     try {
       await deleteFavorite(favoriteId);
 
-      setFavorites((prev) =>
-        prev.filter((favorite) => favorite.id !== favoriteId),
+      setFavorites((previous) =>
+        previous.filter(
+          (favorite) =>
+            favorite.id !== favoriteId,
+        ),
       );
     } finally {
       setDeletingId(null);
@@ -180,10 +249,10 @@ const MyPage = () => {
       await deleteMe();
       logout();
       navigate('/');
-    } catch (err) {
+    } catch (error) {
       setWithdrawError(
         getApiErrorMessage(
-          err,
+          error,
           '회원 탈퇴 처리 중 오류가 발생했습니다.',
         ),
       );
@@ -211,7 +280,9 @@ const MyPage = () => {
           </div>
 
           <button
-            onClick={() => setShowEditModal(true)}
+            onClick={() =>
+              setShowEditModal(true)
+            }
             className="absolute -bottom-2 -right-2 bg-secondary-container text-on-secondary-container p-2.5 rounded-2xl shadow-lg hover:scale-105 transition-transform"
           >
             <span className="material-symbols-outlined text-lg">
@@ -232,6 +303,7 @@ const MyPage = () => {
             <span className="material-symbols-outlined text-base">
               mail
             </span>
+
             {displayEmail}
           </p>
         </div>
@@ -250,7 +322,9 @@ const MyPage = () => {
 
             <h3 className="text-3xl font-extrabold">
               {diagnosisCount ?? '-'}
-              <span className="text-lg font-normal ml-1">회</span>
+              <span className="text-lg font-normal ml-1">
+                회
+              </span>
             </h3>
           </div>
 
@@ -264,8 +338,12 @@ const MyPage = () => {
             </p>
 
             <h3 className="text-3xl font-extrabold">
-              {favoritesLoading ? '-' : favorites.length}
-              <span className="text-lg font-normal ml-1">개</span>
+              {favoritesLoading
+                ? '-'
+                : favorites.length}
+              <span className="text-lg font-normal ml-1">
+                개
+              </span>
             </h3>
           </div>
 
@@ -297,13 +375,15 @@ const MyPage = () => {
             </div>
 
             <p className="text-lg font-medium leading-relaxed">
-              {displayName}님의 진단 결과를 바탕으로 맞춤형 전공을
-              추천해드립니다.
+              {displayName}님의 진단 결과를
+              바탕으로 맞춤형 전공을 추천해드립니다.
             </p>
           </div>
 
           <button
-            onClick={() => navigate(diagnosisEntryPath)}
+            onClick={() =>
+              navigate(diagnosisEntryPath)
+            }
             className="mt-6 flex items-center gap-2 text-sm font-bold text-secondary-container group"
           >
             진단 시작하기
@@ -332,82 +412,95 @@ const MyPage = () => {
               </div>
             )}
 
-            {!favoritesLoading && favorites.length === 0 && (
-              <div className="bg-white rounded-2xl p-12 text-center text-on-surface-variant">
-                <span className="material-symbols-outlined text-4xl mb-3 block text-outline">
-                  bookmark
-                </span>
+            {!favoritesLoading &&
+              favorites.length === 0 && (
+                <div className="bg-white rounded-2xl p-12 text-center text-on-surface-variant">
+                  <span className="material-symbols-outlined text-4xl mb-3 block text-outline">
+                    bookmark
+                  </span>
 
-                <p className="font-medium">
-                  즐겨찾기한 전공이 없습니다.
-                </p>
+                  <p className="font-medium">
+                    즐겨찾기한 전공이 없습니다.
+                  </p>
 
-                <button
-                  onClick={() => navigate('/diagnosis/explore')}
-                  className="mt-4 text-sm font-bold text-secondary"
-                >
-                  전공 탐색하러 가기 →
-                </button>
-              </div>
-            )}
-
-            {!favoritesLoading && favorites.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {favorites.map(({ id, major }) => (
-                  <div
-                    key={id}
-                    className="bg-white p-6 rounded-2xl shadow-sm border border-transparent hover:border-secondary-container transition-all"
+                  <button
+                    onClick={() =>
+                      navigate(
+                        '/diagnosis/explore',
+                      )
+                    }
+                    className="mt-4 text-sm font-bold text-secondary"
                   >
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-secondary">
-                        <span className="material-symbols-outlined">
-                          school
-                        </span>
+                    전공 탐색하러 가기 →
+                  </button>
+                </div>
+              )}
+
+            {!favoritesLoading &&
+              favorites.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {favorites.map(({ id, major }) => (
+                    <div
+                      key={id}
+                      className="bg-white p-6 rounded-2xl shadow-sm border border-transparent hover:border-secondary-container transition-all"
+                    >
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-secondary">
+                          <span className="material-symbols-outlined">
+                            school
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={() =>
+                            handleDeleteFavorite(
+                              id,
+                            )
+                          }
+                          disabled={deletingId === id}
+                          className="p-1 rounded-lg hover:bg-error-container/20 transition-colors disabled:opacity-40"
+                          title="즐겨찾기 삭제"
+                        >
+                          <span
+                            className="material-symbols-outlined text-secondary"
+                            style={{
+                              fontVariationSettings:
+                                "'FILL' 1",
+                            }}
+                          >
+                            {deletingId === id
+                              ? 'hourglass_empty'
+                              : 'bookmark'}
+                          </span>
+                        </button>
                       </div>
 
-                      <button
-                        onClick={() => handleDeleteFavorite(id)}
-                        disabled={deletingId === id}
-                        className="p-1 rounded-lg hover:bg-error-container/20 transition-colors disabled:opacity-40"
-                        title="즐겨찾기 삭제"
-                      >
-                        <span
-                          className="material-symbols-outlined text-secondary"
-                          style={{
-                            fontVariationSettings: "'FILL' 1",
-                          }}
-                        >
-                          {deletingId === id
-                            ? 'hourglass_empty'
-                            : 'bookmark'}
+                      <h5 className="font-bold text-lg mb-1">
+                        {major?.name ??
+                          `전공 #${id}`}
+                      </h5>
+
+                      <p className="text-sm text-on-surface-variant mb-4 line-clamp-2">
+                        {major?.description ?? ''}
+                      </p>
+
+                      {major?.category && (
+                        <span className="text-xs px-2 py-0.5 rounded bg-surface-container text-on-surface-variant">
+                          {major.category}
                         </span>
-                      </button>
+                      )}
                     </div>
-
-                    <h5 className="font-bold text-lg mb-1">
-                      {major?.name ?? `전공 #${id}`}
-                    </h5>
-
-                    <p className="text-sm text-on-surface-variant mb-4 line-clamp-2">
-                      {major?.description ?? ''}
-                    </p>
-
-                    {major?.category && (
-                      <span className="text-xs px-2 py-0.5 rounded bg-surface-container text-on-surface-variant">
-                        {major.category}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
           </section>
 
-          <DiagnosisHistoryPanel history={history} />
+          <DiagnosisHistoryPanel
+            history={history}
+          />
         </div>
 
         <aside>
-          {/* 계정 설정 카드: sticky를 제거하여 동의 관리 영역을 가리지 않도록 수정 */}
           <div className="bg-surface-container-low rounded-3xl p-8">
             <h3 className="text-xl font-bold text-primary-container mb-6 flex items-center gap-2">
               <span className="material-symbols-outlined">
@@ -421,12 +514,14 @@ const MyPage = () => {
                 {
                   icon: 'person',
                   label: '프로필 편집',
-                  onClick: () => setShowEditModal(true),
+                  onClick: () =>
+                    setShowEditModal(true),
                 },
                 {
                   icon: 'lock',
                   label: '비밀번호 변경',
-                  onClick: () => setShowPasswordModal(true),
+                  onClick: () =>
+                    setShowPasswordModal(true),
                 },
               ].map(({ icon, label, onClick }) => (
                 <button
@@ -466,12 +561,12 @@ const MyPage = () => {
                 <span className="material-symbols-outlined text-sm">
                   person_remove
                 </span>
+
                 회원 탈퇴
               </button>
             </div>
           </div>
 
-          {/* 계정 설정 카드 아래에 정상 배치되는 동의 관리 영역 */}
           <ConsentManagement
             onRequestWithdrawal={() => {
               setWithdrawError(null);
@@ -483,13 +578,17 @@ const MyPage = () => {
 
       {showEditModal && (
         <ProfileEditModal
-          onClose={() => setShowEditModal(false)}
+          onClose={() =>
+            setShowEditModal(false)
+          }
         />
       )}
 
       {showPasswordModal && (
         <PasswordChangeModal
-          onClose={() => setShowPasswordModal(false)}
+          onClose={() =>
+            setShowPasswordModal(false)
+          }
         />
       )}
 
@@ -507,7 +606,8 @@ const MyPage = () => {
             </h3>
 
             <p className="text-sm text-on-surface-variant mb-4">
-              탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.
+              탈퇴 시 모든 데이터가 삭제되며
+              복구할 수 없습니다.
               정말 탈퇴하시겠습니까?
             </p>
 
@@ -534,7 +634,9 @@ const MyPage = () => {
                 disabled={withdrawing}
                 className="flex-1 py-3 rounded-lg bg-error text-white font-bold hover:bg-error/90 transition-all disabled:opacity-50"
               >
-                {withdrawing ? '처리 중...' : '탈퇴'}
+                {withdrawing
+                  ? '처리 중...'
+                  : '탈퇴'}
               </button>
             </div>
           </div>
