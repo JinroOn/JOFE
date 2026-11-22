@@ -1,29 +1,14 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import type { Major } from './types';
+import { getRequiredScores } from './types';
+import { getMajor } from '../../../api/major';
 import CompareRadarChart from './components/CompareRadarChart';
 import SliderPanel from './components/SliderPanel';
 import FitnessCard from './components/FitnessCard';
 import ComparisonTable from './components/ComparisonTable';
 
 const AXES = ['수리·논리', '문제해결', '정보기술', '구현력', '시스템이해', '데이터분석', '의사소통', '협업·윤리', '자기관리'];
-
-const MAJORS: Major[] = [
-  {
-    id: 'cs', name: '컴퓨터공학과', college: '공과대학',
-    required: [8.0, 7.0, 8.0, 9.0, 9.0, 7.0, 6.0, 7.0, 7.0],
-    employment: 'High', employmentPct: 85, startSalary: '4,800~',
-  },
-  {
-    id: 'ds', name: '데이터사이언스', college: '융합전공',
-    required: [8.0, 8.0, 7.0, 8.0, 7.0, 10.0, 7.0, 8.0, 7.0],
-    employment: 'V.High', employmentPct: 92, startSalary: '5,500~',
-  },
-  {
-    id: 'stat', name: '통계학과', college: '상경대학',
-    required: [10.0, 9.0, 6.0, 5.0, 6.0, 10.0, 6.0, 6.0, 8.0],
-    employment: 'Mid', employmentPct: 65, startSalary: '4,200~',
-  },
-];
 
 const computeFitness = (userScores: number[], required: number[]) => {
   const avgDiff =
@@ -32,32 +17,78 @@ const computeFitness = (userScores: number[], required: number[]) => {
 };
 
 const MajorCompare = () => {
-  const [scores, setScores] = useState<number[]>([8.8, 8.2, 8.6, 7.4, 7.9, 9.1, 7.2, 8.4, 6.0]);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
-  const allFitness = useMemo(
-    () => MAJORS.map((m) => computeFitness(scores, m.required)),
-    [scores]
+  const idsParam = searchParams.get('ids') ?? '';
+  const ids = useMemo(
+    () => idsParam.split(',').map(Number).filter((n) => n > 0),
+    [idsParam],
   );
 
-  const bestIdx = allFitness.indexOf(Math.max(...allFitness));
+  const [majors, setMajors] = useState<Major[]>([]);
+  const [loading, setLoading] = useState(ids.length > 0);
+  const [scores, setScores] = useState<number[]>([5, 5, 5, 5, 5, 5, 5, 5, 5]);
+
+  useEffect(() => {
+    if (ids.length === 0) return;
+    Promise.all(ids.map(getMajor))
+      .then(setMajors)
+      .finally(() => setLoading(false));
+  }, [ids]);
+
+  const allFitness = useMemo(
+    () => majors.map((m) => computeFitness(scores, getRequiredScores(m))),
+    [scores, majors],
+  );
+
+  const bestIdx = allFitness.length > 0 ? allFitness.indexOf(Math.max(...allFitness)) : 0;
 
   const handleSlider = (i: number, val: number) =>
     setScores((prev) => prev.map((s, idx) => (idx === i ? val : s)));
 
-  const radarDatasets = [
-    {
-      label: '현재 역량',
-      scores: scores.map((s) => s / 10),
-      color: '#FFAB00',
-      strokeDash: undefined as string | undefined,
-    },
-    {
-      label: '목표 전공 필요 역량',
-      scores: MAJORS[bestIdx].required.map((s) => s / 10),
-      color: '#00677f',
-      strokeDash: '4 2',
-    },
-  ];
+  const radarDatasets =
+    majors.length > 0
+      ? [
+          {
+            label: '현재 역량',
+            scores: scores.map((s) => s / 10),
+            color: '#FFAB00',
+            strokeDash: undefined as string | undefined,
+          },
+          {
+            label: '목표 전공 필요 역량',
+            scores: getRequiredScores(majors[bestIdx]).map((s) => s / 10),
+            color: '#00677f',
+            strokeDash: '4 2',
+          },
+        ]
+      : [];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <span className="material-symbols-outlined animate-spin text-4xl text-on-surface-variant">
+          progress_activity
+        </span>
+      </div>
+    );
+  }
+
+  if (majors.length === 0) {
+    return (
+      <div className="min-h-screen bg-surface flex flex-col items-center justify-center gap-4">
+        <span className="material-symbols-outlined text-5xl text-on-surface-variant">compare_arrows</span>
+        <p className="text-on-surface-variant font-medium">비교할 전공을 전공 탐색에서 선택해주세요.</p>
+        <button
+          onClick={() => navigate('/diagnosis/explore')}
+          className="px-6 py-3 bg-primary-container text-white font-bold rounded-xl hover:opacity-90 transition-opacity"
+        >
+          전공 탐색으로 이동
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-surface pb-24">
@@ -73,18 +104,15 @@ const MajorCompare = () => {
                 미래를 향한 가장 정교한<br />전공 시뮬레이션
               </h1>
               <p className="text-on-surface-variant max-w-2xl text-base sm:text-lg leading-relaxed">
-                나의 역량 지표를 조정하여 희망 전공과의 적합도 변화를 실시간으로 확인하세요.<br />
-                AI가 당신의 잠재력을 데이터로 증명합니다.
+                나의 역량 지표를 조정하여 희망 전공과의 적합도 변화를 실시간으로 확인하세요.
               </p>
             </div>
-            <div className="flex flex-wrap gap-3 shrink-0">
-              <button className="px-6 py-4 bg-surface-container-lowest text-primary-container border border-outline-variant/20 rounded-[14px] font-bold shadow-sm hover:-translate-y-0.5 transition-all">
-                분석 저장하기
-              </button>
-              <button className="px-6 py-4 bg-[#FFAB00] text-primary-container rounded-[14px] font-bold shadow-lg shadow-[#FFAB00]/20 hover:-translate-y-0.5 transition-all">
-                보고서 다운로드
-              </button>
-            </div>
+            <button
+              onClick={() => navigate('/diagnosis/explore')}
+              className="px-6 py-4 bg-surface-container-lowest text-primary-container border border-outline-variant/20 rounded-[14px] font-bold shadow-sm hover:-translate-y-0.5 transition-all shrink-0"
+            >
+              전공 다시 선택
+            </button>
           </div>
         </header>
 
@@ -95,7 +123,6 @@ const MajorCompare = () => {
           </aside>
 
           <div className="md:col-span-8 space-y-8">
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
               <section className="bg-surface-container-lowest p-6 sm:p-8 rounded-[14px] shadow-[0px_20px_40px_rgba(10,25,47,0.06)] flex flex-col items-center">
                 <h3 className="text-lg font-bold self-start mb-4">역량 갭 분석</h3>
@@ -111,16 +138,17 @@ const MajorCompare = () => {
                     <svg width="20" height="2" className="shrink-0">
                       <line x1="0" y1="1" x2="20" y2="1" stroke="#00677f" strokeWidth="2" strokeDasharray="4 2" />
                     </svg>
-                    <span className="text-xs font-bold text-on-surface-variant">목표 전공 필요 역량</span>
+                    <span className="text-xs font-bold text-on-surface-variant">
+                      {majors[bestIdx].name} 필요 역량
+                    </span>
                   </div>
                 </div>
               </section>
 
-              <FitnessCard majors={MAJORS} allFitness={allFitness} bestIdx={bestIdx} />
+              <FitnessCard majors={majors} allFitness={allFitness} bestIdx={bestIdx} />
             </div>
 
-            <ComparisonTable majors={MAJORS} allFitness={allFitness} bestIdx={bestIdx} />
-
+            <ComparisonTable majors={majors} allFitness={allFitness} bestIdx={bestIdx} />
           </div>
         </div>
       </div>

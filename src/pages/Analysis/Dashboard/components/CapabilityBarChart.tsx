@@ -3,47 +3,114 @@ import type { CapabilityRow } from '../types';
 interface CapabilityBarChartProps {
   rows: CapabilityRow[];
   className?: string;
+  targetMajorName?: string;
 }
 
-const CapabilityBarChart = ({ rows, className = '' }: CapabilityBarChartProps) => (
-  <section className={`bg-surface-container-lowest p-6 sm:p-8 rounded-[14px] shadow-[0px_20px_40px_rgba(10,25,47,0.06)] ${className}`}>
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-      <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2">
-        <span className="material-symbols-outlined text-secondary">bar_chart</span>
-        전공 요구 역량 vs 내 역량 비교
-      </h3>
-      <div className="flex gap-4 text-xs font-bold shrink-0">
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 bg-secondary rounded-sm" />
-          <span className="text-on-surface-variant">내 점수</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 bg-surface-container-high rounded-sm border border-outline-variant/30" />
-          <span className="text-on-surface-variant">전공 평균</span>
-        </div>
-      </div>
-    </div>
-    <div className="space-y-5">
-      {rows.map((row) => (
-        <div key={row.axis} className="space-y-1.5">
-          <div className="flex justify-between text-sm font-bold">
-            <span className="text-primary-container">{row.axis}</span>
-            <span className={`tabular-nums ${row.userScore >= row.majorAvg ? 'text-secondary' : 'text-on-surface-variant'}`}>
-              {row.userScore} / {row.majorAvg}
-            </span>
+const clampPercent = (value: number): number =>
+  Math.min(Math.max(value, 0), 100);
+
+/**
+ * 학생의 역량 점수(0~100)와 전공별 상대 가중치는
+ * 서로 다른 기준입니다.
+ *
+ * 이 두 값으로 목표 충족 여부나
+ * 부족한 역량을 직접 판정하지 않습니다.
+ */
+const CapabilityBarChart = ({
+  rows,
+  className = '',
+  targetMajorName,
+}: CapabilityBarChartProps) => (
+  <section
+    className={`rounded-[14px] bg-surface-container-lowest p-6 shadow-sm sm:p-8 ${className}`}
+  >
+    <h3 className="mb-3 flex items-center gap-2 text-lg font-bold text-primary-container sm:text-xl">
+      <span
+        className="material-symbols-outlined text-secondary"
+        aria-hidden="true"
+      >
+        bar_chart
+      </span>
+
+      {targetMajorName
+        ? `${targetMajorName}의 역량별 상대 비중과 학생 역량 점수`
+        : '학생 역량 점수와 전공별 상대 비중'}
+    </h3>
+
+    {/* 수정: 개발 진행 문구 제거 */}
+    <p className="mb-6 text-sm leading-relaxed text-on-surface-variant">
+      학생 역량 점수는 0~100점으로 표시됩니다.
+      전공별 상대 가중치는 전공 내에서 각 역량이
+      차지하는 중요도를 나타냅니다. 서로 다른
+      기준이므로 두 값을 직접 비교하여
+      목표 달성 여부나 부족한 역량을 판단하지 않습니다.
+    </p>
+
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {rows.map((row) => {
+        const student =
+          row.userScore === null
+            ? null
+            : clampPercent(row.userScore);
+
+        const weight =
+          row.majorAvg === null
+            ? null
+            : clampPercent(row.majorAvg);
+
+        return (
+          <div
+            key={row.axis}
+            className="rounded-xl border border-outline-variant/20 bg-surface-container-low p-4"
+          >
+            <h4 className="mb-3 font-bold text-primary-container">
+              {row.axis}
+            </h4>
+
+            <div className="mb-3">
+              <div className="mb-1 flex justify-between text-xs text-on-surface-variant">
+                <span>학생 역량 점수</span>
+
+                <strong>
+                  {student === null
+                    ? '-'
+                    : `${Math.round(student)}점`}
+                </strong>
+              </div>
+
+              <div className="h-2 overflow-hidden rounded-full bg-surface-container-high">
+                {student !== null && (
+                  <div
+                    className="h-full rounded-full bg-secondary"
+                    style={{ width: `${student}%` }}
+                  />
+                )}
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-1 flex justify-between text-xs text-on-surface-variant">
+                <span>전공 내 상대 가중치</span>
+
+                <strong>
+                  {weight === null
+                    ? '-'
+                    : weight.toFixed(1)}
+                </strong>
+              </div>
+
+              <div className="h-2 overflow-hidden rounded-full bg-surface-container-high">
+                {weight !== null && (
+                  <div
+                    className="h-full rounded-full bg-on-surface-variant/50"
+                    style={{ width: `${weight}%` }}
+                  />
+                )}
+              </div>
+            </div>
           </div>
-          <div className="relative h-3 bg-surface-container-low rounded-full overflow-hidden">
-            <div
-              className="absolute h-full bg-surface-container-high rounded-full"
-              style={{ width: `${row.majorAvg}%` }}
-            />
-            <div
-              className={`absolute h-full rounded-full transition-all duration-500 ${row.userScore >= row.majorAvg ? 'bg-secondary' : 'bg-secondary/60'}`}
-              style={{ width: `${row.userScore}%` }}
-            />
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   </section>
 );

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import AuthLayout from '../components/AuthLayout';
 import useAuthStore from '../../../store/useAuthStore';
+import { login as loginApi } from '../../../api/auth';
 import { labelClass, isValidEmail } from '../constants';
 
 interface FormState {
@@ -15,45 +17,110 @@ interface FormErrors {
   password?: string;
 }
 
+interface LoginErrorResponse {
+  code?: string;
+  message?: string;
+}
+
 const inputClass =
   'w-full bg-surface-container-high border-b-2 border-transparent focus:border-secondary px-4 py-4 rounded-t-lg transition-all text-on-surface placeholder:text-on-surface-variant/40 outline-none pr-10';
 
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuthStore();
-  const [form, setForm] = useState<FormState>({ email: '', password: '', keepLogin: false });
+
+  const [form, setForm] = useState<FormState>({
+    email: '',
+    password: '',
+    keepLogin: false,
+  });
+
   const [errors, setErrors] = useState<FormErrors>({});
   const [emailTouched, setEmailTouched] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const validate = () => {
-    const e: FormErrors = {};
-    if (!isValidEmail(form.email)) e.email = '올바른 이메일 형식을 입력해 주세요.';
-    if (!form.password) e.password = '비밀번호를 입력해 주세요.';
-    setErrors(e);
-    return Object.keys(e).length === 0;
+    const nextErrors: FormErrors = {};
+
+    if (!isValidEmail(form.email)) {
+      nextErrors.email = '올바른 이메일 형식을 입력해 주세요.';
+    }
+
+    if (!form.password) {
+      nextErrors.password = '비밀번호를 입력해 주세요.';
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (
+    event: React.FormEvent,
+  ) => {
+    event.preventDefault();
+
     if (!validate()) return;
+
     setLoading(true);
-    // TODO: API 연동 — 현재는 목업 로그인 (test123 / test123)
-    await new Promise((r) => setTimeout(r, 1000));
-    if (form.email === 'admin123@gmail.com' && form.password === 'admin123') {
-      login({ id: 0, email: 'admin123@gmail.com', nickname: 'Admin', role: 'admin' }, 'mock-admin-token');
+
+    try {
+      const data = await loginApi(
+        form.email,
+        form.password,
+      );
+
+      login(
+        {
+          id: data.user.id,
+          email: data.user.email,
+          nickname: data.user.nickname,
+          profileImageUrl: data.user.profileImageUrl,
+          role: data.user.role,
+        },
+        data.accessToken,
+        data.refreshToken,
+      );
+
+      navigate(
+        data.user.role === 'admin'
+          ? '/admin'
+          : '/',
+      );
+    } catch (err) {
+      const response = axios.isAxiosError<LoginErrorResponse>(
+        err,
+      )
+        ? err.response
+        : undefined;
+
+      if (response?.status === 401) {
+        setErrors({
+          password:
+            '이메일 또는 비밀번호가 올바르지 않습니다.',
+        });
+      } else if (
+        response?.status === 429 &&
+        response.data?.code ===
+          'AUTH_TOO_MANY_LOGIN_ATTEMPTS'
+      ) {
+        const serverMessage = response.data?.message;
+
+        setErrors({
+          password:
+            typeof serverMessage === 'string' &&
+            serverMessage.trim().length > 0
+              ? serverMessage
+              : '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.',
+        });
+      } else {
+        setErrors({
+          password:
+            '로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
+        });
+      }
+    } finally {
       setLoading(false);
-      navigate('/admin');
-      return;
-    } else if (form.email === 'test123@gmail.com' && form.password === 'test123') {
-      login({ id: 1, email: 'test123@gmail.com', nickname: 'test123' }, 'mock-token');
-    } else {
-      setErrors({ password: '이메일 또는 비밀번호가 올바르지 않습니다.' });
-      setLoading(false);
-      return;
     }
-    setLoading(false);
-    navigate('/');
   };
 
   return (
@@ -65,6 +132,7 @@ const Login = () => {
             <div className="flex-1 py-4 text-center font-bold text-primary-container text-sm border-b-2 border-secondary -mb-px">
               로그인
             </div>
+
             <Link
               to="/auth/signup"
               className="flex-1 py-4 text-center text-on-surface-variant/60 text-sm hover:text-primary transition-colors"
@@ -74,66 +142,122 @@ const Login = () => {
           </div>
 
           <div className="p-8 sm:p-10">
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-6"
+            >
               {/* 이메일 */}
               <div>
-                <label className={labelClass}>이메일 주소</label>
+                <label className={labelClass}>
+                  이메일 주소
+                </label>
+
                 <div className="relative">
                   <input
                     type="email"
                     value={form.email}
-                    onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                    onBlur={() => setEmailTouched(true)}
+                    onChange={(event) =>
+                      setForm((previous) => ({
+                        ...previous,
+                        email: event.target.value,
+                      }))
+                    }
+                    onBlur={() =>
+                      setEmailTouched(true)
+                    }
                     placeholder="example@email.com"
                     className={inputClass}
                   />
+
                   {emailTouched && form.email && (
                     <span
-                      className={`material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-xl ${isValidEmail(form.email) ? 'text-green-500' : 'text-error'}`}
-                      style={{ fontVariationSettings: "'FILL' 1" }}
+                      className={`material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-xl ${
+                        isValidEmail(form.email)
+                          ? 'text-green-500'
+                          : 'text-error'
+                      }`}
+                      style={{
+                        fontVariationSettings: "'FILL' 1",
+                      }}
                     >
-                      {isValidEmail(form.email) ? 'check_circle' : 'cancel'}
+                      {isValidEmail(form.email)
+                        ? 'check_circle'
+                        : 'cancel'}
                     </span>
                   )}
                 </div>
-                {errors.email && <p className="text-error text-xs mt-1 ml-1">{errors.email}</p>}
+
+                {errors.email && (
+                  <p className="text-error text-xs mt-1 ml-1">
+                    {errors.email}
+                  </p>
+                )}
               </div>
 
               {/* 비밀번호 */}
               <div>
-                <label className={labelClass}>비밀번호</label>
+                <label className={labelClass}>
+                  비밀번호
+                </label>
+
                 <div className="relative">
                   <input
                     type="password"
                     value={form.password}
-                    onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                    onChange={(event) =>
+                      setForm((previous) => ({
+                        ...previous,
+                        password: event.target.value,
+                      }))
+                    }
                     placeholder="비밀번호를 입력하세요"
                     className={inputClass}
                   />
+
                   {errors.password && (
                     <span
                       className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-xl text-error"
-                      style={{ fontVariationSettings: "'FILL' 1" }}
+                      style={{
+                        fontVariationSettings: "'FILL' 1",
+                      }}
                     >
                       cancel
                     </span>
                   )}
                 </div>
-                {errors.password && <p className="text-error text-xs mt-1 ml-1">{errors.password}</p>}
+
+                {errors.password && (
+                  <p
+                    role="alert"
+                    className="text-error text-xs mt-1 ml-1"
+                  >
+                    {errors.password}
+                  </p>
+                )}
               </div>
 
-              {/* 로그인 상태 유지 + 비밀번호 찾기 */}
+              {/* 로그인 유지와 비밀번호 찾기 */}
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 text-sm text-on-surface-variant cursor-pointer">
                   <input
                     type="checkbox"
                     checked={form.keepLogin}
-                    onChange={(e) => setForm((p) => ({ ...p, keepLogin: e.target.checked }))}
+                    onChange={(event) =>
+                      setForm((previous) => ({
+                        ...previous,
+                        keepLogin:
+                          event.target.checked,
+                      }))
+                    }
                     className="w-4 h-4 rounded border-outline-variant accent-secondary"
                   />
                   로그인 상태 유지
                 </label>
-                <Link to="/auth/find-password" className="text-sm text-on-surface-variant hover:text-secondary transition-colors">
+
+                <Link
+                  to="/auth/find-password"
+                  className="text-sm text-on-surface-variant hover:text-secondary transition-colors"
+                >
                   비밀번호 찾기
                 </Link>
               </div>
@@ -144,7 +268,9 @@ const Login = () => {
                   disabled={loading}
                   className="w-full bg-secondary text-white font-bold py-5 rounded-lg shadow-lg shadow-secondary/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 disabled:opacity-60"
                 >
-                  {loading ? '처리 중...' : '로그인'}
+                  {loading
+                    ? '처리 중...'
+                    : '로그인'}
                 </button>
               </div>
             </form>
