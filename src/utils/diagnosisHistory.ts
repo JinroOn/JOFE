@@ -1,42 +1,32 @@
 import type { DiagnosisHistoryItem } from '../types/history';
 
-// links는 API 주소이므로 이동에 사용하지 않는다.
-// 서버의 nextAction만 화면 경로로 옮긴다.
 export const historyActionPath = (
   item: DiagnosisHistoryItem,
 ): string | null => {
-  if (item.nextAction === 'RESUME') {
-    return item.type === 'EXPLORATION_V1'
-      ? `/diagnosis/exploration/session/${item.sessionId}`
-      : null;
-  }
-
-  if (
-    item.nextAction !== 'VIEW_RESULT' ||
-    item.resultAvailability !== 'AVAILABLE'
-  ) {
+  // 이전 방식 진단의 이어하기와 완료 결과 모두 차단
+  if (item.type !== 'EXPLORATION_V1') {
     return null;
   }
 
-  if (item.type === 'EXPLORATION_V1') {
+  if (item.nextAction === 'RESUME') {
+    return `/diagnosis/exploration/session/${item.sessionId}`;
+  }
+
+  if (
+    item.nextAction === 'VIEW_RESULT' &&
+    item.resultAvailability === 'AVAILABLE'
+  ) {
     return `/analysis/exploration/${item.sessionId}`;
   }
 
-  return `/analysis/dashboard?view=legacy${
-    item.resultId === null
-      ? ''
-      : `&resultId=${item.resultId}`
-  }`;
+  return null;
 };
 
 export const historyUnavailableMessage = (
   item: DiagnosisHistoryItem,
 ): string | null => {
-  if (
-    item.type === 'LEGACY' &&
-    item.status === 'in_progress'
-  ) {
-    return '이전 방식의 진단이 종료됐어요.';
+  if (item.type !== 'EXPLORATION_V1') {
+    return null;
   }
 
   if (item.status !== 'completed') {

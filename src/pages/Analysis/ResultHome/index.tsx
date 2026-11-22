@@ -12,8 +12,6 @@ import {
   isExplorationEnabled,
 } from '../../../config/features';
 
-import Dashboard from '../Dashboard';
-
 type ResultSection =
   | 'compare'
   | 'activities'
@@ -22,61 +20,58 @@ type ResultSection =
 
 type Decision =
   | {
-      kind:
-        | 'LOADING'
-        | 'EMPTY'
-        | 'UNAVAILABLE'
-        | 'ERROR';
+      kind: 'LOADING' | 'EMPTY' | 'UNAVAILABLE' | 'ERROR';
     }
   | {
       kind: 'READY';
       sessionId: number;
     };
 
-function resultSection(
+const resultSection = (
   value: string | null,
-): ResultSection | null {
-  return value === 'compare' ||
+): ResultSection | null => {
+  if (
+    value === 'compare' ||
     value === 'activities' ||
     value === 'ask' ||
     value === 'plan'
-    ? value
-    : null;
-}
+  ) {
+    return value;
+  }
+  return null;
+};
 
-const ExplorationResultHome = ({
-  section,
-}: {
-  section: ResultSection | null;
-}) => {
+const ResultHome = () => {
+  const [params] = useSearchParams();
+  const section = resultSection(params.get('next'));
+
   const [decision, setDecision] = useState<Decision>({
     kind: 'LOADING',
   });
-
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!isExplorationEnabled) return;
 
-    let alive = true;
+    let active = true;
 
     getDashboardSummary()
       .then((summary) => {
-        if (!alive) return;
+        if (!active) return;
 
         if (summary.exploration === 'UNAVAILABLE') {
-          setDecision({
-            kind: 'UNAVAILABLE',
-          });
-
+          setDecision({ kind: 'UNAVAILABLE' });
           return;
         }
 
+        // 기존 진단 결과는 새 서비스의 결과로 사용하지 않습니다.
         const latest =
           summary.latestByType.EXPLORATION_V1 ??
-          (summary.latestResult?.type === 'EXPLORATION_V1'
-            ? summary.latestResult
-            : null);
+          (
+            summary.latestResult?.type === 'EXPLORATION_V1'
+              ? summary.latestResult
+              : null
+          );
 
         setDecision(
           latest
@@ -84,21 +79,17 @@ const ExplorationResultHome = ({
                 kind: 'READY',
                 sessionId: latest.sessionId,
               }
-            : {
-                kind: 'EMPTY',
-              },
+            : { kind: 'EMPTY' },
         );
       })
       .catch(() => {
-        if (alive) {
-          setDecision({
-            kind: 'ERROR',
-          });
+        if (active) {
+          setDecision({ kind: 'ERROR' });
         }
       });
 
     return () => {
-      alive = false;
+      active = false;
     };
   }, [attempt]);
 
@@ -106,17 +97,13 @@ const ExplorationResultHome = ({
     isExplorationEnabled &&
     decision.kind === 'READY'
   ) {
-    const path =
-      '/analysis/exploration/' +
-      decision.sessionId +
-      (section ? '/' + section : '');
+    const destination =
+      `/analysis/exploration/${decision.sessionId}` +
+      (section ? `/${section}` : '');
 
-    return (
-      <Navigate
-        to={path}
-        replace
-      />
-    );
+    // view=legacy, resultId 등 이전 쿼리 파라미터는
+    // 목적지로 전달하지 않습니다.
+    return <Navigate to={destination} replace />;
   }
 
   const unavailable =
@@ -132,7 +119,7 @@ const ExplorationResultHome = ({
     decision.kind === 'ERROR';
 
   return (
-    <main className="min-h-[60vh] flex items-center justify-center px-4">
+    <main className="flex min-h-[60vh] items-center justify-center px-4">
       <section className="max-w-lg text-center">
         {loading ? (
           <p
@@ -154,28 +141,23 @@ const ExplorationResultHome = ({
             <p className="mt-3 text-sm text-on-surface-variant">
               {unavailable || error
                 ? '잠시 후 다시 확인해 주세요.'
-                : '진단을 완료하면 후보 전공을 비교하고, 활동이나 상담을 이어갈 수 있어요.'}
+                : '전공 탐색 진단을 완료하면 추천 전공, 비교, 탐색 활동과 상담을 확인할 수 있습니다.'}
             </p>
 
             {unavailable ? (
               <Link
                 to="/"
-                className="inline-flex mt-6 px-5 py-3 rounded-lg bg-primary-container text-white"
+                className="mt-6 inline-flex rounded-lg bg-primary-container px-5 py-3 text-white"
               >
                 홈으로 돌아가기
               </Link>
             ) : error ? (
               <button
                 type="button"
-                className="mt-6 px-5 py-3 rounded-lg bg-primary-container text-white"
+                className="mt-6 rounded-lg bg-primary-container px-5 py-3 text-white"
                 onClick={() => {
-                  setDecision({
-                    kind: 'LOADING',
-                  });
-
-                  setAttempt(
-                    (value) => value + 1,
-                  );
+                  setDecision({ kind: 'LOADING' });
+                  setAttempt((previous) => previous + 1);
                 }}
               >
                 다시 불러오기
@@ -183,7 +165,7 @@ const ExplorationResultHome = ({
             ) : (
               <Link
                 to={diagnosisEntryPath}
-                className="inline-flex mt-6 px-5 py-3 rounded-lg bg-primary-container text-white"
+                className="mt-6 inline-flex rounded-lg bg-primary-container px-5 py-3 text-white"
               >
                 전공 탐색 진단 시작하기
               </Link>
@@ -192,20 +174,6 @@ const ExplorationResultHome = ({
         )}
       </section>
     </main>
-  );
-};
-
-const ResultHome = () => {
-  const [params] = useSearchParams();
-
-  if (params.get('view') === 'legacy') {
-    return <Dashboard />;
-  }
-
-  return (
-    <ExplorationResultHome
-      section={resultSection(params.get('next'))}
-    />
   );
 };
 
