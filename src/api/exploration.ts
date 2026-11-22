@@ -1,7 +1,7 @@
-
 import api, { publicApi } from './axios';
 import { isExplorationMock } from '../config/features';
 import * as mock from './explorationMock';
+
 import type {
   AdvanceResponse,
   BackendComparisonMajor,
@@ -97,7 +97,9 @@ const toExplorationShareState = (
   dto: BackendExplorationShareState,
 ): ExplorationShareState => {
   const expiresAt = dto.expiresAt ?? null;
-  const expiryTime = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+  const expiryTime = expiresAt
+    ? Date.parse(expiresAt)
+    : Number.NaN;
 
   let status: ExplorationShareState['status'];
 
@@ -105,7 +107,10 @@ const toExplorationShareState = (
     status = 'ACTIVE';
   } else if (!expiresAt) {
     status = 'NONE';
-  } else if (Number.isFinite(expiryTime) && expiryTime <= Date.now()) {
+  } else if (
+    Number.isFinite(expiryTime) &&
+    expiryTime <= Date.now()
+  ) {
     status = 'EXPIRED';
   } else {
     status = 'DISABLED';
@@ -135,7 +140,8 @@ const toSharedExplorationResult = (
   // 백엔드는 majors를 평면 배열로 내려준다.
   // 화면에서는 전공군별로 다시 묶어서 표시한다.
   dto.majors.forEach((major) => {
-    const majors = majorsByGroup.get(major.groupCode) ?? [];
+    const majors =
+      majorsByGroup.get(major.groupCode) ?? [];
 
     majors.push({
       name: major.majorName,
@@ -172,7 +178,9 @@ export const startExplorationSession = () =>
         )
         .then((r) => r.data);
 
-export const getExplorationSession = (sessionId: number) =>
+export const getExplorationSession = (
+  sessionId: number,
+) =>
   isExplorationMock
     ? mock.getSession(sessionId)
     : api
@@ -187,23 +195,34 @@ export const listExplorationSessions = () =>
     : api
         .get<ExplorationSessionSummary[]>(
           `${BASE}/sessions`,
-          { params: { type: 'EXPLORATION_V1' } },
+          {
+            params: {
+              type: 'EXPLORATION_V1',
+            },
+          },
         )
         .then((r) => r.data);
 
-// 응답을 받지 못한 요청의 재시도는 같은 revision과 키를 유지한다.
+// 응답을 받지 못한 요청의 재시도는
+// 같은 revision과 키를 유지한다.
 export const abandonExplorationSession = (
   sessionId: number,
   expectedRevision: number,
   mutationId: string,
 ) =>
   isExplorationMock
-    ? mock.abandonSession(sessionId, expectedRevision, mutationId)
-    : api.post<ExplorationSession>(
-        `${BASE}/sessions/${sessionId}/abandon`,
-        { expectedRevision },
-        idem(mutationId),
-      ).then((r) => r.data);
+    ? mock.abandonSession(
+        sessionId,
+        expectedRevision,
+        mutationId,
+      )
+    : api
+        .post<ExplorationSession>(
+          `${BASE}/sessions/${sessionId}/abandon`,
+          { expectedRevision },
+          idem(mutationId),
+        )
+        .then((r) => r.data);
 
 export const requestNextQuestions = (
   sessionId: number,
@@ -219,14 +238,19 @@ export const requestNextQuestions = (
         )
         .then((r) => r.data);
 
-// clientMutationId를 Idempotency-Key로도 사용해 재시도 시 같은 키가 나가게 한다
+// clientMutationId를 Idempotency-Key로도 사용해
+// 재시도 시 같은 키가 나가게 한다.
 export const saveExplorationAnswer = (
   sessionId: number,
   issuedId: number,
   body: SaveAnswerRequest,
 ) =>
   isExplorationMock
-    ? mock.saveAnswer(sessionId, issuedId, body)
+    ? mock.saveAnswer(
+        sessionId,
+        issuedId,
+        body,
+      )
     : api
         .put<SaveAnswerResponse>(
           `${BASE}/sessions/${sessionId}/answers/${issuedId}`,
@@ -240,7 +264,10 @@ export const advanceExplorationStage = (
   expectedRevision: number,
 ) =>
   isExplorationMock
-    ? mock.advance(sessionId, expectedRevision)
+    ? mock.advance(
+        sessionId,
+        expectedRevision,
+      )
     : api
         .post<AdvanceResponse>(
           `${BASE}/sessions/${sessionId}/advance`,
@@ -249,12 +276,27 @@ export const advanceExplorationStage = (
         )
         .then((r) => r.data);
 
+// --------------------------------------------------
+// 신규 수정: 백엔드 결과의 선택적 notes 지원
+//
+// 이전 결과에는 notes가 없을 수 있으므로
+// 필수 필드로 만들지 않습니다.
+// --------------------------------------------------
+
+type BackendExplorationResultWithNotes =
+  BackendExplorationResult & {
+    notes?: string[];
+  };
+
 // 백엔드 결과 DTO를 화면이 쓰는 형태로 옮긴다.
 export const toExplorationResult = (
-  dto: BackendExplorationResult,
+  dto: BackendExplorationResultWithNotes,
 ): ExplorationResult => {
   const byCode = new Map(
-    dto.majors.map((major) => [major.majorCode, major]),
+    dto.majors.map((major) => [
+      major.majorCode,
+      major,
+    ]),
   );
 
   const toCard = (
@@ -269,6 +311,24 @@ export const toExplorationResult = (
     explanation: major.explanation,
   });
 
+  // 신규 수정:
+  // - 필드 미포함 -> []
+  // - 빈 배열 -> []
+  // - 공백 문자열 제거
+  // - 동일 안내 문구의 중복 표시 방지
+  // - 백엔드의 실제 안내 문구는 변경하지 않음
+  const notes = Array.isArray(dto.notes)
+    ? [
+        ...new Set(
+          dto.notes.filter(
+            (note) =>
+              typeof note === 'string' &&
+              note.trim().length > 0,
+          ),
+        ),
+      ]
+    : [];
+
   return {
     resultId: dto.resultId,
     sessionId: dto.sessionId,
@@ -276,20 +336,26 @@ export const toExplorationResult = (
     resultVersion: dto.resultVersion,
     createdAt: dto.completedAt,
 
-     // 추가: 백엔드의 후보 반응 정보를 그대로 유지
+    // 백엔드의 후보 반응 정보를 그대로 유지
     ...(dto.presentation
-    ? { presentation: dto.presentation }
-    : {}),
+      ? {
+          presentation: dto.presentation,
+        }
+      : {}),
 
     groups: dto.groups.map((group) => ({
       groupCode: group.groupCode,
       name: group.name ?? '',
       summary: group.summary ?? '',
       evidenceLevel: group.evidenceLevel,
-      reasonCodes: group.reasonCodes ?? dto.reasonCodes,
+      reasonCodes:
+        group.reasonCodes ?? dto.reasonCodes,
       majors: group.majorCodes
         .map((code) => byCode.get(code))
-        .filter((major) => major !== undefined)
+        .filter(
+          (major) =>
+            major !== undefined,
+        )
         .map(toCard),
     })),
 
@@ -300,26 +366,40 @@ export const toExplorationResult = (
     preparationResponses:
       dto.preparationResponses ??
       dto.cautions.filter(
-        (caution) => 'questionId' in caution,
+        (caution) =>
+          'questionId' in caution,
       ),
 
     nextActivities: dto.nextActivities,
-    recheckAxes: (dto.recheckAxes ?? []).filter(
-      (axis) => axis.name?.trim(),
-    ),
-    notes: [],
+
+    recheckAxes:
+      (dto.recheckAxes ?? []).filter(
+        (axis) => axis.name?.trim(),
+      ),
+
+    // 신규 수정:
+    // 더 이상 notes: []로 고정하지 않습니다.
+    notes,
+
     capabilities: dto.capabilities,
-    activityAvailability: dto.activityAvailability,
+    activityAvailability:
+      dto.activityAvailability,
     activityMessage: dto.activityMessage,
     testOnly: dto.testOnly,
+
     displayTextMissing: dto.groups.some(
       (group) => !group.name?.trim(),
     ),
+
     displayVersion: dto.displayVersion,
     displaySource: dto.displaySource,
+
     cautionAvailability:
-      dto.cautionAvailability ?? 'UNAVAILABLE',
-    cautionUnavailableReason: dto.cautionUnavailableReason,
+      dto.cautionAvailability ??
+      'UNAVAILABLE',
+
+    cautionUnavailableReason:
+      dto.cautionUnavailableReason,
   };
 };
 
@@ -329,14 +409,19 @@ export const completeExplorationSession = (
   expectedRevision: number,
 ): Promise<CompleteResponse> =>
   isExplorationMock
-    ? mock.complete(sessionId, expectedRevision)
+    ? mock.complete(
+        sessionId,
+        expectedRevision,
+      )
     : api
-        .post<BackendExplorationResult>(
+        .post<BackendExplorationResultWithNotes>(
           `${BASE}/sessions/${sessionId}/complete`,
           { expectedRevision },
           idem(),
         )
-        .then((r) => toExplorationResult(r.data));
+        .then((r) =>
+          toExplorationResult(r.data),
+        );
 
 export const getExplorationResult = (
   sessionId: number,
@@ -344,7 +429,7 @@ export const getExplorationResult = (
   isExplorationMock
     ? mock.getResult(sessionId)
     : api
-        .get<BackendExplorationResult>(
+        .get<BackendExplorationResultWithNotes>(
           `${BASE}/sessions/${sessionId}/result`,
         )
         .then((r) => ({
@@ -377,33 +462,61 @@ export const toExplorationComparison = (
   ) =>
     rows.map((row) => ({
       directionCode: row.directionCode,
-      descriptions: row.descriptions.map((d) => d.text),
+      descriptions: row.descriptions.map(
+        (d) => d.text,
+      ),
     }));
 
   return {
     resultId,
-    majors: [dto.left, dto.right]
-      .filter((major) => major !== undefined)
+
+    majors: [
+      dto.left,
+      dto.right,
+    ]
+      .filter(
+        (major) =>
+          major !== undefined,
+      )
       .map(toProfile),
+
     commonPoints: [],
     differences: [],
     sourceNote: dto.message ?? '',
-    comparisonSets: (dto.comparisonSets ?? []).map((set) => ({
-      comparisonSet: set.comparisonSet,
-      left: directions(set.leftDirections),
-      right: directions(set.rightDirections),
-      focusResponses: set.focusResponses ?? [],
-    })),
-    comparisonState: dto.comparisonState ?? null,
-    skippedComparisonSets: dto.skippedComparisonSets ?? [],
+
+    comparisonSets:
+      (dto.comparisonSets ?? []).map(
+        (set) => ({
+          comparisonSet: set.comparisonSet,
+          left: directions(
+            set.leftDirections,
+          ),
+          right: directions(
+            set.rightDirections,
+          ),
+          focusResponses:
+            set.focusResponses ?? [],
+        }),
+      ),
+
+    comparisonState:
+      dto.comparisonState ?? null,
+
+    skippedComparisonSets:
+      dto.skippedComparisonSets ?? [],
+
     available: dto.available,
-    candidateChoices: (dto.candidateChoices ?? []).map(
-      (major) => ({
-        majorCode: major.majorCode,
-        name: major.majorName,
-        groupName: major.groupName ?? '',
-      }),
-    ),
+
+    candidateChoices:
+      (dto.candidateChoices ?? []).map(
+        (major) => ({
+          majorCode: major.majorCode,
+          name: major.majorName,
+          groupName:
+            major.groupName ?? '',
+        }),
+      ),
+
     reasonCode: dto.reasonCode,
   };
 };
@@ -415,7 +528,12 @@ export const getExplorationComparison = (
   isExplorationMock
     ? mock
         .getComparison(resultId, pair)
-        .then((dto) => toExplorationComparison(dto, resultId))
+        .then((dto) =>
+          toExplorationComparison(
+            dto,
+            resultId,
+          ),
+        )
     : api
         .get<BackendExplorationComparison>(
           `${BASE}/results/${resultId}/comparison`,
@@ -428,9 +546,16 @@ export const getExplorationComparison = (
               : undefined,
           },
         )
-        .then((r) => toExplorationComparison(r.data, resultId));
+        .then((r) =>
+          toExplorationComparison(
+            r.data,
+            resultId,
+          ),
+        );
 
-export const getExplorationActivities = (resultId: number) =>
+export const getExplorationActivities = (
+  resultId: number,
+) =>
   isExplorationMock
     ? mock.getActivities(resultId)
     : api
@@ -439,122 +564,243 @@ export const getExplorationActivities = (resultId: number) =>
         )
         .then((r) => r.data);
 
-interface BackendSupportState extends Omit<SupportState, 'issuedQuestions' | 'answers'> {
+interface BackendSupportState
+  extends Omit<
+    SupportState,
+    'issuedQuestions' | 'answers'
+  > {
   issued?: {
-    question: SupportSession['issuedQuestions'][number];
+    question:
+      SupportSession['issuedQuestions'][number];
     effective: boolean;
     answerApplicable: boolean;
     answerCode: string | null;
   }[];
 }
 
-const toSupportState = ({ issued = [], ...data }: BackendSupportState): SupportState => {
-  // BOTH에는 계획 준비도 문항도 있으므로 활동 문항만 활동 화면에 전달한다.
-  const activity = issued.filter(({ effective, question }) =>
-    effective && question.questionId.startsWith('ACTIVITY-'),
+const toSupportState = ({
+  issued = [],
+  ...data
+}: BackendSupportState): SupportState => {
+  // BOTH에는 계획 준비도 문항도 있으므로
+  // 활동 문항만 활동 화면에 전달한다.
+  const activity = issued.filter(
+    ({ effective, question }) =>
+      effective &&
+      question.questionId.startsWith(
+        'ACTIVITY-',
+      ),
   );
+
   return {
     ...data,
     purpose: data.purpose ?? null,
-    targetMajorCode: data.targetMajorCode ?? null,
-    allowedPurposes: data.allowedPurposes ?? [],
-    issuedQuestions: activity.map(({ question }) => question),
-    answers: activity.flatMap(({ question, answerApplicable, answerCode }) =>
-      answerApplicable && answerCode !== null ? [{ issuedId: question.issuedId, optionCode: answerCode }] : [],
+    targetMajorCode:
+      data.targetMajorCode ?? null,
+    allowedPurposes:
+      data.allowedPurposes ?? [],
+
+    issuedQuestions: activity.map(
+      ({ question }) => question,
+    ),
+
+    answers: activity.flatMap(
+      ({
+        question,
+        answerApplicable,
+        answerCode,
+      }) =>
+        answerApplicable &&
+        answerCode !== null
+          ? [
+              {
+                issuedId:
+                  question.issuedId,
+                optionCode: answerCode,
+              },
+            ]
+          : [],
     ),
   };
 };
 
-export const getExplorationSupport = (resultId: number) =>
+export const getExplorationSupport = (
+  resultId: number,
+) =>
   isExplorationMock
     ? mock.getSupport(resultId)
     : api
-        .get<BackendSupportState>(`${BASE}/results/${resultId}/support`)
-        .then((r) => toSupportState(r.data));
+        .get<BackendSupportState>(
+          `${BASE}/results/${resultId}/support`,
+        )
+        .then((r) =>
+          toSupportState(r.data),
+        );
 
-// 백엔드 SupportRequests.Select — expectedSupportRevision 이 필수다.
+// 백엔드 SupportRequests.Select:
+// expectedSupportRevision이 필수다.
 export const selectExplorationSupport = (
   resultId: number,
   selection: SupportSelection,
   expectedSupportRevision: number,
 ) =>
   isExplorationMock
-    ? mock.selectSupport(resultId, selection, expectedSupportRevision)
+    ? mock.selectSupport(
+        resultId,
+        selection,
+        expectedSupportRevision,
+      )
     : api
         .post<BackendSupportState>(
           `${BASE}/results/${resultId}/support`,
-          { ...selection, expectedSupportRevision },
+          {
+            ...selection,
+            expectedSupportRevision,
+          },
           idem(),
         )
-        .then((r) => toSupportState(r.data));
+        .then((r) =>
+          toSupportState(r.data),
+        );
 
-export const startExplorationActivitySupport = async (resultId: number): Promise<SupportState> => {
-  for (let attempt = 0; ; attempt += 1) {
-    const current = await getExplorationSupport(resultId);
-    if (current.purpose === 'ACTIVITY' || current.purpose === 'BOTH') return current;
+export const startExplorationActivitySupport =
+  async (
+    resultId: number,
+  ): Promise<SupportState> => {
+    for (
+      let attempt = 0;
+      ;
+      attempt += 1
+    ) {
+      const current =
+        await getExplorationSupport(resultId);
 
-    const selection: SupportSelection = current.purpose === 'PLAN'
-      ? { purpose: 'BOTH', targetMajorCode: current.targetMajorCode }
-      : { purpose: 'ACTIVITY', targetMajorCode: null };
-    try {
-      return await selectExplorationSupport(resultId, selection, current.supportRevision);
-    } catch (error) {
-      if (attempt === 0 && toExplorationErrorCode(error) === 'STALE_REVISION') continue;
-      throw error;
+      if (
+        current.purpose === 'ACTIVITY' ||
+        current.purpose === 'BOTH'
+      ) {
+        return current;
+      }
+
+      const selection: SupportSelection =
+        current.purpose === 'PLAN'
+          ? {
+              purpose: 'BOTH',
+              targetMajorCode:
+                current.targetMajorCode,
+            }
+          : {
+              purpose: 'ACTIVITY',
+              targetMajorCode: null,
+            };
+
+      try {
+        return await selectExplorationSupport(
+          resultId,
+          selection,
+          current.supportRevision,
+        );
+      } catch (error) {
+        if (
+          attempt === 0 &&
+          toExplorationErrorCode(error) ===
+            'STALE_REVISION'
+        ) {
+          continue;
+        }
+
+        throw error;
+      }
     }
-  }
-};
+  };
 
 export const saveExplorationSupportAnswer = (
   resultId: number,
   issuedId: number,
-  body: { optionCode: string; expectedSupportRevision: number; clientMutationId: string },
+  body: {
+    optionCode: string;
+    expectedSupportRevision: number;
+    clientMutationId: string;
+  },
 ) =>
   isExplorationMock
-    ? mock.saveSupportAnswer(resultId, issuedId, body)
+    ? mock.saveSupportAnswer(
+        resultId,
+        issuedId,
+        body,
+      )
     : api
         .put<BackendSupportState>(
           `${BASE}/results/${resultId}/support/answers/${issuedId}`,
           body,
           idem(body.clientMutationId),
         )
-        .then((r) => toSupportState(r.data));
+        .then((r) =>
+          toSupportState(r.data),
+        );
 
-// 계획을 만들려면 결과 후 지원이 PLAN·BOTH 이고 목표 전공이 같아야 한다.
-// 이미 활동 지원(ACTIVITY·BOTH)을 쓰고 있으면 BOTH 로 바꿔 활동 쪽 선택을 지우지 않는다.
-// 다른 기기에서 먼저 바꿨으면(STALE_REVISION) 한 번만 다시 읽어 맞춘다.
+// 계획을 만들려면 결과 후 지원이 PLAN·BOTH이고
+// 목표 전공이 같아야 한다.
+// 이미 활동 지원(ACTIVITY·BOTH)을 쓰고 있으면
+// BOTH로 바꿔 활동 쪽 선택을 지우지 않는다.
+// 다른 기기에서 먼저 바꿨으면 한 번만 다시 읽어 맞춘다.
 export const ensurePlanSupport = async (
   resultId: number,
   majorCode: string,
 ): Promise<SupportState> => {
-  for (let attempt = 0; ; attempt += 1) {
-    const current = await getExplorationSupport(resultId);
+  for (
+    let attempt = 0;
+    ;
+    attempt += 1
+  ) {
+    const current =
+      await getExplorationSupport(resultId);
+
     const planReady =
-      (current.purpose === 'PLAN' || current.purpose === 'BOTH') &&
-      current.targetMajorCode === majorCode;
-    if (planReady) return current;
+      (
+        current.purpose === 'PLAN' ||
+        current.purpose === 'BOTH'
+      ) &&
+      current.targetMajorCode ===
+        majorCode;
+
+    if (planReady) {
+      return current;
+    }
 
     const purpose: SupportPurpose =
-      current.purpose === 'ACTIVITY' || current.purpose === 'BOTH'
+      current.purpose === 'ACTIVITY' ||
+      current.purpose === 'BOTH'
         ? 'BOTH'
         : 'PLAN';
+
     try {
       return await selectExplorationSupport(
         resultId,
-        { purpose, targetMajorCode: majorCode },
+        {
+          purpose,
+          targetMajorCode: majorCode,
+        },
         current.supportRevision,
       );
     } catch (error) {
-      if (attempt === 0 && toExplorationErrorCode(error) === 'STALE_REVISION') {
+      if (
+        attempt === 0 &&
+        toExplorationErrorCode(error) ===
+          'STALE_REVISION'
+      ) {
         continue;
       }
+
       throw error;
     }
   }
 };
 
-// 같은 결과의 상담이 있으면 이어서 연다고 가정한다
-export const openExplorationConsultation = (resultId: number) =>
+// 같은 결과의 상담이 있으면 이어서 연다고 가정한다.
+export const openExplorationConsultation = (
+  resultId: number,
+) =>
   isExplorationMock
     ? mock.openConsultation(resultId)
     : api
@@ -571,7 +817,11 @@ export const askExplorationConsultation = (
   clientMutationId: string,
 ) =>
   isExplorationMock
-    ? mock.ask(consultationId, content, clientMutationId)
+    ? mock.ask(
+        consultationId,
+        content,
+        clientMutationId,
+      )
     : api
         .post<ExplorationAskResponse>(
           `${BASE}/consultations/${consultationId}/messages`,
@@ -580,36 +830,50 @@ export const askExplorationConsultation = (
         )
         .then((r) => r.data);
 
-// 답변이 오지 않은 채 남은 질문을 취소한다. retryKey 는 상담 응답의 pendingRequest 에서 온다.
+// 답변이 오지 않은 채 남은 질문을 취소한다.
+// retryKey는 상담 응답의 pendingRequest에서 온다.
 export const cancelExplorationConsultationMessage = (
   consultationId: number,
   retryKey: string,
 ) =>
   isExplorationMock
-    ? mock.cancelConsultationMessage(consultationId, retryKey)
+    ? mock.cancelConsultationMessage(
+        consultationId,
+        retryKey,
+      )
     : api
         .delete<{ status: 'CANCELLED' }>(
           `${BASE}/consultations/${consultationId}/messages/${encodeURIComponent(retryKey)}`,
         )
         .then((r) => r.data);
 
-// 백엔드는 majorCode 와 supportRevision 두 키만 받는다. 먼저 ensurePlanSupport 로 지원을 맞춰야 한다.
+// 백엔드는 majorCode와 supportRevision 두 키만 받는다.
+// 먼저 ensurePlanSupport로 지원을 맞춰야 한다.
 export const createExplorationPlan = (
   resultId: number,
   majorCode: string,
   supportRevision: number | null,
 ) =>
   isExplorationMock
-    ? mock.createPlan(resultId, majorCode, supportRevision)
+    ? mock.createPlan(
+        resultId,
+        majorCode,
+        supportRevision,
+      )
     : api
         .post<ExplorationPlan>(
           `${BASE}/results/${resultId}/plans`,
-          { majorCode, supportRevision },
+          {
+            majorCode,
+            supportRevision,
+          },
           idem(),
         )
         .then((r) => r.data);
 
-export const listExplorationPlans = (resultId: number) =>
+export const listExplorationPlans = (
+  resultId: number,
+) =>
   isExplorationMock
     ? mock.listPlans(resultId)
     : api
@@ -618,37 +882,57 @@ export const listExplorationPlans = (resultId: number) =>
         )
         .then((r) => r.data);
 
-export const getExplorationPlan = (planId: number) =>
+export const getExplorationPlan = (
+  planId: number,
+) =>
   isExplorationMock
     ? mock.getPlan(planId)
     : api
-        .get<ExplorationPlan>(`${BASE}/plans/${planId}`)
+        .get<ExplorationPlan>(
+          `${BASE}/plans/${planId}`,
+        )
         .then((r) => r.data);
 
-// retryable 인 계획만 같은 계획으로 다시 생성한다. 취소·확정 실패는 새 계획을 만들어야 한다.
-export const retryExplorationPlan = (planId: number) =>
+// retryable인 계획만 같은 계획으로 다시 생성한다.
+// 취소·확정 실패는 새 계획을 만들어야 한다.
+export const retryExplorationPlan = (
+  planId: number,
+) =>
   isExplorationMock
     ? mock.retryPlan(planId)
     : api
-        .post<ExplorationPlan>(`${BASE}/plans/${planId}/retry`, {})
+        .post<ExplorationPlan>(
+          `${BASE}/plans/${planId}/retry`,
+          {},
+        )
         .then((r) => r.data);
 
-export const cancelExplorationPlan = (planId: number) =>
+export const cancelExplorationPlan = (
+  planId: number,
+) =>
   isExplorationMock
     ? mock.cancelPlan(planId)
     : api
-        .delete<{ status: 'CANCELLED' }>(`${BASE}/plans/${planId}/generation`)
+        .delete<{
+          status: 'CANCELLED';
+        }>(
+          `${BASE}/plans/${planId}/generation`,
+        )
         .then((r) => r.data);
 
 // 공유 상태 조회
-export const getExplorationShare = (resultId: number) =>
+export const getExplorationShare = (
+  resultId: number,
+) =>
   isExplorationMock
     ? mock.getShare(resultId)
     : api
         .get<BackendExplorationShareState>(
           `${BASE}/results/${resultId}/share`,
         )
-        .then((r) => toExplorationShareState(r.data));
+        .then((r) =>
+          toExplorationShareState(r.data),
+        );
 
 // 공유 링크 생성
 // 최신 shareRevision을 먼저 조회한 뒤 생성 요청을 보낸다.
@@ -659,20 +943,25 @@ export const createExplorationShare = async (
     return mock.createShare(resultId);
   }
 
-  const current = await getExplorationShare(resultId);
+  const current =
+    await getExplorationShare(resultId);
 
   if (current.available === false) {
-    throw new Error('SHARING_UNAVAILABLE');
+    throw new Error(
+      'SHARING_UNAVAILABLE',
+    );
   }
 
-  const { data } = await api.post<BackendExplorationShareState>(
-    `${BASE}/results/${resultId}/share`,
-    {
-      expectedShareRevision: current.shareRevision ?? 0,
-      includeNickname: false,
-    },
-    idem(),
-  );
+  const { data } =
+    await api.post<BackendExplorationShareState>(
+      `${BASE}/results/${resultId}/share`,
+      {
+        expectedShareRevision:
+          current.shareRevision ?? 0,
+        includeNickname: false,
+      },
+      idem(),
+    );
 
   return toExplorationShareState(data);
 };
@@ -686,27 +975,39 @@ export const disableExplorationShare = async (
     return mock.disableShare(resultId);
   }
 
-  const current = await getExplorationShare(resultId);
+  const current =
+    await getExplorationShare(resultId);
 
-  const { data } = await api.post<BackendExplorationShareState>(
-    `${BASE}/results/${resultId}/share/revoke`,
-    {
-      expectedShareRevision: current.shareRevision ?? 0,
-    },
-    idem(),
-  );
+  const { data } =
+    await api.post<BackendExplorationShareState>(
+      `${BASE}/results/${resultId}/share/revoke`,
+      {
+        expectedShareRevision:
+          current.shareRevision ?? 0,
+      },
+      idem(),
+    );
 
-  // 철회 응답에는 expiresAt이 없으므로 직전 조회값을 유지한다.
+  // 철회 응답에는 expiresAt이 없으므로
+  // 직전 조회값을 유지한다.
   return toExplorationShareState({
     ...data,
-    available: data.available ?? current.available,
-    expiresAt: data.expiresAt ?? current.expiresAt ?? undefined,
-    issuedAt: data.issuedAt ?? current.createdAt ?? undefined,
+    available:
+      data.available ??
+      current.available,
+    expiresAt:
+      data.expiresAt ??
+      current.expiresAt ??
+      undefined,
+    issuedAt:
+      data.issuedAt ??
+      current.createdAt ??
+      undefined,
   });
 };
 
 // 공개 결과는 로그인 없이 조회한다.
-// 백엔드 응답의 평면 majors를 전공군별로 묶어서 화면에 전달한다.
+// 백엔드 응답의 평면 majors를 전공군별로 묶는다.
 export const getSharedExplorationResult = (
   token: string,
 ) =>
@@ -716,9 +1017,13 @@ export const getSharedExplorationResult = (
         .get<BackendSharedExplorationResult>(
           `${BASE}/shared-results/${encodeURIComponent(token)}`,
         )
-        .then((r) => toSharedExplorationResult(r.data));
+        .then((r) =>
+          toSharedExplorationResult(r.data),
+        );
 
-export const getExplorationMajorProfile = (majorCode: string) =>
+export const getExplorationMajorProfile = (
+  majorCode: string,
+) =>
   isExplorationMock
     ? mock.getMajorProfile(majorCode)
     : api
@@ -733,22 +1038,35 @@ export const toExplorationErrorCode = (
   const e = error as {
     response?: {
       status?: number;
-      data?: { code?: string };
+      data?: {
+        code?: string;
+      };
     };
   };
 
-  if (!e?.response) return 'NETWORK';
+  if (!e?.response) {
+    return 'NETWORK';
+  }
 
-  if (e.response.data?.code === 'INVALID_REQUEST') {
+  if (
+    e.response.data?.code ===
+    'INVALID_REQUEST'
+  ) {
     return 'INVALID_INPUT';
   }
 
-  if (e.response.data?.code === 'RESOURCE_NOT_FOUND') {
+  if (
+    e.response.data?.code ===
+    'RESOURCE_NOT_FOUND'
+  ) {
     return 'NOT_FOUND';
   }
 
   return (
-    (e.response.data?.code as ExplorationErrorCode | undefined) ??
-    'UNKNOWN'
+    (
+      e.response.data?.code as
+        | ExplorationErrorCode
+        | undefined
+    ) ?? 'UNKNOWN'
   );
 };
