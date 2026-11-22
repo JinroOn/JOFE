@@ -1,5 +1,7 @@
 export interface RecommendedMajor {
   rank: number;
+  displayRank?: number | null;
+  tieCount?: number | null;
   majorId: number;
   name: string;
   category?: string;
@@ -16,7 +18,7 @@ export interface RecommendedMajor {
 
 export interface CapabilityRow {
   axis: string;
-  // 정보가 없는 축은 임의의 0점/예시 점수로 대체하지 않습니다.
+  // 학생 점수와 전공별 상대 가중치는 서로 다른 척도입니다.
   userScore: number | null;
   majorAvg: number | null;
 }
