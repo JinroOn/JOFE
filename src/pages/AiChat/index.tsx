@@ -189,9 +189,6 @@ const AiChat = () => {
             <button className="transition hover:text-on-surface" onClick={handleNewChat}>
               <span className="material-symbols-outlined">add_comment</span>
             </button>
-            <button className="transition hover:text-on-surface">
-              <span className="material-symbols-outlined">more_vert</span>
-            </button>
           </div>
         </div>
 

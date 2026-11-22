@@ -1,10 +1,11 @@
 import type { SyntheticEvent } from 'react';
 
+// 서비스에 없는 자료(강의 목록, 인터뷰)를 묻는 질문은 두지 않는다
 const quickQuestions = [
-  '추천 강의 리스트 보기',
+  '전공을 고를 때 무엇을 먼저 볼까?',
   '필요한 코딩 역량은?',
   '관련 자격증 추천',
-  '현직자 인터뷰 자료',
+  '관심 전공을 미리 경험해 볼 방법은?',
 ];
 
 interface Props {
@@ -41,12 +42,6 @@ const InputArea = ({ message, onChange, onSubmit, onQuickQuestion, disabled = fa
           disabled={disabled}
           className="h-10 flex-1 bg-transparent text-sm text-on-surface outline-none placeholder:text-outline disabled:opacity-60"
         />
-        <button type="button" className="hidden text-outline transition hover:text-on-surface sm:block">
-          <span className="material-symbols-outlined">attach_file</span>
-        </button>
-        <button type="button" className="hidden text-outline transition hover:text-on-surface sm:block">
-          <span className="material-symbols-outlined">image</span>
-        </button>
         <button
           type="submit"
           disabled={disabled}
@@ -56,8 +51,8 @@ const InputArea = ({ message, onChange, onSubmit, onQuickQuestion, disabled = fa
         </button>
       </form>
 
-      <p className="mt-3 text-center text-[10px] font-semibold tracking-[0.25em] text-outline">
-        POWERED BY JINROON ADVANCED CAREER ENGINE V2.0
+      <p className="mt-3 text-center text-xs text-outline break-keep">
+        AI 답변은 참고용이며, 합격이나 취업 가능성은 판단하지 않습니다.
       </p>
     </div>
   </div>

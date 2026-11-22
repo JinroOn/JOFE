@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 import { getNotices } from '../../../api/notice';
 import type { Notice } from '../../../types/notice';
 
-type Tab = 'notice' | 'library';
-
 const formatDate = (iso: string) =>
   new Date(iso)
     .toLocaleDateString('ko-KR', {
@@ -24,8 +22,6 @@ const formatDatetime = (iso: string) =>
   });
 
 const LibraryNotice = () => {
-  const [activeTab, setActiveTab] =
-    useState<Tab>('notice');
   const [search, setSearch] = useState('');
   const [notices, setNotices] = useState<Notice[]>([]);
   const [totalPages, setTotalPages] = useState(1);
@@ -36,8 +32,6 @@ const LibraryNotice = () => {
     useState<Notice | null>(null);
 
   useEffect(() => {
-    if (activeTab !== 'notice') return;
-
     let active = true;
 
     getNotices(currentPage)
@@ -59,7 +53,7 @@ const LibraryNotice = () => {
     return () => {
       active = false;
     };
-  }, [activeTab, currentPage]);
+  }, [currentPage]);
 
   const filtered = notices
     .filter((notice) =>
@@ -85,48 +79,16 @@ const LibraryNotice = () => {
       {/* 소개 */}
       <header className="w-full min-w-0 mb-8 sm:mb-12">
         <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-primary-container mb-4 break-keep">
-          공지사항 및 자료실
+          공지사항
         </h1>
 
         <p className="w-full max-w-2xl text-sm sm:text-base text-on-surface-variant leading-relaxed break-keep">
-          진로 설계의 핵심 정보를 확인하세요.
-          최신 입시 뉴스부터 전공별 심층 리포트까지
-          인공지능이 큐레이션한 가이드라인을 제공합니다.
+          진로온 서비스의 안내와 변경 사항을 확인하세요.
         </p>
       </header>
 
-      {/* 탭 및 검색 */}
-      <section className="w-full min-w-0 bg-surface-container-low p-3 sm:p-6 rounded-2xl mb-8 flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
-        <div className="flex w-full md:w-auto min-w-0 gap-2 p-1 bg-surface-container-high rounded-xl">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('notice');
-              setCurrentPage(0);
-              setLoading(true);
-            }}
-            className={`flex-1 md:flex-none min-w-0 px-3 sm:px-6 py-3 sm:py-2 rounded-lg font-bold transition-all ${
-              activeTab === 'notice'
-                ? 'bg-surface-container-lowest text-primary shadow-sm'
-                : 'text-on-surface-variant hover:bg-surface-container-highest'
-            }`}
-          >
-            공지사항
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('library')}
-            className={`flex-1 md:flex-none min-w-0 px-3 sm:px-6 py-3 sm:py-2 rounded-lg font-bold transition-all ${
-              activeTab === 'library'
-                ? 'bg-surface-container-lowest text-primary shadow-sm'
-                : 'text-on-surface-variant hover:bg-surface-container-highest'
-            }`}
-          >
-            자료실
-          </button>
-        </div>
-
+      {/* 검색 */}
+      <section className="w-full min-w-0 bg-surface-container-low p-3 sm:p-6 rounded-2xl mb-8 flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-end">
         <div className="relative w-full md:w-96 min-w-0">
           <span
             aria-hidden="true"
@@ -149,8 +111,7 @@ const LibraryNotice = () => {
       </section>
 
       {/* 공지사항 */}
-      {activeTab === 'notice' && (
-        <section className="w-full min-w-0 overflow-hidden bg-surface-container-lowest rounded-[14px] shadow-[0_20px_40px_rgba(10,25,47,0.06)]">
+      <section className="w-full min-w-0 overflow-hidden bg-surface-container-lowest rounded-[14px] shadow-[0_20px_40px_rgba(10,25,47,0.06)]">
           <table className="w-full min-w-0 table-fixed sm:table-auto border-collapse">
             <thead>
               <tr className="bg-surface-container-low border-b border-outline-variant/10">
@@ -322,70 +283,6 @@ const LibraryNotice = () => {
             </nav>
           )}
         </section>
-      )}
-
-      {/* 자료실 탭: 기존 콘텐츠 유지 */}
-      {activeTab === 'library' && (
-        <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-12 min-w-0">
-          <div className="md:col-span-2 min-w-0 relative overflow-hidden rounded-[14px] bg-primary-container text-white p-5 sm:p-8 group cursor-pointer shadow-[0_20px_40px_rgba(10,25,47,0.06)]">
-            <div className="absolute inset-0 bg-gradient-to-br from-secondary/20 to-transparent" />
-
-            <div className="relative z-10">
-              <span className="inline-block bg-secondary-container text-on-secondary-fixed px-3 py-1 rounded-full text-xs font-bold mb-4">
-                Special Report
-              </span>
-
-              <h3 className="text-xl sm:text-2xl font-bold mb-2 break-keep">
-                2025 AI 융합전공 입시 트렌드 분석
-              </h3>
-
-              <p className="text-white/70 text-sm mb-6 max-w-md leading-relaxed break-keep">
-                인공지능 기술의 발전이 대학 전공 선택에
-                미치는 영향과 새롭게 신설되는 첨단
-                학과들을 분석한 핵심 리포트입니다.
-              </p>
-
-              <div className="flex items-center text-secondary-container font-bold text-sm gap-1">
-                리포트 보기
-                <span className="material-symbols-outlined">
-                  arrow_forward
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="min-w-0 bg-surface-container-lowest p-5 sm:p-8 rounded-[14px] border border-outline-variant/15 shadow-[0_20px_40px_rgba(10,25,47,0.06)] flex flex-col justify-between">
-            <div>
-              <span className="inline-block bg-tertiary-fixed text-on-tertiary-fixed px-3 py-1 rounded-full text-xs font-bold mb-4">
-                Weekly Best
-              </span>
-
-              <h3 className="text-xl font-bold text-primary-container mb-2 break-keep">
-                자기소개서 마스터 클래스 자료집
-              </h3>
-            </div>
-
-            <div className="flex items-center justify-between gap-3 mt-4">
-              <div className="flex -space-x-2 shrink-0">
-                {[
-                  'bg-slate-200',
-                  'bg-slate-300',
-                  'bg-slate-400',
-                ].map((className) => (
-                  <div
-                    key={className}
-                    className={`w-8 h-8 rounded-full border-2 border-surface ${className}`}
-                  />
-                ))}
-              </div>
-
-              <span className="text-xs text-on-surface-variant font-medium">
-                1,240+ 다운로드
-              </span>
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* 공지사항 상세 모달 */}
       {selected && (

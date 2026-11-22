@@ -47,7 +47,9 @@ const DiagnosisHistoryPanel = ({ history }: { history: DiagnosisHistoryControlle
     <ul className="space-y-3">
       {history.items.map((item) => {
         const isExploration = item.type === 'EXPLORATION_V1';
-        const title = `${isExploration ? '전공 탐색' : '이전 방식'} 진단 #${item.sessionId}`;
+        // 탐색형이 꺼져 있으면 진단이 한 종류뿐이라 "이전 방식"이라고 부르지 않는다
+        const legacyName = isExplorationEnabled ? '이전 방식' : '전공';
+        const title = `${isExploration ? '전공 탐색' : legacyName} 진단 #${item.sessionId}`;
         const status = STATUS[item.status];
         const action = historyActionPath(item);
         const unavailable = historyUnavailableMessage(item);

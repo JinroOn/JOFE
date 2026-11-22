@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link, useLocation, useNavigationType } from 'react-router-dom';
 import useAuthStore from './store/useAuthStore';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
@@ -24,8 +25,6 @@ import ExplorationPlan from './pages/Analysis/ExplorationPlan';
 import ExplorationShared from './pages/Analysis/ExplorationShared';
 import { isExplorationEnabled } from './config/features';
 import LibraryNotice from './pages/Library/Notice';
-import LibraryContent from './pages/Library/Content';
-import LibraryContentDetail from './pages/Library/Content/Detail';
 import AiChat from './pages/AiChat';
 import MajorExplore from './pages/Analysis/MajorExplore';
 import WeakCapability from './pages/Analysis/WeakCapability';
@@ -88,7 +87,7 @@ const NotFoundPage = () => (
           to="/library"
           className="min-h-[44px] inline-flex items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-lowest font-semibold text-primary-container px-6 py-3"
         >
-          공지사항 및 자료실
+          공지사항
         </Link>
       </div>
     </div>
@@ -117,7 +116,13 @@ const AdminOnlyRoute = ({ children }: { children: ReactNode }) => {
 
 const AppLayout = () => {
   const location = useLocation();
+  const navigationType = useNavigationType();
   const sessionExpired = useAuthStore((s) => s.sessionExpired);
+
+  // 새 화면으로 이동하면 맨 위에서 시작한다. 뒤로 가기(POP)는 브라우저의 위치 복원에 맡긴다.
+  useEffect(() => {
+    if (navigationType !== 'POP') window.scrollTo(0, 0);
+  }, [location.pathname, navigationType]);
   const setSessionExpired = useAuthStore((s) => s.setSessionExpired);
   const isAuthPage = location.pathname.startsWith('/auth');
   const isMainPage = location.pathname === '/';
@@ -173,8 +178,6 @@ const AppLayout = () => {
           />
           <Route path="/analysis/*" element={<NotFoundPage />} />
           <Route path="/library" element={<UserOnlyRoute><LibraryNotice /></UserOnlyRoute>} />
-          <Route path="/library/content" element={<UserOnlyRoute><LibraryContent /></UserOnlyRoute>} />
-          <Route path="/library/content/:id" element={<UserOnlyRoute><LibraryContentDetail /></UserOnlyRoute>} />
           <Route path="/ai-chat" element={<UserOnlyRoute><AiChat /></UserOnlyRoute>} />
           <Route path="/mypage" element={<UserOnlyRoute><MyPage /></UserOnlyRoute>} />
           <Route path="/admin" element={<AdminOnlyRoute><AdminLayout /></AdminOnlyRoute>}>

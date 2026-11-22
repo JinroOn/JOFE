@@ -127,7 +127,7 @@ const DiagnosisLoading = () => {
                 {current.message}
               </h2>
               <p className="break-keep text-sm font-medium tracking-[0.35px] text-slate-500">
-                수만 건의 학과·진로 데이터를 기반으로 최적의 맞춤 경로를 도출합니다
+                성향·역량 응답을 전공별 요구 역량과 비교해 먼저 살펴볼 전공을 정리합니다
               </p>
             </div>
 

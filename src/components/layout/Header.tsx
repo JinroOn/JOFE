@@ -8,7 +8,13 @@ import {
   isExplorationEnabled,
 } from '../../config/features';
 
-const NAV_LINKS = [
+type NavItem = {
+  label: string;
+  to: string;
+  sub?: { label: string; to: string }[];
+};
+
+const NAV_LINKS: NavItem[] = [
   {
     label: '역량진단',
     to: diagnosisEntryPath,
@@ -39,19 +45,10 @@ const NAV_LINKS = [
       },
     ],
   },
+  // 하위 메뉴가 하나뿐이라 펼치지 않고 바로 이동한다
   {
-    label: '자료실',
+    label: '공지사항',
     to: '/library',
-    sub: [
-      {
-        label: '공지사항 및 자료실',
-        to: '/library',
-      },
-      {
-        label: '학습콘텐츠',
-        to: '/library/content',
-      },
-    ],
   },
 ];
 
@@ -117,7 +114,19 @@ const Header = () => {
 
           <div className="hidden md:flex items-center gap-6">
             {NAV_LINKS.map(
-              ({ label, to, sub }) => (
+              ({ label, to, sub }) => !sub ? (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    `text-[16px] font-bold hover:opacity-70 transition-opacity ${
+                      isActive ? 'text-secondary' : 'text-[#0a192f]'
+                    }`
+                  }
+                >
+                  {label}
+                </NavLink>
+              ) : (
                 <div
                   key={to}
                   className="relative"
@@ -292,7 +301,22 @@ const Header = () => {
         // 모바일 메뉴도 불투명 배경을 사용합니다.
         <div className="md:hidden bg-[#f8fafc] border-t border-outline-variant/20 px-4 sm:px-8 py-6 flex flex-col gap-2 shadow-lg">
           {NAV_LINKS.map(
-            ({ label, to, sub }) => (
+            ({ label, to, sub }) => !sub ? (
+              <NavLink
+                key={to}
+                to={to}
+                onClick={() =>
+                  setMobileOpen(false)
+                }
+                className={({ isActive }) =>
+                  `py-2 text-[16px] font-bold border-b border-outline-variant/10 ${
+                    isActive ? 'text-secondary' : 'text-[#0a192f]'
+                  }`
+                }
+              >
+                {label}
+              </NavLink>
+            ) : (
               <div key={to}>
                 <p className="text-[16px] font-bold text-[#0a192f] py-2 border-b border-outline-variant/10">
                   {label}
