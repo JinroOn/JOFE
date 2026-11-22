@@ -436,19 +436,57 @@ test('network, authentication and integrity errors never silently erase explorat
   }
 });
 
-test('history navigation follows server actions and never follows API links', () => {
-  const { historyActionPath, historyUnavailableMessage } = compile('src/utils/diagnosisHistory.ts');
-  assert.equal(historyActionPath(historyFixture.items[0]), '/analysis/exploration/11');
-  assert.equal(historyActionPath(historyFixture.items[1]), '/analysis/dashboard?view=legacy&resultId=101');
-  assert.equal(historyActionPath(historyFixture.items[5]), '/diagnosis');
-  assert.equal(historyActionPath(historyFixture.items[6]), '/diagnosis/exploration/session/16');
-  assert.equal(historyActionPath({ ...historyFixture.items[0], nextAction: 'NONE' }), null);
+
+test('history navigation resumes only exploration and preserves archived result links', () => {
+  const {
+    historyActionPath,
+    historyUnavailableMessage,
+  } = compile('src/utils/diagnosisHistory.ts');
+
+  // 탐색 진단 완료 결과는 기존대로 조회
+  assert.equal(
+    historyActionPath(historyFixture.items[0]),
+    '/analysis/exploration/11',
+  );
+
+  // 기존 방식의 완료된 결과는 조회 가능
+  assert.equal(
+    historyActionPath(historyFixture.items[1]),
+    '/analysis/dashboard?view=legacy&resultId=101',
+  );
+
+  // 기존 방식의 진행 중인 진단은 이어하기 차단
+  assert.equal(
+    historyActionPath(historyFixture.items[5]),
+    null,
+  );
+
+  // 탐색 진단의 이어하기는 유지
+  assert.equal(
+    historyActionPath(historyFixture.items[6]),
+    '/diagnosis/exploration/session/16',
+  );
+
+  assert.equal(
+    historyActionPath({
+      ...historyFixture.items[0],
+      nextAction: 'NONE',
+    }),
+    null,
+  );
+
   for (const item of historyFixture.items.slice(2, 5)) {
     assert.equal(historyActionPath(item), null);
     assert.ok(historyUnavailableMessage(item));
   }
-  assert.equal(historyUnavailableMessage(historyFixture.items[5]), null);
+
+  // 기존 방식의 중단된 진단은 서비스 종료 안내
+  assert.match(
+    historyUnavailableMessage(historyFixture.items[5]),
+    /이전 방식의 진단이 종료됐어요/,
+  );
 });
+
 
 test('history renders mixed IDs and distinct unavailable result states without result buttons', () => {
   const React = require('react');
