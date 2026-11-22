@@ -7,8 +7,10 @@ import {
   useState,
 } from 'react';
 import type { ReactNode } from 'react';
+
 import api from '../../../../api/axios';
 import { getExplorationMajorProfile } from '../../../../api/exploration';
+
 import type {
   ExplorationMajorCard,
   ExplorationMajorProfile,
@@ -24,7 +26,6 @@ interface MajorDetailDialogProps {
   onClose: () => void;
 }
 
-// 결과 화면의 resultId를 모든 상세창에 전달합니다.
 interface ExplanationContextValue {
   resultId: number;
   enabled: boolean;
@@ -40,7 +41,9 @@ export const MajorExplanationProvider = ({
 }: ExplanationContextValue & {
   children: ReactNode;
 }) => (
-  <ExplanationContext.Provider value={{ resultId, enabled }}>
+  <ExplanationContext.Provider
+    value={{ resultId, enabled }}
+  >
     {children}
   </ExplanationContext.Provider>
 );
@@ -64,6 +67,10 @@ interface MajorExplanationResponse {
   majorCode: string;
   status: ExplanationStatus;
   connections?: ExplanationConnection[];
+
+  // 신규 JOBE API에서 제공하는 재시도 가능 여부.
+  // 구버전 서버에서는 없을 수 있으므로 선택 필드로 둡니다.
+  retryAvailable?: boolean;
 }
 
 const isExplanationResponse = (
@@ -92,7 +99,6 @@ const isExplanationResponse = (
   );
 };
 
-// 백엔드에서 응답 근거 부족을 422로 반환하는 경우
 const isEvidenceUnavailable = (
   error: unknown,
 ): boolean => {
@@ -125,13 +131,24 @@ const EXPLANATION_MESSAGE: Partial<
 > = {
   INSUFFICIENT_EVIDENCE:
     '이 전공과 연결할 수 있는 응답 근거가 충분하지 않아요. 위의 기존 응답 요약은 계속 확인할 수 있어요.',
+
   FAILED:
     'AI 설명을 생성하지 못했어요. 기존 응답 요약과 전공 정보는 계속 확인할 수 있어요.',
+
   UNAVAILABLE:
     '현재 AI 설명을 제공할 수 없어요. 기존 응답 요약과 전공 정보는 그대로 이용할 수 있어요.',
 };
 
-// 실제 API와 통신하는 전공별 AI 설명 컴포넌트
+// --------------------------------------------------
+// 전공별 AI 설명
+//
+// GET  /explanation
+// POST /explanation
+// POST /explanation/retry
+//
+// resultId는 진단 결과 ID이며 sessionId가 아닙니다.
+// --------------------------------------------------
+
 const ActiveMajorExplanation = ({
   resultId,
   majorCode,
@@ -141,21 +158,39 @@ const ActiveMajorExplanation = ({
 }) => {
   const [data, setData] =
     useState<MajorExplanationResponse | null>(null);
-  const [checking, setChecking] = useState(true);
-  const [readError, setReadError] = useState(false);
-  const [requesting, setRequesting] = useState(false);
-  const [revision, setRevision] = useState(0);
+
+  const [checking, setChecking] =
+    useState(true);
+
+  const [readError, setReadError] =
+    useState(false);
+
+  const [requesting, setRequesting] =
+    useState(false);
+
+  const [revision, setRevision] =
+    useState(0);
+
+  // 같은 상세창에서 재시도 POST를 한 번만 시도합니다.
+  const [retryAttempted, setRetryAttempted] =
+    useState(false);
 
   const requestInFlight = useRef(false);
-  const postController = useRef<AbortController | null>(null);
+
+  const postController =
+    useRef<AbortController | null>(null);
+
   const mounted = useRef(false);
 
-  // api의 baseURL에 이미 /api가 포함되어 있습니다.
+  // axios baseURL에 /api가 포함되어 있으므로
+  // 이 경로에는 /api를 다시 붙이지 않습니다.
   const endpoint =
     `/exploration/v1/results/${resultId}` +
     `/majors/${encodeURIComponent(majorCode)}/explanation`;
 
-  // 상세창을 닫으면 진행 중인 POST의 응답도 무시합니다.
+  const retryEndpoint = `${endpoint}/retry`;
+
+  // 상세창을 닫으면 진행 중인 요청을 중단합니다.
   useEffect(() => {
     mounted.current = true;
 
@@ -165,8 +200,10 @@ const ActiveMajorExplanation = ({
     };
   }, []);
 
-  // 최초 진입 시 GET으로 상태 조회
-  // GENERATING일 때만 3초 간격으로 추가 GET 수행
+  // --------------------------------------------------
+  // GET: 최초 조회 및 생성 상태 확인
+  // --------------------------------------------------
+
   useEffect(() => {
     let active = true;
 
@@ -180,12 +217,13 @@ const ActiveMajorExplanation = ({
         const response =
           await api.get<MajorExplanationResponse>(
             endpoint,
-            { signal: controller.signal },
+            {
+              signal: controller.signal,
+            },
           );
 
         if (!active) return;
 
-        // 다른 전공의 설명이 섞이지 않도록 확인
         if (
           !isExplanationResponse(
             response.data,
@@ -201,14 +239,21 @@ const ActiveMajorExplanation = ({
         setReadError(false);
         setChecking(false);
 
-        if (response.data.status === 'GENERATING') {
+        // 생성 중일 때만 GET으로 상태를 조회합니다.
+        // 재시도 POST를 반복하지 않습니다.
+        if (
+          response.data.status === 'GENERATING'
+        ) {
           timer = setTimeout(
             () => void check(),
             3000,
           );
         }
       } catch (error) {
-        if (!active || axios.isCancel(error)) {
+        if (
+          !active ||
+          axios.isCancel(error)
+        ) {
           return;
         }
 
@@ -219,6 +264,7 @@ const ActiveMajorExplanation = ({
             majorCode,
             status: 'INSUFFICIENT_EVIDENCE',
           });
+
           setReadError(false);
         } else {
           setReadError(true);
@@ -239,7 +285,11 @@ const ActiveMajorExplanation = ({
     };
   }, [endpoint, majorCode, revision]);
 
-  // 사용자가 명시적으로 버튼을 눌렀을 때만 생성 요청
+  // --------------------------------------------------
+  // 최초 AI 설명 생성 요청
+  // NOT_REQUESTED에서만 사용합니다.
+  // --------------------------------------------------
+
   const requestExplanation = async () => {
     if (
       requestInFlight.current ||
@@ -249,7 +299,6 @@ const ActiveMajorExplanation = ({
       return;
     }
 
-    // 더블클릭 등으로 인한 중복 POST 방지
     requestInFlight.current = true;
     setRequesting(true);
 
@@ -257,12 +306,13 @@ const ActiveMajorExplanation = ({
     postController.current = controller;
 
     try {
-      // POST 본문 없음
       const response =
         await api.post<MajorExplanationResponse>(
           endpoint,
           undefined,
-          { signal: controller.signal },
+          {
+            signal: controller.signal,
+          },
         );
 
       if (!mounted.current) return;
@@ -280,9 +330,13 @@ const ActiveMajorExplanation = ({
       setData(response.data);
       setReadError(false);
 
-      if (response.data.status === 'GENERATING') {
-        // 이후에는 재생성 POST가 아니라 GET으로 확인
-        setRevision((previous) => previous + 1);
+      if (
+        response.data.status === 'GENERATING'
+      ) {
+        // 이후에는 GET으로만 상태를 확인합니다.
+        setRevision(
+          (previous) => previous + 1,
+        );
       }
     } catch (error) {
       if (
@@ -297,10 +351,11 @@ const ActiveMajorExplanation = ({
           majorCode,
           status: 'INSUFFICIENT_EVIDENCE',
         });
+
         setReadError(false);
       } else {
-        // 요청 실패 원인을 확신할 수 없을 때는
-        // 중복 POST 대신 GET 상태 확인만 허용
+        // 요청 성공 여부를 모를 때는
+        // 중복 POST 대신 GET 재확인만 허용합니다.
         setReadError(true);
       }
     } finally {
@@ -312,6 +367,106 @@ const ActiveMajorExplanation = ({
       }
     }
   };
+
+  // --------------------------------------------------
+  // 신규 기능: FAILED 설명 재시도
+  //
+  // FAILED + retryAvailable === true 조건에서만 호출
+  // POST 본문 없음
+  // --------------------------------------------------
+
+  const retryExplanation = async () => {
+    if (
+      requestInFlight.current ||
+      requesting ||
+      retryAttempted ||
+      data?.status !== 'FAILED' ||
+      data.retryAvailable !== true
+    ) {
+      return;
+    }
+
+    // 더블클릭이나 상태 갱신에 따른 중복 호출 방지
+    requestInFlight.current = true;
+
+    setRetryAttempted(true);
+    setRequesting(true);
+    setReadError(false);
+
+    const controller = new AbortController();
+    postController.current = controller;
+
+    try {
+      const response =
+        await api.post<MajorExplanationResponse>(
+          retryEndpoint,
+          undefined,
+          {
+            signal: controller.signal,
+          },
+        );
+
+      if (!mounted.current) return;
+
+      if (
+        !isExplanationResponse(
+          response.data,
+          majorCode,
+        )
+      ) {
+        setReadError(true);
+        return;
+      }
+
+      setData(response.data);
+      setReadError(false);
+
+      if (
+        response.data.status === 'GENERATING'
+      ) {
+        // 202 GENERATING 이후에는
+        // 기존 GET 상태 조회 흐름을 다시 시작합니다.
+        setRevision(
+          (previous) => previous + 1,
+        );
+      }
+
+      // READY이면 저장된 설명을 바로 표시합니다.
+      // FAILED이면 기존 실패 안내를 유지합니다.
+      // 실패 후 재시도 버튼은 다시 보여주지 않습니다.
+    } catch (error) {
+      if (
+        !mounted.current ||
+        axios.isCancel(error)
+      ) {
+        return;
+      }
+
+      if (isEvidenceUnavailable(error)) {
+        setData({
+          majorCode,
+          status: 'INSUFFICIENT_EVIDENCE',
+        });
+
+        setReadError(false);
+      } else {
+        // 서버에서 재시도가 접수됐는지 알 수 없는 경우
+        // POST를 다시 보내지 않고 GET으로 상태를 확인합니다.
+        setReadError(true);
+      }
+    } finally {
+      requestInFlight.current = false;
+      postController.current = null;
+
+      if (mounted.current) {
+        setRequesting(false);
+      }
+    }
+  };
+
+  // --------------------------------------------------
+  // READY 응답의 AI 설명
+  // --------------------------------------------------
 
   const connections =
     data?.status === 'READY' &&
@@ -325,6 +480,13 @@ const ActiveMajorExplanation = ({
         )
       : [];
 
+  // 백엔드의 명시적인 true일 때만 재시도 허용
+  const canRetryExplanation =
+    !readError &&
+    !retryAttempted &&
+    data?.status === 'FAILED' &&
+    data.retryAvailable === true;
+
   return (
     <div className="mt-4 min-w-0 border-t border-secondary/20 pt-4">
       <h4 className="mb-2 text-sm font-bold text-primary-container">
@@ -337,7 +499,7 @@ const ActiveMajorExplanation = ({
         진단 결과나 전공 순위가 바뀌지는 않아요.
       </p>
 
-      {/* 최초 저장 상태 확인 */}
+      {/* 저장된 AI 설명 상태 확인 */}
       {checking && !data && !readError && (
         <p
           role="status"
@@ -347,7 +509,7 @@ const ActiveMajorExplanation = ({
         </p>
       )}
 
-      {/* GET / POST 네트워크 오류 */}
+      {/* 네트워크 또는 상태 조회 오류 */}
       {readError && (
         <div
           role="alert"
@@ -364,6 +526,8 @@ const ActiveMajorExplanation = ({
               setReadError(false);
               setData(null);
               setChecking(true);
+
+              // POST가 아니라 GET을 다시 실행합니다.
               setRevision(
                 (previous) => previous + 1,
               );
@@ -374,7 +538,7 @@ const ActiveMajorExplanation = ({
         </div>
       )}
 
-      {/* NOT_REQUESTED: 명시적으로 생성 요청 */}
+      {/* 설명 최초 생성 */}
       {!readError &&
         data?.status === 'NOT_REQUESTED' && (
           <button
@@ -391,7 +555,7 @@ const ActiveMajorExplanation = ({
           </button>
         )}
 
-      {/* GENERATING: 생성 중에는 버튼 제거 */}
+      {/* 설명 생성 중 */}
       {!readError &&
         data?.status === 'GENERATING' && (
           <p
@@ -404,7 +568,7 @@ const ActiveMajorExplanation = ({
           </p>
         )}
 
-      {/* READY: 저장된 AI 설명과 실제 문항·답변 */}
+      {/* READY: AI 설명 및 실제 문항·답변 */}
       {!readError &&
         data?.status === 'READY' &&
         (
@@ -423,12 +587,10 @@ const ActiveMajorExplanation = ({
                     {KIND_LABEL[item.kind] ?? '응답'}
                   </p>
 
-                  {/* AI가 작성한 연결 설명 */}
                   <p className="text-sm text-primary-container leading-relaxed whitespace-pre-line break-words">
                     {item.connection}
                   </p>
 
-                  {/* 실제 문항·답변은 요청 시 펼쳐서 확인 */}
                   <details className="mt-3 rounded-lg bg-surface-container-low px-3 py-2">
                     <summary className="min-h-[44px] flex cursor-pointer items-center text-sm font-semibold text-secondary">
                       사용한 응답 보기
@@ -439,6 +601,7 @@ const ActiveMajorExplanation = ({
                         <dt className="text-xs font-bold text-primary-container">
                           실제 진단 문항
                         </dt>
+
                         <dd className="mt-1 text-sm text-on-surface-variant leading-relaxed whitespace-pre-line break-words">
                           {item.question}
                         </dd>
@@ -448,6 +611,7 @@ const ActiveMajorExplanation = ({
                         <dt className="text-xs font-bold text-primary-container">
                           내가 선택한 답변
                         </dt>
+
                         <dd className="mt-1 text-sm text-on-surface-variant leading-relaxed whitespace-pre-line break-words">
                           {item.answer}
                         </dd>
@@ -460,22 +624,51 @@ const ActiveMajorExplanation = ({
           )
         )}
 
-      {/* 최종 실패 상태: 재생성 버튼 없음 */}
+      {/* FAILED / 근거 부족 / 사용 불가 안내 */}
       {!readError &&
         data &&
         EXPLANATION_MESSAGE[data.status] && (
-          <p
+          <div
             role="status"
             className="rounded-lg bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant leading-relaxed"
           >
-            {EXPLANATION_MESSAGE[data.status]}
-          </p>
+            <p>
+              {EXPLANATION_MESSAGE[data.status]}
+            </p>
+
+            {/* 신규 기능: 재시도 가능한 FAILED만 표시 */}
+            {canRetryExplanation && (
+              <button
+                type="button"
+                disabled={requesting}
+                onClick={() =>
+                  void retryExplanation()
+                }
+                className="mt-3 min-h-[44px] w-full sm:w-auto rounded-lg bg-secondary px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {requesting
+                  ? '다시 요청하는 중…'
+                  : '다시 시도'}
+              </button>
+            )}
+
+            {requesting &&
+              data.status === 'FAILED' &&
+              retryAttempted && (
+                <p className="mt-2 text-xs text-on-surface-variant">
+                  AI 설명을 다시 요청하고 있어요…
+                </p>
+              )}
+          </div>
         )}
     </div>
   );
 };
 
-// 선택한 결과·전공마다 AI 설명 상태를 별도로 관리합니다.
+// --------------------------------------------------
+// 결과·전공별 설명 상태 분리
+// --------------------------------------------------
+
 const MajorExplanationSection = ({
   majorCode,
 }: {
@@ -496,7 +689,10 @@ const MajorExplanationSection = ({
   );
 };
 
+// --------------------------------------------------
 // 기존 전공 상세창
+// --------------------------------------------------
+
 const MajorDetailDialog = ({
   major,
   groupName,
@@ -510,6 +706,7 @@ const MajorDetailDialog = ({
 
   const [profile, setProfile] =
     useState<ExplorationMajorProfile | null>(null);
+
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
@@ -532,7 +729,9 @@ const MajorDetailDialog = ({
         setFailed(false);
       })
       .catch(() => {
-        if (alive) setFailed(true);
+        if (alive) {
+          setFailed(true);
+        }
       });
 
     return () => {
@@ -600,7 +799,7 @@ const MajorDetailDialog = ({
             내 응답에서 나타난 점
           </h3>
 
-          {/* 기존 관심·활동·학습 응답 요약 유지 */}
+          {/* 기존 관심·활동·학습 요약 유지 */}
           <ul className="list-disc pl-4 space-y-1 text-sm text-on-surface-variant">
             {major.reasons.map((r) => (
               <li key={`${r.kind}-${r.reasonCode}`}>
@@ -609,12 +808,13 @@ const MajorDetailDialog = ({
             ))}
           </ul>
 
-          {/* 새 기능: 전공별 AI 설명 */}
+          {/* AI 설명과 재시도 기능 */}
           <MajorExplanationSection
             majorCode={major.majorCode}
           />
         </section>
 
+        {/* 전공 프로필 조회 실패 */}
         {failed && (
           <div
             role="alert"
@@ -634,6 +834,7 @@ const MajorDetailDialog = ({
           </div>
         )}
 
+        {/* 전공 프로필 로딩 */}
         {!failed && !profile && (
           <p
             role="status"
@@ -643,6 +844,7 @@ const MajorDetailDialog = ({
           </p>
         )}
 
+        {/* 기존 전공 정보 */}
         {profile && (
           <>
             {profile.description && (
@@ -769,7 +971,7 @@ const MajorDetailDialog = ({
         )}
       </div>
 
-      {/* 기존 전공 비교 버튼 유지 */}
+      {/* 기존 전공 비교 버튼 */}
       <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-outline-variant/20 bg-surface-container-lowest px-5 py-3 sm:px-6">
         <button
           type="button"
