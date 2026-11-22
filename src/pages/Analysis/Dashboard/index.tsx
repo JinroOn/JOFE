@@ -16,6 +16,7 @@ import RecommendedMajors from './components/RecommendedMajors';
 import CapabilityBarChart from './components/CapabilityBarChart';
 import ShareSection from './components/ShareSection';
 import { diagnosisEntryPath } from '../../../config/features';
+import { getDisplayRank, getTopRankedScores } from '../../../utils/majorRank';
 import {
   COMPETENCY_AXES,
   hasCompleteScores,
@@ -73,6 +74,8 @@ const mapMajorScoresToRecommendedMajors = (
       const reason = fixMojibake(score.recommendationReason);
       return {
         rank: score.rank,
+        displayRank: score.displayRank,
+        tieCount: score.tieCount,
         majorId: score.majorId,
         name: fixMojibake(major?.name) ?? `전공 ID ${score.majorId}`,
         category: fixMojibake(major?.category),
@@ -221,10 +224,11 @@ const Dashboard = () => {
     () => parseCompetencyScores(selectedResult?.competencyVector),
     [selectedResult?.competencyVector],
   );
-  const topMajorScore = useMemo(
-    () => [...majorScores].sort((a, b) => a.rank - b.rank)[0],
-    [majorScores],
-  );
+
+  // 공동 1위일 때 저장 순서 첫 전공을 단독 1위로 고르지 않습니다.
+  const jointTopScores = useMemo(() => getTopRankedScores(majorScores), [majorScores]);
+  const topMajorScore = jointTopScores.length === 1 ? jointTopScores[0] : undefined;
+
   const topMajor = topMajorScore ? majorMap.get(topMajorScore.majorId) : undefined;
   const requiredScores = useMemo(() => parseMajorRequiredScores(topMajor), [topMajor]);
   const capabilityRows: CapabilityRow[] = useMemo(
@@ -434,17 +438,35 @@ const Dashboard = () => {
                   <RecommendedMajors majors={recommendedMajors} />
                 )}
               </div>
-              <CapabilityBarChart
-                rows={capabilityRows}
-                targetMajorName={fixMojibake(topMajor?.name)}
-                className="md:col-span-12"
-              />
+
+              {jointTopScores.length > 1 ? (
+                <section className="md:col-span-12 rounded-[14px] bg-surface-container-lowest p-6 text-sm text-on-surface-variant">
+                  공동 1위 전공이 {jointTopScores.length}개입니다. 임의의 한 전공을 선정해 비교하지 않습니다.
+                  <Link to="/analysis/weak" className="ml-2 font-bold text-secondary underline">
+                    전공 선택 후 역량 정보 보기
+                  </Link>
+                </section>
+              ) : (
+                <CapabilityBarChart
+                  rows={capabilityRows}
+                  targetMajorName={fixMojibake(topMajor?.name)}
+                  className="md:col-span-12"
+                />
+              )}
             </div>
+
             <ShareSection
               userName={displayName}
-              topMajor={recommendedMajors[0]}
+              topMajor={jointTopScores.length > 1 && recommendedMajors[0]
+                ? {
+                    ...recommendedMajors[0],
+                    name: `${recommendedMajors[0].name} 외 ${jointTopScores.length - 1}개 전공 (공동 ${getDisplayRank(jointTopScores[0])}위)`,
+                    category: '공동 1위 전공',
+                  }
+                : recommendedMajors[0]}
               shareToken={selectedResult?.shareToken}
             />
+
             <footer className="mt-8 flex flex-wrap justify-center gap-4">
               <button className="flex items-center gap-2 px-6 py-4 bg-primary-container text-white rounded-[14px] font-bold shadow-sm">
                 <span className="material-symbols-outlined">picture_as_pdf</span> 리포트 저장 (PDF)

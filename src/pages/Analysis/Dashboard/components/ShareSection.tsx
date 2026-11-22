@@ -84,7 +84,9 @@ const ShareSection = ({ userName, topMajor, shareToken }: ShareSectionProps) => 
 
             <div className="glass-panel p-5 sm:p-6 rounded-[14px] border border-white/10 shadow-xl">
               <div className="text-on-primary-container text-[11px] font-bold uppercase tracking-widest mb-3 opacity-70">
-                Top Recommended Major
+                {(topMajor?.tieCount ?? 1) > 1
+                  ? 'Joint Top Recommended Majors'
+                  : 'Top Recommended Major'}
               </div>
 
               <div className="flex items-end justify-between gap-4">

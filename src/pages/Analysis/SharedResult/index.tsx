@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useParams, Link } from 'react-router-dom';
 import type {
   SharedDiagnosisResult,
-  ResultMajorScore,
+  SharedResultMajorScore,
 } from '../../../types/results';
 import type { Major } from '../../../types/major';
 import type {
@@ -20,6 +20,7 @@ import AiCommentBanner from '../Dashboard/components/AiCommentBanner';
 import RecommendedMajors from '../Dashboard/components/RecommendedMajors';
 import CapabilityBarChart from '../Dashboard/components/CapabilityBarChart';
 import { diagnosisEntryPath } from '../../../config/features';
+import { getTopRankedScores } from '../../../utils/majorRank';
 import {
   COMPETENCY_AXES,
   hasCompleteScores,
@@ -46,7 +47,7 @@ const clamp = (
 ) => Math.min(Math.max(value, min), max);
 
 const mapMajorScoresToRecommendedMajors = (
-  scores: ResultMajorScore[],
+  scores: SharedResultMajorScore[],
   majorMap: Map<number, Major>,
 ): RecommendedMajor[] =>
   [...scores]
@@ -61,6 +62,8 @@ const mapMajorScoresToRecommendedMajors = (
 
       return {
         rank: score.rank,
+        displayRank: score.displayRank,
+        tieCount: score.tieCount,
         majorId: score.majorId,
         name:
           fixMojibake(major?.name) ??
@@ -109,7 +112,7 @@ const SharedResult = () => {
 
   const [majors, setMajors] = useState<Major[]>([]);
   const [majorScores, setMajorScores] = useState<
-    ResultMajorScore[]
+    SharedResultMajorScore[]
   >([]);
 
   const [loading, setLoading] = useState(true);
@@ -193,13 +196,8 @@ const SharedResult = () => {
     [result?.competencyVector],
   );
 
-  const topMajorScore = useMemo(
-    () =>
-      [...majorScores].sort(
-        (a, b) => a.rank - b.rank,
-      )[0],
-    [majorScores],
-  );
+  const jointTopScores = useMemo(() => getTopRankedScores(majorScores), [majorScores]);
+  const topMajorScore = jointTopScores.length === 1 ? jointTopScores[0] : undefined;
 
   const topMajor = topMajorScore
     ? majorMap.get(topMajorScore.majorId)
@@ -392,19 +390,28 @@ const SharedResult = () => {
               status={result.aiCommentStatus}
             />
 
-            {recommendedMajors.length > 0 && (
-              <RecommendedMajors
-                majors={recommendedMajors}
-              />
+            {recommendedMajors.length > 0 ? (
+              <RecommendedMajors majors={recommendedMajors} />
+            ) : (
+              <p className="rounded-xl bg-surface-container-lowest p-5 text-sm text-on-surface-variant">
+                공유된 결과에 전공별 점수 정보가 없습니다.
+              </p>
             )}
           </div>
 
-          {userScores && majorScores.length > 0 && (
+          {userScores && jointTopScores.length === 1 && (
             <CapabilityBarChart
               rows={capabilityRows}
               targetMajorName={topMajor?.name}
               className="md:col-span-12"
             />
+          )}
+
+          {jointTopScores.length > 1 && (
+            <section className="md:col-span-12 rounded-xl bg-surface-container-lowest p-5 text-sm text-on-surface-variant">
+              이 결과에는 공동 1위 전공이 {jointTopScores.length}개 있습니다.
+              공유 화면에서는 어느 한 전공의 상대 비중을 대표 기준으로 표시하지 않습니다.
+            </section>
           )}
         </div>
 

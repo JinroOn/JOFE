@@ -1,15 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-import RadarChart from './components/RadarChart';
-
-import {
-  getDiagnosisResults,
-  getResultMajorScores,
-} from '../../../api/results';
-
-import { getMajor } from '../../../api/major';
-
+import { getDiagnosisResults, getResultMajorScores } from '../../../api/results';
+import { getMajors } from '../../../api/major';
 import {
   getPlansByResult,
   getPlanItems,
@@ -17,1278 +9,574 @@ import {
   completePlanItem,
   createPlan,
 } from '../../../api/plan';
+import type { DiagnosisResult, ResultMajorScore } from '../../../types/results';
+import type { Major } from '../../../types/major';
+import type { MajorWeeklyPlan, MajorWeeklyPlanItem } from '../../../types/plan';
+import {
+  COMPETENCY_AXES,
+  parseCompetencyScores,
+  parseMajorRequiredScores,
+  scoreText,
+} from '../../../utils/competencyScores';
+import { getRankLabel, getTopRankedScores } from '../../../utils/majorRank';
 
-import type { DiagnosisResult } from '../../../types/results';
-import type { MajorWeeklyPlanItem } from '../../../types/plan';
+type ResultListState = 'LOADING' | 'READY' | 'ERROR';
 
-const AXES = [
-  { label: '수리·논리력', sub: '알고리즘 / 수학적 사고' },
-  { label: '문제해결력', sub: '논리적 분석 / 창의적 해결' },
-  { label: '정보기술', sub: '프로그래밍 / 기술 이해' },
-  { label: '구현력', sub: '코딩 / 설계 실현' },
-  { label: '시스템이해', sub: '운영체제 / 컴퓨터구조' },
-  { label: '데이터 분석', sub: '통계 / 데이터 시각화' },
-  { label: '의사소통', sub: '발표 / 문서화' },
-  { label: '협업·윤리', sub: '팀워크 / 직업윤리' },
-  { label: '자기관리', sub: '시간관리 / 자기개발' },
-];
-
-const RANK_STYLES = [
-  {
-    color: 'text-error',
-    barColor: 'bg-error',
-    border: 'border-error/20',
-    badge: 'bg-error/10 text-error',
-  },
-  {
-    color: 'text-[#FF6B35]',
-    barColor: 'bg-[#FF6B35]',
-    border: 'border-[#FF6B35]/20',
-    badge: 'bg-[#FF6B35]/10 text-[#FF6B35]',
-  },
-  {
-    color: 'text-[#FFAB00]',
-    barColor: 'bg-[#FFAB00]',
-    border: 'border-[#FFAB00]/20',
-    badge: 'bg-[#FFAB00]/10 text-[#FFAB00]',
-  },
-];
-
-const statusStyle: Record<string, string> = {
-  done:
-    'bg-secondary-container/20 border-secondary-container/40 text-secondary',
-  current:
-    'bg-primary-container text-white border-primary-container shadow-lg',
-  locked:
-    'bg-surface-container border-outline-variant/20 text-on-surface-variant/50',
-};
-
-const statusIcon: Record<string, string> = {
-  done: 'check_circle',
-  current: 'radio_button_checked',
-  locked: 'lock',
-};
-
-function getGrade(score: number): string {
-  if (score < 30) return 'D-';
-  if (score < 40) return 'D';
-  if (score < 50) return 'D+';
-  if (score < 55) return 'C-';
-  if (score < 65) return 'C';
-  if (score < 70) return 'C+';
-  if (score < 75) return 'B-';
-  if (score < 80) return 'B';
-  if (score < 85) return 'B+';
-  if (score < 90) return 'A-';
-  if (score < 95) return 'A';
-  return 'A+';
+interface ResultSnapshot {
+  resultId: number;
+  revision: number;
+  scores: ResultMajorScore[];
+  majors: Major[];
+  plans: MajorWeeklyPlan[];
+  loadError: boolean;
 }
 
-const COMPETENCY_KEYS = [
-  'mathLogic',
-  'problemSolving',
-  'infoTech',
-  'implementation',
-  'systemUnderstanding',
-  'dataAnalysis',
-  'communication',
-  'collaboration',
-  'selfManagement',
-] as const;
-
-function parseVector(value: string | null): number[] | null {
-  if (!value) return null;
-
-  try {
-    const parsed: unknown = JSON.parse(value);
-
-    if (Array.isArray(parsed)) {
-      return parsed.map(Number);
-    }
-
-    if (parsed !== null && typeof parsed === 'object') {
-      const record = parsed as Record<string, unknown>;
-
-      return COMPETENCY_KEYS.map(
-        (key) => Number(record[key] ?? 0),
-      );
-    }
-  } catch {
-    // 기존 쉼표 구분 형식도 지원합니다.
-  }
-
-  const parts = value.split(',').map(Number);
-
-  return parts.some(Number.isNaN) ? null : parts;
+interface PlanDetailSnapshot {
+  planId: number;
+  items: MajorWeeklyPlanItem[];
+  riskNotes: string[];
 }
 
-function normalizeScores(raw: number[]): number[] {
-  const max = Math.max(...raw);
+const formatDate = (date: string) =>
+  new Date(date).toLocaleDateString('ko-KR');
 
-  return raw.map((value) =>
-    max > 1 ? value / 100 : value,
-  );
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso)
-    .toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    })
-    .replace(/\. /g, '.')
-    .replace(/\.$/, '');
-}
-
-// 진단 결과 없음 / API 조회 실패 / 비교 정보 없음 안내
 const StatusScreen = ({
   title,
   description,
-  icon,
   buttonText,
   onClick,
 }: {
   title: string;
   description: string;
-  icon: string;
   buttonText: string;
   onClick: () => void;
 }) => (
-  <div className="min-h-screen bg-surface pb-24">
-    <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-12">
-      <header className="mb-10">
-        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-secondary bg-secondary/10 px-3 py-1 rounded-full mb-4">
-          <span
-            className="material-symbols-outlined text-[14px]"
-            aria-hidden="true"
-          >
-            analytics
-          </span>
-          역량 점수 비교
+  <main className="min-h-screen bg-surface px-4 py-12">
+    <div className="mx-auto max-w-3xl">
+      <h1 className="mb-8 text-3xl font-black text-primary-container">취약 역량 심층 분석</h1>
+      <section className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-8 text-center shadow-sm sm:p-12">
+        <span className="material-symbols-outlined mb-4 text-5xl text-secondary" aria-hidden="true">
+          info
         </span>
-
-        <h1 className="text-3xl sm:text-4xl font-black text-primary-container tracking-tight">
-          취약 역량 심층 분석
-        </h1>
-      </header>
-
-      <section
-        role="status"
-        className="max-w-[760px] mx-auto rounded-[14px] border border-outline-variant/20 bg-surface-container-lowest px-6 py-12 sm:p-14 text-center shadow-sm"
-      >
-        <span
-          className="material-symbols-outlined text-5xl text-secondary mb-5"
-          aria-hidden="true"
-        >
-          {icon}
-        </span>
-
-        <h2 className="text-xl sm:text-2xl font-bold text-primary-container mb-4">
-          {title}
-        </h2>
-
-        <p className="text-sm sm:text-base text-on-surface-variant leading-relaxed break-keep mb-7">
-          {description}
-        </p>
-
+        <h2 className="mb-3 text-xl font-bold text-primary-container">{title}</h2>
+        <p className="mb-6 text-sm leading-relaxed text-on-surface-variant">{description}</p>
         <button
           type="button"
           onClick={onClick}
-          className="min-h-[44px] rounded-xl bg-primary-container px-6 py-3 text-sm font-bold text-white hover:opacity-90 transition-opacity"
+          className="min-h-[44px] rounded-xl bg-primary-container px-6 py-3 font-bold text-white"
         >
           {buttonText}
         </button>
       </section>
+    </div>
+  </main>
+);
+
+const LoadingScreen = () => (
+  <div className="flex min-h-[60vh] items-center justify-center bg-surface" role="status">
+    <div className="flex items-center gap-3 text-sm text-on-surface-variant">
+      <span className="material-symbols-outlined animate-spin" aria-hidden="true">progress_activity</span>
+      기존 진단 결과를 확인하고 있어요…
     </div>
   </div>
 );
 
 const WeakCapability = () => {
   const navigate = useNavigate();
-
-  const [results, setResults] =
-    useState<DiagnosisResult[]>([]);
-
-  const [selectedResultId, setSelectedResultId] =
-    useState<number | null>(null);
-
-  const [loading, setLoading] = useState(true);
-
-  const [resultsLoadError, setResultsLoadError] =
-    useState(false);
-
-  const [resultsVersion, setResultsVersion] =
-    useState(0);
-
-  const [comparisonAvailable, setComparisonAvailable] =
-    useState(false);
-
-  const [comparisonVersion, setComparisonVersion] =
-    useState(0);
-
-  const [currentScores, setCurrentScores] =
-    useState<number[]>(Array(9).fill(0));
-
-  const [targetScores, setTargetScores] =
-    useState<number[]>(Array(9).fill(0));
-
-  const [topMajorName, setTopMajorName] =
-    useState('');
-
-  const [topMajorScoreId, setTopMajorScoreId] =
-    useState<number | null>(null);
-
-  const [planItems, setPlanItems] =
-    useState<MajorWeeklyPlanItem[]>([]);
-
-  const [riskNotes, setRiskNotes] =
-    useState<string[]>([]);
-
-  const [completing, setCompleting] =
-    useState<number | null>(null);
-
-  const [confirmingId, setConfirmingId] =
-    useState<number | null>(null);
-
-  const [generatingPlan, setGeneratingPlan] =
-    useState(false);
-
-  const [planGenerateError, setPlanGenerateError] =
-    useState(false);
-
-  const [confirmingRegenerate, setConfirmingRegenerate] =
-    useState(false);
-
-  // --------------------------------------------------
-  // 기존 진단 결과 목록 조회
-  //
-  // GET /results는 기존 역량 진단 결과입니다.
-  // 탐색 진단 결과는 여기에 포함하지 않습니다.
-  //
-  // ESLint 수정:
-  // useEffect에서 동기적으로 setState를 호출하지 않습니다.
-  // --------------------------------------------------
+  const [results, setResults] = useState<DiagnosisResult[]>([]);
+  const [resultsState, setResultsState] = useState<ResultListState>('LOADING');
+  const [resultsRevision, setResultsRevision] = useState(0);
+  const [chosenResultId, setChosenResultId] = useState<number | null>(null);
+  const [revision, setRevision] = useState(0);
+  const [snapshot, setSnapshot] = useState<ResultSnapshot | null>(null);
+  const [choice, setChoice] = useState<{ resultId: number; scoreId: number } | null>(null);
+  const [planDetail, setPlanDetail] = useState<PlanDetailSnapshot | null>(null);
+  const [generatingPlan, setGeneratingPlan] = useState(false);
+  const [planError, setPlanError] = useState(false);
+  const [regenerateConfirm, setRegenerateConfirm] = useState(false);
+  const [confirmingItemId, setConfirmingItemId] = useState<number | null>(null);
+  const [completingItemId, setCompletingItemId] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
-
     getDiagnosisResults()
-      .then((data) => {
+      .then((items) => {
         if (!active) return;
-
-        setResultsLoadError(false);
-
-        const sorted = [...data].sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() -
-            new Date(a.createdAt).getTime(),
-        );
-
-        setResults(sorted);
-
-        if (sorted.length > 0) {
-          setSelectedResultId(sorted[0].id);
-        } else {
-          setSelectedResultId(null);
-          setLoading(false);
-        }
+        setResults([...items].sort((a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        ));
+        setResultsState('READY');
       })
       .catch(() => {
-        if (!active) return;
-
-        setResultsLoadError(true);
-        setResults([]);
-        setSelectedResultId(null);
-        setLoading(false);
+        if (active) setResultsState('ERROR');
       });
+    return () => { active = false; };
+  }, [resultsRevision]);
 
-    return () => {
-      active = false;
-    };
-  }, [resultsVersion]);
-
-  // --------------------------------------------------
-  // 선택한 기존 진단 회차의 점수와 계획 조회
-  //
-  // ESLint 수정:
-  // 비동기 요청 전에 상태를 즉시 변경하지 않습니다.
-  // 기존 점수는 조회 응답 이후에 갱신합니다.
-  // --------------------------------------------------
+  // 선택한 회차가 삭제되거나 바뀐 경우 최신 회차로 돌아갑니다.
+  const selectedResultId = results.some((item) => item.id === chosenResultId)
+    ? chosenResultId
+    : results[0]?.id ?? null;
+  const selectedResult = results.find((item) => item.id === selectedResultId) ?? null;
 
   useEffect(() => {
-    if (
-      selectedResultId === null ||
-      results.length === 0
-    ) {
-      return;
-    }
-
-    const selected = results.find(
-      (result) => result.id === selectedResultId,
-    );
-
-    if (!selected) return;
-
+    if (selectedResultId === null) return;
     let active = true;
-
     const load = async () => {
       try {
-        const rawVector = parseVector(
-          selected.competencyVector,
-        );
-
-        const validVector =
-          rawVector !== null &&
-          rawVector.length === 9 &&
-          rawVector.every(Number.isFinite);
-
-        // 먼저 요청을 실행합니다.
-        // Promise가 완료된 뒤 상태를 갱신합니다.
-        const [scoresResponse, plansResponse] =
-          await Promise.allSettled([
-            getResultMajorScores(selected.id),
-            getPlansByResult(selected.id),
-          ]);
-
+        const [scores, majors, plans] = await Promise.all([
+          getResultMajorScores(selectedResultId),
+          getMajors().catch(() => [] as Major[]),
+          getPlansByResult(selectedResultId).catch(() => [] as MajorWeeklyPlan[]),
+        ]);
         if (!active) return;
-
-        // 이전 회차의 데이터를 초기화합니다.
-        setComparisonAvailable(false);
-        setCurrentScores(Array(9).fill(0));
-        setTargetScores(Array(9).fill(0));
-        setTopMajorName('');
-        setTopMajorScoreId(null);
-
-        setPlanItems([]);
-        setRiskNotes([]);
-
-        setConfirmingId(null);
-        setConfirmingRegenerate(false);
-        setGeneratingPlan(false);
-        setPlanGenerateError(false);
-
-        // 유효한 역량 점수와 전공별 점수가 있을 때만
-        // 실제 비교 기준을 조회합니다.
-        if (
-          validVector &&
-          scoresResponse.status === 'fulfilled' &&
-          scoresResponse.value.length > 0
-        ) {
-          const top = scoresResponse.value.reduce(
-            (a, b) => (a.rank < b.rank ? a : b),
-          );
-
-          const major = await getMajor(
-            top.majorId,
-          ).catch(() => null);
-
-          if (!active) return;
-
-          if (major) {
-            const requirements = [
-              major.reqMathLogic,
-              major.reqProblemSolving,
-              major.reqInfoTech,
-              major.reqImplementation,
-              major.reqSystemUnderstanding,
-              major.reqDataAnalysis,
-              major.reqCommunication,
-              major.reqCollaboration,
-              major.reqSelfManagement,
-            ];
-
-            const hasRequirements =
-              requirements.some(
-                (value) =>
-                  value !== null &&
-                  Number.isFinite(value),
-              );
-
-            if (hasRequirements) {
-              setCurrentScores(
-                normalizeScores(rawVector),
-              );
-
-              setTargetScores(
-                requirements.map(
-                  (value) => (value ?? 0) / 100,
-                ),
-              );
-
-              setTopMajorName(major.name);
-              setTopMajorScoreId(top.id);
-              setComparisonAvailable(true);
-            }
-          }
-        }
-
-        // 기존 학습 로드맵 및 주의사항 조회
-        if (
-          plansResponse.status === 'fulfilled' &&
-          plansResponse.value.length > 0
-        ) {
-          const succeeded = plansResponse.value
-            .filter(
-              (plan) =>
-                plan.aiPlanStatus === 'SUCCEEDED',
-            )
-            .sort((a, b) => a.id - b.id);
-
-          const activePlan =
-            succeeded.find(
-              (plan) => plan.activeVersion,
-            ) ??
-            succeeded[succeeded.length - 1] ??
-            null;
-
-          if (activePlan) {
-            const [items, notes] =
-              await Promise.all([
-                getPlanItems(activePlan.id).catch(
-                  () => [],
-                ),
-                getPlanRiskNotes(activePlan.id).catch(
-                  () => [],
-                ),
-              ]);
-
-            if (!active) return;
-
-            setPlanItems(
-              [...items].sort(
-                (a, b) => a.weekNo - b.weekNo,
-              ),
-            );
-
-            setRiskNotes(
-              notes.map((note) => note.note),
-            );
-          }
-        }
+        setSnapshot({ resultId: selectedResultId, revision, scores, majors, plans, loadError: false });
       } catch {
-        // 데이터 조회 오류를 진단 미완료로
-        // 잘못 판단하지 않습니다.
-      } finally {
         if (active) {
-          setLoading(false);
+          setSnapshot({ resultId: selectedResultId, revision, scores: [], majors: [], plans: [], loadError: true });
         }
       }
     };
-
     void load();
+    return () => { active = false; };
+  }, [selectedResultId, revision]);
 
-    return () => {
-      active = false;
-    };
-  }, [
-    selectedResultId,
-    results,
-    comparisonVersion,
-  ]);
+  const data = snapshot?.resultId === selectedResultId && snapshot.revision === revision
+    ? snapshot
+    : null;
+  const sortedScores = useMemo(
+    () => [...(data?.scores ?? [])].sort((a, b) => a.rank - b.rank),
+    [data],
+  );
+  const leaders = useMemo(() => getTopRankedScores(sortedScores), [sortedScores]);
+  const majorMap = useMemo(
+    () => new Map((data?.majors ?? []).map((major) => [major.id, major])),
+    [data],
+  );
 
-  // --------------------------------------------------
-  // 기존 AI 학습 로드맵 생성
-  // --------------------------------------------------
+  // 공동 1위일 때는 명시적인 선택이 필수입니다.
+  // 회차가 바뀌면 이전 회차에서 저장한 선택은 사용하지 않습니다.
+  const chosenScore = leaders.length === 1
+    ? leaders[0]
+    : leaders.find((score) =>
+        choice?.resultId === selectedResultId && choice.scoreId === score.id,
+      ) ?? null;
+  const selectedMajor = chosenScore ? majorMap.get(chosenScore.majorId) : undefined;
+  const chosenName = chosenScore
+    ? selectedMajor?.name ?? `전공 ID ${chosenScore.majorId}`
+    : '';
 
-  const handleCreatePlan = async () => {
-    if (
-      !selectedResultId ||
-      !topMajorScoreId ||
-      generatingPlan
-    ) {
-      return;
-    }
+  const studentScores = useMemo(
+    () => parseCompetencyScores(selectedResult?.competencyVector),
+    [selectedResult?.competencyVector],
+  );
+  const weights = useMemo(
+    () => parseMajorRequiredScores(selectedMajor),
+    [selectedMajor],
+  );
 
+  // '활성' 계획이더라도 지금 선택한 전공 점수 행 ID가 다르면 표시하지 않습니다.
+  const activePlan = useMemo(() => {
+    if (!chosenScore || !data) return null;
+    const ownPlans = data.plans
+      .filter((plan) =>
+        plan.resultMajorScoreId === chosenScore.id &&
+        plan.aiPlanStatus === 'SUCCEEDED',
+      )
+      .sort((a, b) => b.id - a.id);
+    return ownPlans.find((plan) => plan.activeVersion) ?? ownPlans[0] ?? null;
+  }, [chosenScore, data]);
+
+  const activePlanId = activePlan?.id ?? null;
+
+  useEffect(() => {
+    if (activePlanId === null) return;
+    let active = true;
+    Promise.all([
+      getPlanItems(activePlanId),
+      getPlanRiskNotes(activePlanId),
+    ])
+      .then(([items, notes]) => {
+        if (!active) return;
+        setPlanDetail({
+          planId: activePlanId,
+          items: [...items].sort((a, b) => a.weekNo - b.weekNo),
+          riskNotes: notes.map((note) => note.note),
+        });
+      })
+      .catch(() => {
+        if (active) setPlanDetail({ planId: activePlanId, items: [], riskNotes: [] });
+      });
+    return () => { active = false; };
+  }, [activePlanId]);
+
+  const visiblePlanDetail = activePlan && planDetail?.planId === activePlan.id
+    ? planDetail
+    : null;
+  const planItems = visiblePlanDetail?.items ?? [];
+  const riskNotes = visiblePlanDetail?.riskNotes ?? [];
+  const completedCount = planItems.filter((item) => item.isCompleted).length;
+  const progress = planItems.length > 0
+    ? Math.round((completedCount / planItems.length) * 100)
+    : 0;
+  const firstIncomplete = planItems.findIndex((item) => !item.isCompleted);
+
+  const chooseMajor = (score: ResultMajorScore) => {
+    if (generatingPlan || selectedResultId === null) return;
+    setChoice({ resultId: selectedResultId, scoreId: score.id });
+    setRegenerateConfirm(false);
+    setConfirmingItemId(null);
+    setPlanError(false);
+  };
+
+  const selectResult = (resultId: number) => {
+    if (generatingPlan) return;
+    setChosenResultId(resultId);
+    setChoice(null);
+    setRegenerateConfirm(false);
+    setPlanError(false);
+  };
+
+  const createSelectedPlan = async () => {
+    if (!selectedResultId || !chosenScore || generatingPlan) return;
     setGeneratingPlan(true);
-    setPlanGenerateError(false);
-
+    setPlanError(false);
     try {
       const plan = await createPlan({
         diagnosisResultId: selectedResultId,
-        resultMajorScoreId: topMajorScoreId,
+        resultMajorScoreId: chosenScore.id,
         activeVersion: true,
       });
-
       if (plan.aiPlanStatus === 'SUCCEEDED') {
-        const [items, notes] =
-          await Promise.all([
-            getPlanItems(plan.id).catch(() => []),
-            getPlanRiskNotes(plan.id).catch(() => []),
-          ]);
-
-        setPlanItems(
-          [...items].sort(
-            (a, b) => a.weekNo - b.weekNo,
-          ),
-        );
-
-        setRiskNotes(
-          notes.map((note) => note.note),
-        );
+        // 최신 계획 목록을 다시 읽되 선택한 전공은 그대로 둡니다.
+        setRevision((value) => value + 1);
       } else {
-        setPlanGenerateError(true);
+        setPlanError(true);
       }
     } catch {
-      setPlanGenerateError(true);
+      setPlanError(true);
     } finally {
       setGeneratingPlan(false);
+      setRegenerateConfirm(false);
     }
   };
 
-  // --------------------------------------------------
-  // 기존 학습 항목 완료 처리
-  // --------------------------------------------------
-
-  const handleComplete = async (
-    item: MajorWeeklyPlanItem,
-  ) => {
-    if (
-      item.isCompleted ||
-      completing !== null
-    ) {
-      return;
-    }
-
-    setCompleting(item.id);
-    setConfirmingId(null);
-
+  const completeSelectedItem = async (item: MajorWeeklyPlanItem) => {
+    if (item.isCompleted || completingItemId !== null) return;
+    setCompletingItemId(item.id);
     try {
       await completePlanItem(item.id);
-
-      setPlanItems((previous) =>
-        previous.map((planItem) =>
-          planItem.id === item.id
-            ? {
-                ...planItem,
-                isCompleted: true,
-              }
-            : planItem,
-        ),
+      setPlanDetail((previous) => previous && previous.planId === activePlan?.id
+        ? {
+            ...previous,
+            items: previous.items.map((row) =>
+              row.id === item.id ? { ...row, isCompleted: true } : row,
+            ),
+          }
+        : previous,
       );
+      setConfirmingItemId(null);
+    } catch {
+      // 요청에 실패하면 완료 표시를 변경하지 않습니다.
     } finally {
-      setCompleting(null);
+      setCompletingItemId(null);
     }
   };
 
-  // --------------------------------------------------
-  // 프론트엔드 점수 차이 계산
-  // AI 모델 분석이 아닌 단순 점수 비교입니다.
-  // --------------------------------------------------
-
-  const weakItems = AXES.map(
-    (axis, index) => ({
-      axis,
-      current: Math.round(
-        (currentScores[index] ?? 0) * 100,
-      ),
-      target: Math.round(
-        (targetScores[index] ?? 0) * 100,
-      ),
-      gap:
-        (targetScores[index] ?? 0) -
-        (currentScores[index] ?? 0),
-    }),
-  )
-    .filter((item) => item.gap > 0)
-    .sort((a, b) => b.gap - a.gap)
-    .slice(0, 3)
-    .map((item, index) => ({
-      rank: index + 1,
-      area: item.axis.label,
-      sub: item.axis.sub,
-      grade: getGrade(item.current),
-      current: item.current,
-      target: item.target,
-      ...RANK_STYLES[index],
-    }));
-
-  const firstIncompleteIdx =
-    planItems.findIndex(
-      (item) => !item.isCompleted,
-    );
-
-  const getRoadmapStatus = (
-    index: number,
-    item: MajorWeeklyPlanItem,
-  ): string => {
-    if (item.isCompleted) {
-      return 'done';
-    }
-
-    if (index === firstIncompleteIdx) {
-      return 'current';
-    }
-
-    return 'locked';
-  };
-
-  const completedCount =
-    planItems.filter(
-      (item) => item.isCompleted,
-    ).length;
-
-  const progressPct =
-    planItems.length > 0
-      ? Math.round(
-          (completedCount / planItems.length) * 100,
-        )
-      : 0;
-
-  const selectedResult =
-    results.find(
-      (result) =>
-        result.id === selectedResultId,
-    ) ?? null;
-
-  // --------------------------------------------------
-  // 로딩
-  // --------------------------------------------------
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
-        <div
-          role="status"
-          className="flex flex-col items-center gap-3 text-on-surface-variant"
-        >
-          <span
-            className="material-symbols-outlined animate-spin text-4xl"
-            aria-hidden="true"
-          >
-            progress_activity
-          </span>
-
-          <p className="text-sm">
-            역량 진단 결과를 확인하고 있어요…
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // --------------------------------------------------
-  // 기존 진단 결과 조회 실패
-  // --------------------------------------------------
-
-  if (resultsLoadError) {
+  if (resultsState === 'LOADING') return <LoadingScreen />;
+  if (resultsState === 'ERROR') {
     return (
       <StatusScreen
-        icon="error_outline"
         title="기존 진단 결과를 불러오지 못했어요"
-        description="일시적으로 결과를 확인할 수 없습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요."
-        buttonText="다시 확인하기"
+        description="일시적인 조회 문제일 수 있습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요."
+        buttonText="다시 불러오기"
         onClick={() => {
-          // 수정: 사용자 클릭 시 로딩 상태 설정
-          setLoading(true);
-          setResultsVersion(
-            (previous) => previous + 1,
-          );
+          setResultsState('LOADING');
+          setResultsRevision((value) => value + 1);
         }}
       />
     );
   }
-
-  // --------------------------------------------------
-  // 기존 진단 미완료
-  // 탐색 진단만 완료한 계정도 해당합니다.
-  // --------------------------------------------------
-
-  if (results.length === 0) {
+  if (results.length === 0 || selectedResultId === null) {
     return (
       <StatusScreen
-        icon="assignment"
         title="기존 진단을 완료하면 볼 수 있어요"
-        description="취약 역량 심층 분석은 기존 진단의 역량 점수를 바탕으로 제공됩니다. 전공 탐색 진단은 이 화면에서 사용하는 역량 점수를 생성하지 않습니다."
+        description="탐색 진단은 이 화면에서 사용하는 역량 점수를 생성하지 않습니다. 먼저 기존 전공 진단을 완료해 주세요."
         buttonText="기존 진단 시작하기"
         onClick={() => navigate('/diagnosis')}
       />
     );
   }
-
-  // --------------------------------------------------
-  // 결과는 있으나 비교 자료가 없는 경우
-  // --------------------------------------------------
-
-  if (
-    !comparisonAvailable ||
-    !topMajorName
-  ) {
+  if (!data) return <LoadingScreen />;
+  if (data.loadError) {
     return (
       <StatusScreen
-        icon="info"
-        title="역량 비교 정보를 확인할 수 없어요"
-        description="기존 진단 결과는 있지만 역량 점수 또는 1위 전공의 비교 기준을 불러오지 못했습니다. 잠시 후 다시 확인해 주세요."
-        buttonText="비교 정보 다시 확인하기"
-        onClick={() => {
-          // 수정: 사용자 클릭 시 로딩 상태 설정
-          setLoading(true);
-          setComparisonVersion(
-            (previous) => previous + 1,
-          );
-        }}
+        title="전공별 점수 정보를 불러오지 못했어요"
+        description="진단 결과는 있지만 전공별 점수 조회에 실패했습니다."
+        buttonText="점수 다시 확인하기"
+        onClick={() => setRevision((value) => value + 1)}
+      />
+    );
+  }
+  if (sortedScores.length === 0) {
+    return (
+      <StatusScreen
+        title="전공별 점수 정보가 없습니다"
+        description="기존 진단 결과는 있으나 연결된 전공별 점수가 없어 순위와 계획을 표시하지 않습니다."
+        buttonText="결과 리포트로 이동"
+        onClick={() => navigate('/analysis/dashboard')}
       />
     );
   }
 
-  // --------------------------------------------------
-  // 정상적인 기존 진단 결과 화면
-  // --------------------------------------------------
-
   return (
-    <div className="min-h-screen bg-surface pb-24">
-      <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-12 space-y-10">
-
-        {/* 상단 제목 및 설명 */}
-        <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div>
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-secondary bg-secondary/10 px-3 py-1 rounded-full mb-4">
-              <span
-                className="material-symbols-outlined text-[14px]"
-                aria-hidden="true"
-              >
-                analytics
-              </span>
-
-              역량 점수 비교
-            </span>
-
-            <h1 className="text-4xl md:text-5xl font-black text-primary-container tracking-tight leading-tight mb-4">
-              취약 역량 심층 분석
-            </h1>
-
-            <p className="text-on-surface-variant text-base sm:text-lg leading-relaxed">
-              기존 진단에서 1위로 나온{' '}
-              <span className="font-semibold text-secondary">
-                '{topMajorName}'
-              </span>
-              의 요구 역량과 진단 점수를 비교했습니다.
-              <br className="hidden sm:block" />
-
-              {weakItems.length > 0
-                ? ` 비교 기준보다 낮은 역량 ${weakItems.length}개를 먼저 확인해보세요.`
-                : ' 모든 역량이 해당 전공의 비교 기준을 충족하고 있습니다.'}
-            </p>
-          </div>
-
+    <main className="min-h-screen bg-surface pb-24">
+      <div className="mx-auto max-w-[1280px] space-y-8 px-4 pt-10 sm:px-8">
+        <header>
+          <span className="mb-3 inline-flex rounded-full bg-secondary/10 px-3 py-1 text-xs font-bold text-secondary">
+            기존 진단 · 전공별 역량 참고 정보
+          </span>
+          <h1 className="mb-3 text-3xl font-black text-primary-container sm:text-4xl">
+            취약 역량 심층 분석
+          </h1>
+          <p className="max-w-3xl text-sm leading-relaxed text-on-surface-variant sm:text-base">
+            기존 진단의 역량 점수와 전공 내부의 상대 가중치를 확인할 수 있습니다.
+            현재 전공별 절대 목표 점수와 취약 역량 판정 기준은 검토 중이므로,
+            두 값을 직접 비교하여 미달·충족 여부를 판단하지 않습니다.
+          </p>
           {selectedResult && (
-            <div className="flex items-center gap-2 text-sm text-on-surface-variant shrink-0">
-              <span
-                className="material-symbols-outlined text-[16px]"
-                aria-hidden="true"
-              >
-                schedule
-              </span>
-
-              {formatDate(selectedResult.createdAt)}
-            </div>
+            <p className="mt-2 text-xs text-on-surface-variant">
+              선택한 진단: {formatDate(selectedResult.createdAt)}
+            </p>
           )}
         </header>
 
-        {/* 기존 진단 회차 선택 */}
         {results.length > 1 && (
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-on-surface-variant shrink-0">
+          <section aria-label="진단 회차 선택" className="flex flex-wrap items-center gap-3">
+            <label htmlFor="weak-result-select" className="text-sm font-semibold text-on-surface-variant">
               진단 회차
-            </span>
+            </label>
+            <select
+              id="weak-result-select"
+              value={selectedResultId}
+              disabled={generatingPlan}
+              onChange={(event) => selectResult(Number(event.target.value))}
+              className="min-h-[44px] rounded-lg border border-outline-variant/30 bg-white px-3 text-sm font-bold text-primary-container"
+            >
+              {results.map((result, index) => (
+                <option key={result.id} value={result.id}>
+                  {results.length - index}회차 · {formatDate(result.createdAt)}
+                </option>
+              ))}
+            </select>
+          </section>
+        )}
 
-            {results.length <= 5 ? (
-              <div className="flex flex-wrap gap-2">
-                {results.map((result, index) => (
+        <section className="rounded-2xl border border-outline-variant/20 bg-white p-5 shadow-sm sm:p-7">
+          <h2 className="mb-3 text-xl font-bold text-primary-container">최상위 추천 전공</h2>
+          {leaders.length > 1 ? (
+            <>
+              <p className="mb-4 text-sm leading-relaxed text-on-surface-variant">
+                최상위 순위는 {getRankLabel(leaders[0])}이며, 해당 전공이 {leaders.length}개 있습니다.
+                저장 순서로 전공을 자동 선택하지 않습니다. 내용을 살펴볼 전공을 직접 선택해 주세요.
+              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {leaders.map((score) => (
                   <button
-                    key={result.id}
+                    key={score.id}
                     type="button"
-                    onClick={() => {
-                      setLoading(true);
-                      setSelectedResultId(result.id);
-                    }}
-                    className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${
-                      result.id === selectedResultId
-                        ? 'bg-primary-container text-white shadow-md'
-                        : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                    aria-pressed={chosenScore?.id === score.id}
+                    disabled={generatingPlan}
+                    onClick={() => chooseMajor(score)}
+                    className={`min-h-[70px] rounded-xl border p-4 text-left transition-colors disabled:opacity-50 ${
+                      chosenScore?.id === score.id
+                        ? 'border-secondary bg-secondary/10 text-primary-container'
+                        : 'border-outline-variant/30 bg-surface-container-lowest hover:border-secondary/60'
                     }`}
                   >
-                    <span>
-                      {results.length - index}회차
+                    <span className="mb-1 block text-xs font-bold text-secondary">
+                      {getRankLabel(score)}
                     </span>
-
-                    <span
-                      className={`text-xs font-normal ${
-                        result.id === selectedResultId
-                          ? 'text-white/70'
-                          : 'text-on-surface-variant/60'
-                      }`}
-                    >
-                      {formatDate(result.createdAt)}
+                    <span className="font-bold text-primary-container">
+                      {majorMap.get(score.majorId)?.name ?? `전공 ID ${score.majorId}`}
+                    </span>
+                    <span className="mt-1 block text-xs text-on-surface-variant">
+                      최종 {score.finalScore.toFixed(1)}점
                     </span>
                   </button>
                 ))}
               </div>
-            ) : (
-              <select
-                value={selectedResultId ?? ''}
-                onChange={(event) => {
-                  setLoading(true);
-                  setSelectedResultId(
-                    Number(event.target.value),
-                  );
-                }}
-                aria-label="진단 회차 선택"
-                className="rounded-[12px] border border-outline-variant/30 bg-white px-4 py-2.5 text-sm font-bold text-primary-container outline-none cursor-pointer"
-              >
-                {results.map((result, index) => (
-                  <option
-                    key={result.id}
-                    value={result.id}
-                  >
-                    {results.length - index}회차 ·{' '}
-                    {formatDate(result.createdAt)}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-        )}
-
-        {/* 역량 비교 및 레이더 차트 */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-7 space-y-4">
-            <h2 className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">
-              {weakItems.length > 0
-                ? `비교 기준 미달 역량 ${weakItems.length}개`
-                : '역량 비교 결과'}
-            </h2>
-
-            {weakItems.length === 0 ? (
-              <div
-                role="status"
-                className="bg-surface-container-lowest rounded-[14px] p-8 text-center text-on-surface-variant border border-outline-variant/10"
-              >
-                <span
-                  className="material-symbols-outlined text-4xl mb-2 block text-secondary"
-                  aria-hidden="true"
-                >
-                  check_circle
-                </span>
-
-                <p className="font-bold text-primary-container mb-2">
-                  모든 역량이 비교 기준을 충족합니다
-                </p>
-
-                <p className="text-sm leading-relaxed">
-                  현재 기존 진단 점수가 1위 전공의
-                  요구 역량 이상으로 나타났습니다.
-                  이 비교는 진단 점수를 바탕으로 한
-                  참고 정보입니다.
-                </p>
-              </div>
-            ) : (
-              weakItems.map((item) => (
-                <div
-                  key={item.rank}
-                  className={`bg-surface-container-lowest rounded-[14px] p-5 sm:p-6 border ${item.border} shadow-sm`}
-                >
-                  <div className="flex items-start justify-between gap-3 mb-4">
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`text-3xl font-black ${item.color} leading-none`}
-                      >
-                        #{item.rank}
-                      </span>
-
-                      <div>
-                        <p className="font-bold text-lg text-primary-container">
-                          {item.area}
-                        </p>
-
-                        <p className="text-sm text-on-surface-variant mt-0.5">
-                          {item.sub}
-                        </p>
-                      </div>
-                    </div>
-
-                    <span
-                      className={`text-xl font-black px-3 py-1 rounded-[14px] shrink-0 ${item.badge}`}
-                    >
-                      {item.grade}
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm font-medium text-on-surface-variant">
-                      <span>현재 역량</span>
-                      <span className={item.color}>
-                        {item.current}%
-                      </span>
-                    </div>
-
-                    <div className="relative w-full h-2.5 bg-surface-container-high rounded-full overflow-hidden">
-                      <div
-                        className={`absolute left-0 top-0 h-full ${item.barColor} rounded-full transition-all duration-700`}
-                        style={{
-                          width: `${item.current}%`,
-                        }}
-                      />
-
-                      <div
-                        className="absolute top-0 h-full w-0.5 bg-secondary/70"
-                        style={{
-                          left: `${item.target}%`,
-                        }}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs text-on-surface-variant">
-                      <span>
-                        기준까지{' '}
-                        <span className="font-bold text-on-surface">
-                          +{item.target - item.current}%p
-                        </span>
-                      </span>
-
-                      <span>
-                        비교 기준: {item.target}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* 레이더 차트와 점수 비교 안내 */}
-          <div className="lg:col-span-5 flex flex-col gap-5">
-            <div className="bg-surface-container-lowest rounded-[14px] p-5 sm:p-6 shadow-[0px_20px_40px_rgba(10,25,47,0.06)] flex-1">
-              <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-4">
-                역량 점수 비교 차트
-              </p>
-
-              <div className="flex justify-center items-center gap-4 mb-4 text-xs font-bold">
-                <span className="flex items-center gap-1.5 text-on-surface-variant">
-                  <span className="w-5 h-0.5 border-t-2 border-dashed border-secondary-container inline-block" />
-                  1위 전공 요구값
-                </span>
-
-                <span className="flex items-center gap-1.5 text-on-surface-variant">
-                  <span className="w-5 h-0.5 bg-error inline-block rounded-full" />
-                  현재 역량
-                </span>
-              </div>
-
-              <div className="w-full aspect-square">
-                <RadarChart
-                  currentScores={currentScores}
-                  targetScores={targetScores}
-                />
-              </div>
-            </div>
-
-            {/* AI 인사이트가 아닌 점수 비교 안내 */}
-            <div className="bg-primary-container/5 border border-primary-container/10 rounded-[14px] p-5 sm:p-6">
-              <div className="flex items-center gap-2 mb-3">
-                <span
-                  className="material-symbols-outlined text-secondary text-[20px]"
-                  aria-hidden="true"
-                >
-                  bar_chart
-                </span>
-
-                <span className="text-base font-bold text-primary-container">
-                  점수 비교 안내
-                </span>
-              </div>
-
-              {weakItems.length > 0 ? (
-                <p className="text-sm text-on-surface-variant leading-relaxed">
-                  <span className="font-bold text-primary-container">
-                    {weakItems[0].area}
-                  </span>
-                  의 현재 점수가 비교 기준보다{' '}
-                  <span className="font-bold text-error">
-                    {weakItems[0].target -
-                      weakItems[0].current}
-                    %p
-                  </span>{' '}
-                  낮게 나타났습니다.
-
-                  {weakItems[1] && (
-                    <>
-                      {' '}
-                      <span className="font-bold text-primary-container">
-                        {weakItems[1].area}
-                      </span>
-                      도 함께 비교해보세요.
-                    </>
-                  )}
-                </p>
-              ) : (
-                <p className="text-sm text-on-surface-variant leading-relaxed">
-                  현재 점수가 모든 비교 기준을
-                  충족하고 있습니다. 이 안내는
-                  진단 점수를 비교한 결과이며,
-                  AI가 별도로 분석한 내용은 아닙니다.
+              {!chosenScore && (
+                <p role="status" className="mt-4 font-bold text-secondary">
+                  비교 정보를 확인할 전공을 선택해 주세요.
                 </p>
               )}
+            </>
+          ) : (
+            <p className="text-sm leading-relaxed text-on-surface-variant">
+              기존 진단에서 {getRankLabel(leaders[0])}로 나온 전공은
+              <strong className="ml-1 text-primary-container">
+                {majorMap.get(leaders[0].majorId)?.name ?? `전공 ID ${leaders[0].majorId}`}
+              </strong>입니다.
+            </p>
+          )}
+        </section>
 
-              <div className="mt-4 pt-4 border-t border-primary-container/10 flex items-center justify-between text-sm text-on-surface-variant">
-                <span>학습 로드맵</span>
-
-                <span className="font-bold text-secondary">
-                  {planItems.length > 0
-                    ? `${planItems.length}주`
-                    : '아직 생성되지 않음'}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 기존 학습 로드맵 유지 */}
-        {planItems.length > 0 ? (
-          <div>
-            <div className="flex items-center justify-between mb-5 gap-3">
-              <h2 className="font-black text-xl text-primary-container">
-                {planItems.length}주 학습 로드맵
+        {chosenScore && (
+          <>
+            <section className="rounded-2xl bg-surface-container-lowest p-5 shadow-sm sm:p-7">
+              <h2 className="mb-3 text-xl font-bold text-primary-container">
+                {chosenName} · 역량 관련 정보
               </h2>
-
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-on-surface-variant bg-surface-container px-3 py-1 rounded-full">
-                  진행률{' '}
-                  <span className="font-bold text-secondary">
-                    {progressPct}%
-                  </span>
-                </span>
-
-                {confirmingRegenerate ? (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-on-surface-variant">
-                      재생성할까요?
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConfirmingRegenerate(false);
-                        void handleCreatePlan();
-                      }}
-                      disabled={generatingPlan}
-                      className="text-xs font-bold bg-primary-container text-white px-2.5 py-1 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
-                    >
-                      {generatingPlan
-                        ? '생성 중…'
-                        : '확인'}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setConfirmingRegenerate(false)
-                      }
-                      disabled={generatingPlan}
-                      className="text-xs font-bold bg-surface-container text-on-surface-variant px-2.5 py-1 rounded-lg hover:bg-surface-container-high transition-colors"
-                    >
-                      취소
-                    </button>
+              <p className="mb-5 text-sm leading-relaxed text-on-surface-variant">
+                왼쪽의 학생 점수는 0~100점이고, 오른쪽의 숫자는 전공 내 상대적인 역량 비중입니다.
+                같은 단위가 아니므로 점수 차이, 달성률 또는 미달 역량 수를 계산하지 않습니다.
+              </p>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {COMPETENCY_AXES.map((axis, index) => (
+                  <div key={axis} className="rounded-xl border border-outline-variant/20 bg-surface-container-low p-4">
+                    <h3 className="mb-3 text-sm font-bold text-primary-container">{axis}</h3>
+                    <div className="mb-2 flex items-center justify-between text-sm">
+                      <span className="text-on-surface-variant">학생 역량</span>
+                      <strong className="text-secondary">{scoreText(studentScores?.[index] ?? null)}</strong>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-on-surface-variant">전공 내 상대 가중치</span>
+                      <strong className="text-primary-container">
+                        {weights[index] === null ? '미제공' : weights[index]?.toFixed(1)}
+                      </strong>
+                    </div>
                   </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setConfirmingRegenerate(true)
-                    }
-                    disabled={generatingPlan}
-                    className="flex items-center gap-1 text-xs font-bold text-on-surface-variant bg-surface-container px-3 py-1 rounded-full hover:bg-surface-container-high transition-colors disabled:opacity-50"
-                  >
-                    <span className="material-symbols-outlined text-[14px]">
-                      refresh
-                    </span>
-                    재생성
-                  </button>
+                ))}
+              </div>
+              <div role="note" className="mt-5 rounded-xl bg-secondary/10 p-4 text-sm text-on-surface-variant">
+                취약 역량의 목표값·산식은 백엔드 논의가 끝난 뒤 반영합니다.
+                현재 화면은 특정 역량을 부족하다고 판정하지 않습니다.
+              </div>
+            </section>
+
+            <section className="rounded-2xl bg-surface-container-lowest p-5 shadow-sm sm:p-7">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-bold text-primary-container">
+                    {chosenName} · 학습 로드맵
+                  </h2>
+                  <p className="mt-1 text-xs text-on-surface-variant">
+                    계획 생성 대상은 현재 선택한 전공입니다.
+                  </p>
+                </div>
+                {activePlan && visiblePlanDetail && (
+                  <span className="rounded-full bg-surface-container px-3 py-1 text-sm font-bold text-secondary">
+                    진행률 {progress}%
+                  </span>
                 )}
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {planItems.map((item, index) => {
-                const status =
-                  getRoadmapStatus(index, item);
-
-                const isConfirming =
-                  confirmingId === item.id;
-
-                return (
-                  <div
-                    key={item.id}
-                    className={`rounded-[14px] border px-4 py-3.5 flex flex-col gap-3 w-full transition-all ${statusStyle[status]}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <span className="material-symbols-outlined text-[20px] mt-0.5 shrink-0">
-                        {completing === item.id
-                          ? 'hourglass_empty'
-                          : statusIcon[status]}
-                      </span>
-
-                      <div className="flex-1">
-                        <p className="text-xs font-bold opacity-60">
-                          WEEK {item.weekNo}
-                        </p>
-
-                        <p className="text-sm font-semibold mt-0.5 leading-snug">
-                          {item.goal}
-                        </p>
-                      </div>
-
-                      {status === 'current' &&
-                        !isConfirming && (
+              {activePlan && !visiblePlanDetail ? (
+                <p role="status" className="py-10 text-center text-sm text-on-surface-variant">
+                  선택한 전공의 학습 계획을 불러오는 중이에요…
+                </p>
+              ) : activePlan && visiblePlanDetail ? (
+                <>
+                  <div className="mb-5 flex flex-wrap items-center justify-end gap-2">
+                    {regenerateConfirm ? (
+                      <>
+                        <span className="text-sm text-on-surface-variant">이 전공의 계획을 재생성할까요?</span>
                         <button
                           type="button"
-                          onClick={() =>
-                            setConfirmingId(item.id)
-                          }
-                          disabled={completing !== null}
-                          className="shrink-0 text-xs font-bold bg-white/20 hover:bg-white/30 rounded-lg px-2.5 py-1 transition-colors"
+                          disabled={generatingPlan}
+                          onClick={() => void createSelectedPlan()}
+                          className="min-h-[44px] rounded-lg bg-primary-container px-4 font-bold text-white disabled:opacity-50"
                         >
-                          완료
+                          {generatingPlan ? '생성 중…' : '확인'}
                         </button>
-                      )}
-                    </div>
-
-                    {isConfirming && (
-                      <div className="flex flex-col gap-2 pt-1 border-t border-white/20">
-                        <p className="text-xs font-bold opacity-80">
-                          이번 주 학습을 완료했나요?
-                        </p>
-
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void handleComplete(item)
-                            }
-                            disabled={completing !== null}
-                            className="flex-1 text-xs font-bold bg-white text-primary-container rounded-lg py-1.5 hover:bg-white/90 transition-colors disabled:opacity-50"
-                          >
-                            {completing === item.id
-                              ? '처리 중…'
-                              : '완료하기'}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setConfirmingId(null)
-                            }
-                            disabled={completing !== null}
-                            className="flex-1 text-xs font-bold bg-white/20 rounded-lg py-1.5 hover:bg-white/30 transition-colors disabled:opacity-50"
-                          >
-                            취소
-                          </button>
-                        </div>
-                      </div>
+                        <button type="button" disabled={generatingPlan} onClick={() => setRegenerateConfirm(false)}
+                          className="min-h-[44px] rounded-lg bg-surface-container px-4 font-semibold">취소</button>
+                      </>
+                    ) : (
+                      <button type="button" onClick={() => setRegenerateConfirm(true)}
+                        className="min-h-[44px] rounded-lg bg-surface-container px-4 text-sm font-bold text-secondary">
+                        로드맵 재생성
+                      </button>
                     )}
                   </div>
-                );
-              })}
-            </div>
-
-            {/* 기존 로드맵 주의사항 */}
-            {riskNotes.length > 0 && (
-              <div className="mt-6 bg-[#FFAB00]/5 border border-[#FFAB00]/20 rounded-[14px] p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="material-symbols-outlined text-[#FFAB00] text-[18px]">
-                    warning
-                  </span>
-
-                  <span className="text-sm font-bold text-primary-container">
-                    학습 주의사항
-                  </span>
-                </div>
-
-                <ul className="space-y-2">
-                  {riskNotes.map((note, index) => (
-                    <li
-                      key={index}
-                      className="flex items-start gap-2 text-sm text-on-surface-variant"
-                    >
-                      <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#FFAB00]/60 shrink-0" />
-                      {note}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="bg-surface-container-lowest rounded-[14px] p-8 text-center border border-outline-variant/10">
-            <span
-              className="material-symbols-outlined text-4xl mb-2 block text-on-surface-variant"
-              aria-hidden="true"
-            >
-              route
-            </span>
-
-            <p className="font-medium text-on-surface-variant mb-2">
-              아직 학습 로드맵이 없습니다.
-            </p>
-
-            {generatingPlan ? (
-              <div className="mt-4 flex flex-col items-center gap-2">
-                <span
-                  className="material-symbols-outlined animate-spin text-2xl text-secondary"
-                  aria-hidden="true"
-                >
-                  progress_activity
-                </span>
-
-                <p className="text-sm text-secondary font-medium">
-                  AI가 맞춤형 로드맵을 생성하고 있어요...
-                </p>
-              </div>
-            ) : planGenerateError ? (
-              <div className="mt-4 space-y-3">
-                <p className="text-sm text-error font-medium">
-                  로드맵 생성에 실패했습니다.
-                </p>
-
-                {topMajorScoreId && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void handleCreatePlan()
-                    }
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-container text-white text-sm font-bold rounded-[12px] hover:opacity-90 transition-opacity"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">
-                      refresh
-                    </span>
-                    다시 시도
+                  {planItems.length === 0 && (
+                    <p className="py-5 text-center text-sm text-on-surface-variant">
+                      로드맵의 주간 항목을 확인할 수 없어요.
+                    </p>
+                  )}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {planItems.map((item, index) => {
+                      const status = item.isCompleted
+                        ? '완료'
+                        : index === firstIncomplete
+                          ? '진행 가능'
+                          : '대기';
+                      return (
+                        <div key={item.id} className="rounded-xl border border-outline-variant/20 bg-surface-container-low p-4">
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold text-secondary">WEEK {item.weekNo}</span>
+                            <span className="text-xs text-on-surface-variant">{status}</span>
+                          </div>
+                          <p className="mb-3 text-sm font-semibold text-primary-container">{item.goal}</p>
+                          {!item.isCompleted && index === firstIncomplete && (
+                            confirmingItemId === item.id ? (
+                              <div className="space-y-2">
+                                <p className="text-xs text-on-surface-variant">이 학습을 완료했나요?</p>
+                                <div className="flex gap-2">
+                                  <button type="button" disabled={completingItemId !== null}
+                                    onClick={() => void completeSelectedItem(item)}
+                                    className="min-h-[44px] flex-1 rounded-lg bg-primary-container px-3 text-xs font-bold text-white disabled:opacity-50">
+                                    {completingItemId === item.id ? '처리 중…' : '완료하기'}
+                                  </button>
+                                  <button type="button" disabled={completingItemId !== null}
+                                    onClick={() => setConfirmingItemId(null)}
+                                    className="min-h-[44px] flex-1 rounded-lg border border-outline-variant/30 px-3 text-xs font-bold">
+                                    취소
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button type="button" onClick={() => setConfirmingItemId(item.id)}
+                                className="min-h-[44px] rounded-lg bg-secondary px-4 text-xs font-bold text-white">
+                                완료
+                              </button>
+                            )
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {riskNotes.length > 0 && (
+                    <div className="mt-5 rounded-xl border border-[#FFAB00]/20 bg-[#FFAB00]/5 p-4">
+                      <h3 className="mb-3 font-bold text-primary-container">학습 주의사항</h3>
+                      <ul className="list-disc space-y-2 pl-5 text-sm text-on-surface-variant">
+                        {riskNotes.map((note, index) => <li key={`${index}-${note}`}>{note}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="rounded-xl bg-surface-container-low p-6 text-center">
+                  <p className="mb-4 text-sm text-on-surface-variant">
+                    {chosenName}의 학습 로드맵이 아직 없습니다.
+                  </p>
+                  <button type="button" onClick={() => void createSelectedPlan()} disabled={generatingPlan}
+                    className="min-h-[44px] rounded-xl bg-primary-container px-6 py-3 text-sm font-bold text-white disabled:opacity-50">
+                    {generatingPlan ? 'AI 로드맵 생성 중…' : '학습 로드맵 생성하기'}
                   </button>
-                )}
-              </div>
-            ) : topMajorScoreId ? (
-              <button
-                type="button"
-                onClick={() =>
-                  void handleCreatePlan()
-                }
-                className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 bg-primary-container text-white text-sm font-bold rounded-[12px] hover:opacity-90 transition-opacity"
-              >
-                <span className="material-symbols-outlined text-[18px]">
-                  auto_awesome
-                </span>
-                학습 로드맵 생성하기
-              </button>
-            ) : (
-              <p className="text-sm text-on-surface-variant/70 mt-1">
-                역량 진단을 완료하면 학습 계획을
-                만들 수 있습니다.
-              </p>
-            )}
-          </div>
+                </div>
+              )}
+              {planError && (
+                <p role="alert" className="mt-4 text-sm font-semibold text-error">
+                  계획을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.
+                </p>
+              )}
+            </section>
+          </>
         )}
-
       </div>
-    </div>
+    </main>
   );
 };
 
