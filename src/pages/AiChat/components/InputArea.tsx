@@ -1,10 +1,11 @@
 import type { SyntheticEvent } from 'react';
 
+// 서비스에 없는 자료(강의 목록, 인터뷰)를 묻는 질문은 두지 않는다
 const quickQuestions = [
-  '추천 강의 리스트 보기',
+  '전공을 고를 때 무엇을 먼저 볼까?',
   '필요한 코딩 역량은?',
   '관련 자격증 추천',
-  '현직자 인터뷰 자료',
+  '관심 전공을 미리 경험해 볼 방법은?',
 ];
 
 interface Props {

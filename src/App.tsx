@@ -32,8 +32,6 @@ import ExplorationPlan from './pages/Analysis/ExplorationPlan';
 import ExplorationShared from './pages/Analysis/ExplorationShared';
 import { isExplorationEnabled } from './config/features';
 import LibraryNotice from './pages/Library/Notice';
-import LibraryContent from './pages/Library/Content';
-import LibraryContentDetail from './pages/Library/Content/Detail';
 import AiChat from './pages/AiChat';
 import MajorExplore from './pages/Analysis/MajorExplore';
 import WeakCapability from './pages/Analysis/WeakCapability';
@@ -94,7 +92,7 @@ const NotFoundPage = () => (
           to="/library"
           className="min-h-[44px] inline-flex items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-lowest font-semibold text-primary-container px-6 py-3"
         >
-          공지사항 및 자료실
+          공지사항
         </Link>
       </div>
     </div>
@@ -386,22 +384,6 @@ const AppLayout = () => {
             element={
               <UserOnlyRoute>
                 <LibraryNotice />
-              </UserOnlyRoute>
-            }
-          />
-          <Route
-            path="/library/content"
-            element={
-              <UserOnlyRoute>
-                <LibraryContent />
-              </UserOnlyRoute>
-            }
-          />
-          <Route
-            path="/library/content/:id"
-            element={
-              <UserOnlyRoute>
-                <LibraryContentDetail />
               </UserOnlyRoute>
             }
           />

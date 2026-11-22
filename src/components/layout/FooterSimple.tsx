@@ -11,14 +11,8 @@ const FooterSimple = () => {
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 md:items-end">
-          <div className="flex gap-8 text-sm">
-            <a href="#" className="transition-colors hover:text-white">이용약관</a>
-            <a href="#" className="transition-colors hover:text-white">개인정보처리방침</a>
-            <a href="#" className="transition-colors hover:text-white">고객센터</a>
-          </div>
-          <p className="text-xs">© 2026 JinroOn. All rights reserved.</p>
-        </div>
+        {/* 연결할 페이지가 없는 링크는 두지 않는다 (메인 푸터와 같은 기준) */}
+        <p className="text-xs">© 2026 JinroOn. All rights reserved.</p>
       </div>
     </footer>
   );
