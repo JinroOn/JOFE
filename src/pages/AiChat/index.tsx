@@ -1,9 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
+import {
+  useState,
+  useEffect,
+  useRef,
+} from 'react';
 import type { SyntheticEvent } from 'react';
+
 import Header from '../../components/layout/Header';
 import type { ChatMessage } from './types';
-import type { ConsultationSession, ConsultationLog } from '../../types/consultation';
-import { getSessions, createSession, getSessionLogs, sendMessage } from '../../api/consultation';
+
+import type {
+  ConsultationSession,
+  ConsultationLog,
+} from '../../types/consultation';
+
+import {
+  getSessions,
+  createSession,
+  getSessionLogs,
+  sendMessage,
+} from '../../api/consultation';
+
 import Sidebar from './components/Sidebar';
 import MessageList from './components/MessageList';
 import InputArea from './components/InputArea';
@@ -27,39 +43,82 @@ const TYPING_MESSAGE: ChatMessage = {
 const AI_ERROR_MESSAGE: ChatMessage = {
   id: -2,
   role: 'assistant',
-  content: '답변을 생성하지 못했어요. 잠시 후 다시 시도해 주세요.',
+  content:
+    '답변을 생성하지 못했어요. 잠시 후 다시 시도해 주세요.',
 };
 
-const logToMessage = (log: ConsultationLog): ChatMessage => ({
+const logToMessage = (
+  log: ConsultationLog,
+): ChatMessage => ({
   id: log.id,
-  role: log.role === 'assistant' ? 'assistant' : 'user',
+  role:
+    log.role === 'assistant'
+      ? 'assistant'
+      : 'user',
   content: log.content,
 });
 
-const makeSessionTitle = (firstMessage?: string): string => {
-  if (firstMessage) return firstMessage.slice(0, 40);
+const makeSessionTitle = (
+  firstMessage?: string,
+): string => {
+  if (firstMessage) {
+    return firstMessage.slice(0, 40);
+  }
+
   const now = new Date();
-  return `상담 ${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  return (
+    `상담 ${now.getMonth() + 1}/${now.getDate()} ` +
+    `${String(now.getHours()).padStart(2, '0')}:` +
+    `${String(now.getMinutes()).padStart(2, '0')}`
+  );
 };
 
 const AiChat = () => {
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
-  const [sessions, setSessions] = useState<ConsultationSession[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [navVisible, setNavVisible] = useState(false);
-  const [loadingInit, setLoadingInit] = useState(true);
-  const [loadingLogs, setLoadingLogs] = useState(false);
-  const [sending, setSending] = useState(false);
-  const navTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [messages, setMessages] =
+    useState<ChatMessage[]>([WELCOME_MESSAGE]);
 
-  const loadSessionLogs = async (sessionId: number) => {
+  const [sessions, setSessions] =
+    useState<ConsultationSession[]>([]);
+
+  const [activeSessionId, setActiveSessionId] =
+    useState<number | null>(null);
+
+  const [sidebarOpen, setSidebarOpen] =
+    useState(true);
+
+  const [navVisible, setNavVisible] =
+    useState(false);
+
+  const [loadingInit, setLoadingInit] =
+    useState(true);
+
+  const [loadingLogs, setLoadingLogs] =
+    useState(false);
+
+  const [sending, setSending] =
+    useState(false);
+
+  const navTimer = useRef<
+    ReturnType<typeof setTimeout> | undefined
+  >(undefined);
+
+  const loadSessionLogs = async (
+    sessionId: number,
+  ) => {
     setLoadingLogs(true);
     setActiveSessionId(sessionId);
+
     try {
-      const logs = await getSessionLogs(sessionId);
-      setMessages(logs.length > 0 ? logs.map(logToMessage) : [WELCOME_MESSAGE]);
+      const logs =
+        await getSessionLogs(sessionId);
+
+      setMessages(
+        logs.length > 0
+          ? logs.map(logToMessage)
+          : [WELCOME_MESSAGE],
+      );
     } catch {
       setMessages([WELCOME_MESSAGE]);
     } finally {
@@ -72,25 +131,37 @@ const AiChat = () => {
       try {
         const list = await getSessions();
         setSessions(list);
+
         if (list.length > 0) {
           const latest = [...list].sort(
-            (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+            (a, b) =>
+              new Date(b.startedAt).getTime() -
+              new Date(a.startedAt).getTime(),
           )[0];
+
           await loadSessionLogs(latest.id);
         }
       } catch {
-        // keep welcome message on error
+        // 오류가 나면 환영 메시지를 유지합니다.
       } finally {
         setLoadingInit(false);
       }
     };
-    load();
+
+    void load();
   }, []);
 
   const handleNewChat = async () => {
     try {
-      const session = await createSession({ title: makeSessionTitle() });
-      setSessions((prev) => [session, ...prev]);
+      const session = await createSession({
+        title: makeSessionTitle(),
+      });
+
+      setSessions((previous) => [
+        session,
+        ...previous,
+      ]);
+
       setActiveSessionId(session.id);
       setMessages([WELCOME_MESSAGE]);
       setMessage('');
@@ -107,16 +178,35 @@ const AiChat = () => {
   };
 
   const hideNav = () => {
-    navTimer.current = setTimeout(() => setNavVisible(false), 400);
+    navTimer.current = setTimeout(
+      () => setNavVisible(false),
+      400,
+    );
   };
 
-  const handleSubmit = async (event: SyntheticEvent<HTMLFormElement>) => {
+  const handleSubmit = async (
+    event: SyntheticEvent<HTMLFormElement>,
+  ) => {
     event.preventDefault();
-    const trimmed = message.trim();
-    if (!trimmed || sending) return;
 
-    const userMsg: ChatMessage = { id: Date.now(), role: 'user', content: trimmed };
-    setMessages((prev) => [...prev.filter((m) => m.id !== 0), userMsg, TYPING_MESSAGE]);
+    const trimmed = message.trim();
+
+    if (!trimmed || sending) {
+      return;
+    }
+
+    const userMsg: ChatMessage = {
+      id: Date.now(),
+      role: 'user',
+      content: trimmed,
+    };
+
+    setMessages((previous) => [
+      ...previous.filter((item) => item.id !== 0),
+      userMsg,
+      TYPING_MESSAGE,
+    ]);
+
     setMessage('');
     setSending(true);
 
@@ -124,19 +214,35 @@ const AiChat = () => {
       let sessionId = activeSessionId;
 
       if (!sessionId) {
-        const session = await createSession({ title: makeSessionTitle(trimmed) });
-        setSessions((prev) => [session, ...prev]);
+        const session = await createSession({
+          title: makeSessionTitle(trimmed),
+        });
+
+        setSessions((previous) => [
+          session,
+          ...previous,
+        ]);
+
         sessionId = session.id;
         setActiveSessionId(session.id);
       }
 
-      const { assistantLog } = await sendMessage(sessionId, trimmed);
-      setMessages((prev) => [
-        ...prev.filter((m) => m.id !== TYPING_MESSAGE_ID),
+      const { assistantLog } =
+        await sendMessage(sessionId, trimmed);
+
+      setMessages((previous) => [
+        ...previous.filter(
+          (item) => item.id !== TYPING_MESSAGE_ID,
+        ),
         logToMessage(assistantLog),
       ]);
     } catch {
-      setMessages((prev) => [...prev.filter((m) => m.id !== TYPING_MESSAGE_ID), AI_ERROR_MESSAGE]);
+      setMessages((previous) => [
+        ...previous.filter(
+          (item) => item.id !== TYPING_MESSAGE_ID,
+        ),
+        AI_ERROR_MESSAGE,
+      ]);
     } finally {
       setSending(false);
     }
@@ -144,10 +250,16 @@ const AiChat = () => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface">
-      <div className="fixed inset-x-0 top-0 z-[101] h-2" onMouseEnter={showNav} />
+      <div
+        className="fixed inset-x-0 top-0 z-[101] h-2"
+        onMouseEnter={showNav}
+      />
+
       <div
         className={`fixed inset-x-0 top-0 z-[100] transition-transform duration-300 ${
-          navVisible ? 'translate-y-0' : '-translate-y-full'
+          navVisible
+            ? 'translate-y-0'
+            : '-translate-y-full'
         }`}
         onMouseEnter={showNav}
         onMouseLeave={hideNav}
@@ -167,37 +279,67 @@ const AiChat = () => {
         <div className="flex shrink-0 items-center justify-between border-b border-outline-variant/10 px-4 py-4 md:px-6">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
+              type="button"
+              aria-label={
+                sidebarOpen
+                  ? '상담 목록 접기'
+                  : '상담 목록 펼치기'
+              }
+              onClick={() =>
+                setSidebarOpen(!sidebarOpen)
+              }
               className="hidden lg:flex p-2 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high transition-all"
             >
               <span className="material-symbols-outlined">
-                {sidebarOpen ? 'menu_open' : 'menu'}
+                {sidebarOpen
+                  ? 'menu_open'
+                  : 'menu'}
               </span>
             </button>
+
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-white shadow-md">
-              <span className="material-symbols-outlined text-[22px]">smart_toy</span>
+              <span className="material-symbols-outlined text-[22px]">
+                smart_toy
+              </span>
             </div>
+
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-extrabold text-on-surface">JinroOn AI 진로 컨설턴트</h1>
+                <h1 className="text-base font-extrabold text-on-surface">
+                  JinroOn AI 진로 컨설턴트
+                </h1>
                 <span className="h-2 w-2 rounded-full bg-green-500" />
               </div>
-              <p className="text-xs text-outline">언제든 궁금한 진로 질문을 던져보세요.</p>
+
+              <p className="text-xs text-outline">
+                언제든 궁금한 진로 질문을 던져보세요.
+              </p>
             </div>
           </div>
+
+          {/* 새 상담 버튼만 유지, 작동하지 않는 ⋮ 버튼 제거 */}
           <div className="flex items-center gap-3 text-outline">
-            <button className="transition hover:text-on-surface" onClick={handleNewChat}>
-              <span className="material-symbols-outlined">add_comment</span>
-            </button>
-            <button className="transition hover:text-on-surface">
-              <span className="material-symbols-outlined">more_vert</span>
+            <button
+              type="button"
+              aria-label="새 상담 시작"
+              className="transition hover:text-on-surface"
+              onClick={() => void handleNewChat()}
+            >
+              <span
+                className="material-symbols-outlined"
+                aria-hidden="true"
+              >
+                add_comment
+              </span>
             </button>
           </div>
         </div>
 
         {loadingInit || loadingLogs ? (
           <div className="flex flex-1 items-center justify-center">
-            <span className="text-sm text-on-surface-variant animate-pulse">불러오는 중...</span>
+            <span className="text-sm text-on-surface-variant animate-pulse">
+              불러오는 중...
+            </span>
           </div>
         ) : (
           <MessageList messages={messages} />
