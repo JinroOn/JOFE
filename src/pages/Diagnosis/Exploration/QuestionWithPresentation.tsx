@@ -1,14 +1,21 @@
+
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+
 import {
   createMutationId,
   getExplorationSession,
 } from '../../../api/exploration';
+
 import api from '../../../api/axios';
 import { isExplorationMock } from '../../../config/features';
 import useExplorationStore from '../../../store/useExplorationStore';
-import type { ExplorationSessionDetail } from '../../../types/exploration';
+
+import type {
+  ExplorationSessionDetail,
+} from '../../../types/exploration';
+
 import ExplorationQuestion from './Question';
 import StageStepper from './Question/components/StageStepper';
 
@@ -54,13 +61,18 @@ interface PendingRequest {
   unfamiliar: string[];
 }
 
+interface ConfirmedPresentation {
+  sessionId: number;
+  checkpointId: number;
+}
+
 const primaryBtn =
   'min-h-[44px] rounded-lg bg-primary-container px-6 py-3 font-bold text-white disabled:opacity-50';
 
 const secondaryBtn =
   'min-h-[44px] rounded-lg border border-outline-variant px-5 py-3 font-semibold text-primary-container bg-surface-container-lowest';
 
-// 서버가 실제로 제시한 후보 코드와 체크포인트만 사용합니다.
+// 서버가 실제로 제시한 체크포인트와 후보 코드만 사용합니다.
 const parseCheckpoint = (
   value: unknown,
 ): CandidateCheckpoint | null => {
@@ -157,6 +169,28 @@ const parseCheckpoint = (
   };
 };
 
+// 후보 저장이 성공했지만 최신 문항을 아직
+// 불러오는 중일 때 표시할 화면입니다.
+const QuestionPreparation = () => (
+  <div className="min-h-screen bg-surface">
+    <div className="mx-auto w-full max-w-[760px] px-4 pb-24 pt-8 sm:px-8">
+      <div className="mb-8">
+        <StageStepper stage={2} />
+      </div>
+
+      <section className="cloud-shadow rounded-brand border border-outline-variant/20 bg-surface-container-lowest p-6 sm:p-10">
+        <p
+          role="status"
+          className="text-sm text-on-surface-variant"
+        >
+          후보 반응을 저장했습니다.
+          다음 질문을 불러오는 중이에요…
+        </p>
+      </section>
+    </div>
+  </div>
+);
+
 const QuestionWithPresentation = () => {
   const { sessionId } = useParams();
   const navigate = useNavigate();
@@ -169,6 +203,12 @@ const QuestionWithPresentation = () => {
 
   const phase = useExplorationStore(
     (state) => state.phase,
+  );
+
+  // 수정 1:
+  // /next 응답을 기다리는 동안 SAVING 상태를 확인합니다.
+  const saveState = useExplorationStore(
+    (state) => state.saveState,
   );
 
   const reloadLatest = useExplorationStore(
@@ -191,15 +231,31 @@ const QuestionWithPresentation = () => {
   const [error, setError] =
     useState<string | null>(null);
 
-  // 응답을 받지 못한 요청은 동일한 키와 본문으로 재시도합니다.
-  const pendingRequest = useRef<PendingRequest | null>(
+  // 수정 2:
+  // 서버의 USER_REPORTED 확인 또는
+  // PUT /presentation 성공 이후에만 완료 상태를 저장합니다.
+  //
+  // 이 상태는 revision과 분리되어 있습니다.
+  // 따라서 2단계 문항 저장으로 revision이 증가해도
+  // 후보 화면으로 돌아가지 않습니다.
+  const [
+    confirmedPresentation,
+    setConfirmedPresentation,
+  ] = useState<ConfirmedPresentation | null>(
     null,
   );
 
-  // 상태 업데이트 이전에 발생하는 연속 클릭도 차단합니다.
+  // 응답을 받지 못한 요청은
+  // 동일한 멱등 키와 본문으로 재시도합니다.
+  const pendingRequest =
+    useRef<PendingRequest | null>(null);
+
+  // React 상태 업데이트 이전에 들어오는
+  // 연속 클릭도 차단합니다.
   const submittingRef = useRef(false);
 
-  const validId = Number.isSafeInteger(id) && id > 0;
+  const validId =
+    Number.isSafeInteger(id) && id > 0;
 
   const stageTwo =
     !isExplorationMock &&
@@ -218,8 +274,27 @@ const QuestionWithPresentation = () => {
       ? session.revision
       : null;
 
+  // 수정 3:
+  // 후보 확인 완료 여부는 saveState와 관계없습니다.
+  // 2단계 문항을 저장할 때 SAVING으로 바뀌어도
+  // confirmedForSession은 그대로 true입니다.
+  const confirmedForSession =
+    stageTwo &&
+    confirmedPresentation?.sessionId === id;
+
+  const preparingNext =
+    saveState === 'SAVING';
+
   useEffect(() => {
-    if (!stageTwo || revision === null) {
+    // 수정 4:
+    // 이미 후보 반응이 서버에 저장되었다면
+    // 이후 문항 저장으로 revision이 증가해도
+    // 후보 정보를 다시 조회하지 않습니다.
+    if (
+      !stageTwo ||
+      revision === null ||
+      confirmedForSession
+    ) {
       return;
     }
 
@@ -230,18 +305,22 @@ const QuestionWithPresentation = () => {
         if (!active) return;
 
         // 다른 창에서 회차가 먼저 변경되었을 수 있습니다.
-        if (detail.session.revision !== revision) {
+        if (
+          detail.session.revision !== revision
+        ) {
           setProbe({
             sessionId: id,
             revision,
             kind: 'STALE',
           });
+
           return;
         }
 
-        const response = detail as ExplorationSessionDetail & {
-          fixedCandidates?: unknown;
-        };
+        const response =
+          detail as ExplorationSessionDetail & {
+            fixedCandidates?: unknown;
+          };
 
         const checkpoint = parseCheckpoint(
           response.fixedCandidates,
@@ -253,6 +332,24 @@ const QuestionWithPresentation = () => {
             revision,
             kind: 'ERROR',
           });
+
+          return;
+        }
+
+        // 이어하기 등으로 들어왔을 때
+        // 서버가 이미 후보 반응 제출을 확인했다면
+        // 후보 화면을 거치지 않고 문항 화면으로 이동합니다.
+        if (
+          checkpoint.presentation.source ===
+          'USER_REPORTED'
+        ) {
+          pendingRequest.current = null;
+
+          setConfirmedPresentation({
+            sessionId: id,
+            checkpointId: checkpoint.checkpointId,
+          });
+
           return;
         }
 
@@ -276,10 +373,34 @@ const QuestionWithPresentation = () => {
     return () => {
       active = false;
     };
-  }, [id, stageTwo, revision, refreshVersion]);
+  }, [
+    id,
+    stageTwo,
+    revision,
+    refreshVersion,
+    confirmedForSession,
+  ]);
 
-  // 1단계·3단계 및 Mock 모드는 기존 질문 화면을 그대로 사용합니다.
+  // 1단계, 3단계, Mock 모드,
+  // 진행 중이 아닌 회차는 기존 질문 화면을 사용합니다.
   if (!stageTwo || revision === null) {
+    return <ExplorationQuestion />;
+  }
+
+  // 수정 5: 화면 깜빡임 방지 핵심
+  //
+  // 후보 반응 저장이 확인된 회차에서는
+  // revision 또는 saveState가 바뀌어도
+  // 후보 화면으로 다시 돌아가지 않습니다.
+  //
+  // presentation 저장 직후에는 최신 문항 동기화가
+  // 끝날 때까지 준비 화면을 표시해
+  // 오래된 revision으로 답변하지 못하게 합니다.
+  if (confirmedForSession) {
+    if (saving || syncing) {
+      return <QuestionPreparation />;
+    }
+
     return <ExplorationQuestion />;
   }
 
@@ -294,19 +415,14 @@ const QuestionWithPresentation = () => {
       ? current.checkpoint
       : null;
 
-  // 이미 반응을 제출한 체크포인트는 중복 입력받지 않습니다.
-  if (
-    checkpoint?.presentation.source === 'USER_REPORTED'
-  ) {
-    return <ExplorationQuestion />;
-  }
-
   const selected: Selection =
     checkpoint &&
-    selection?.checkpointId === checkpoint.checkpointId
+    selection?.checkpointId ===
+      checkpoint.checkpointId
       ? selection
       : {
-          checkpointId: checkpoint?.checkpointId ?? 0,
+          checkpointId:
+            checkpoint?.checkpointId ?? 0,
           unexpected: [],
           unfamiliar: [],
         };
@@ -315,16 +431,28 @@ const QuestionWithPresentation = () => {
     navigate('/diagnosis/exploration');
 
   const syncLatest = async () => {
-    if (syncing || saving) return;
+    if (
+      syncing ||
+      saving ||
+      submittingRef.current ||
+      useExplorationStore.getState().saveState ===
+        'SAVING'
+    ) {
+      return;
+    }
 
     pendingRequest.current = null;
+
     setSyncing(true);
     setError(null);
 
     try {
       await reloadLatest();
     } finally {
-      setRefreshVersion((previous) => previous + 1);
+      setRefreshVersion(
+        (previous) => previous + 1,
+      );
+
       setSyncing(false);
     }
   };
@@ -333,7 +461,14 @@ const QuestionWithPresentation = () => {
     kind: 'unexpected' | 'unfamiliar',
     majorCode: string,
   ) => {
-    if (!checkpoint || saving || syncing) return;
+    if (
+      !checkpoint ||
+      saving ||
+      syncing ||
+      preparingNext
+    ) {
+      return;
+    }
 
     const allowed = new Set(
       checkpoint.presentation.shownMajorCodes,
@@ -341,16 +476,20 @@ const QuestionWithPresentation = () => {
 
     if (!allowed.has(majorCode)) return;
 
-    // 선택이 달라지면 이전 실패 요청의 멱등 키는 사용하지 않습니다.
+    // 선택이 달라지면 이전 실패 요청의
+    // 멱등 키는 사용하지 않습니다.
     pendingRequest.current = null;
+
     setError(null);
 
     setSelection((previous) => {
       const base: Selection =
-        previous?.checkpointId === checkpoint.checkpointId
+        previous?.checkpointId ===
+        checkpoint.checkpointId
           ? previous
           : {
-              checkpointId: checkpoint.checkpointId,
+              checkpointId:
+                checkpoint.checkpointId,
               unexpected: [],
               unfamiliar: [],
             };
@@ -358,7 +497,9 @@ const QuestionWithPresentation = () => {
       const existing = base[kind];
 
       const next = existing.includes(majorCode)
-        ? existing.filter((code) => code !== majorCode)
+        ? existing.filter(
+            (code) => code !== majorCode,
+          )
         : existing.length < 7
           ? [...existing, majorCode]
           : existing;
@@ -371,16 +512,26 @@ const QuestionWithPresentation = () => {
   };
 
   const submit = async () => {
+    // 수정 6:
+    // 렌더링 시점의 값이 아니라
+    // 제출 시점의 최신 Zustand 상태를 확인합니다.
+    //
+    // /next 요청이 아직 처리 중이면
+    // PUT /presentation을 실행하지 않습니다.
+    const latestState =
+      useExplorationStore.getState();
+
     if (
       !checkpoint ||
       saving ||
       syncing ||
-      submittingRef.current
+      submittingRef.current ||
+      latestState.saveState === 'SAVING'
     ) {
       return;
     }
 
-    const latest = useExplorationStore.getState().session;
+    const latest = latestState.session;
 
     if (
       latest?.sessionId !== id ||
@@ -391,6 +542,7 @@ const QuestionWithPresentation = () => {
       setError(
         '검사 정보가 변경되었습니다. 최신 회차를 확인해주세요.',
       );
+
       await syncLatest();
       return;
     }
@@ -417,6 +569,7 @@ const QuestionWithPresentation = () => {
       setError(
         '현재 제시된 후보만 최대 7개까지 선택할 수 있어요.',
       );
+
       return;
     }
 
@@ -425,7 +578,8 @@ const QuestionWithPresentation = () => {
     const sameRequest =
       previous?.sessionId === id &&
       previous.expectedRevision === revision &&
-      previous.checkpointId === checkpoint.checkpointId &&
+      previous.checkpointId ===
+        checkpoint.checkpointId &&
       JSON.stringify(previous.unexpected) ===
         JSON.stringify(unexpected) &&
       JSON.stringify(previous.unfamiliar) ===
@@ -438,7 +592,8 @@ const QuestionWithPresentation = () => {
             key: createMutationId(),
             sessionId: id,
             expectedRevision: revision,
-            checkpointId: checkpoint.checkpointId,
+            checkpointId:
+              checkpoint.checkpointId,
             unexpected,
             unfamiliar,
           };
@@ -453,10 +608,14 @@ const QuestionWithPresentation = () => {
       await api.put(
         `/exploration/v1/sessions/${id}/presentation`,
         {
-          expectedRevision: request.expectedRevision,
-          checkpointId: request.checkpointId,
-          unexpected: request.unexpected,
-          unfamiliar: request.unfamiliar,
+          expectedRevision:
+            request.expectedRevision,
+          checkpointId:
+            request.checkpointId,
+          unexpected:
+            request.unexpected,
+          unfamiliar:
+            request.unfamiliar,
         },
         {
           headers: {
@@ -465,22 +624,34 @@ const QuestionWithPresentation = () => {
         },
       );
 
-      // 서버에 반영된 뒤 최신 revision과 조건부 질문을 다시 조회합니다.
       pendingRequest.current = null;
 
+      // 수정 7:
+      // 서버가 후보 반응 저장을 승인한 사실을
+      // 최신 문항 재조회 전에 먼저 기록합니다.
+      //
+      // 이후 reloadLatest로 revision이 바뀌어도
+      // 후보 확인 화면이 다시 나타나지 않습니다.
+      setConfirmedPresentation({
+        sessionId: id,
+        checkpointId: request.checkpointId,
+      });
+
+      // 다음 질문은 반드시 최신 revision으로 불러옵니다.
       await reloadLatest();
 
       setRefreshVersion(
-        (previousVersion) => previousVersion + 1,
+        (previous) => previous + 1,
       );
     } catch (caught) {
-      const status = axios.isAxiosError(caught)
-        ? caught.response?.status
-        : undefined;
+      const status =
+        axios.isAxiosError(caught)
+          ? caught.response?.status
+          : undefined;
 
       if (status === 409 || status === 422) {
-        // revision 충돌 또는 유효하지 않은 후보.
-        // 오래된 요청을 버리고 Zustand까지 최신화합니다.
+        // 기존 충돌 복구 동작 유지:
+        // 오래된 요청을 버리고 서버 최신 상태를 조회합니다.
         pendingRequest.current = null;
 
         setError(
@@ -493,12 +664,14 @@ const QuestionWithPresentation = () => {
           await reloadLatest();
         } finally {
           setRefreshVersion(
-            (previousVersion) => previousVersion + 1,
+            (previous) => previous + 1,
           );
+
           setSyncing(false);
         }
       } else {
-        // 응답 유실 가능성이 있으므로 동일한 키로 재시도할 수 있습니다.
+        // 서버 응답 유실 가능성이 있으므로
+        // 동일한 멱등 키와 본문으로 재시도합니다.
         setError(
           '후보 반응을 저장하지 못했어요. 같은 내용으로 다시 시도할 수 있어요.',
         );
@@ -517,17 +690,17 @@ const QuestionWithPresentation = () => {
 
   return (
     <div className="min-h-screen bg-surface">
-      <div className="max-w-[760px] w-full mx-auto px-4 sm:px-8 pt-8 pb-24">
+      <div className="mx-auto w-full max-w-[760px] px-4 pb-24 pt-8 sm:px-8">
         <div className="mb-8">
           <StageStepper stage={2} />
         </div>
 
-        <section className="rounded-brand bg-surface-container-lowest border border-outline-variant/20 p-6 sm:p-10 cloud-shadow">
-          <p className="text-xs font-bold text-secondary mb-3">
+        <section className="cloud-shadow rounded-brand border border-outline-variant/20 bg-surface-container-lowest p-6 sm:p-10">
+          <p className="mb-3 text-xs font-bold text-secondary">
             2단계 · 후보 확인
           </p>
 
-          <h1 className="text-xl sm:text-2xl font-bold text-primary-container mb-4">
+          <h1 className="mb-4 text-xl font-bold text-primary-container sm:text-2xl">
             지금 제시된 전공을 살펴봐 주세요
           </h1>
 
@@ -542,7 +715,7 @@ const QuestionWithPresentation = () => {
 
           {failed && (
             <div role="alert">
-              <p className="text-sm text-on-surface-variant mb-5">
+              <p className="mb-5 text-sm text-on-surface-variant">
                 {current.kind === 'STALE'
                   ? '다른 창에서 검사 정보가 변경되었어요. 최신 상태를 불러와 주세요.'
                   : '후보 정보를 불러오지 못했어요. 다시 확인해주세요.'}
@@ -551,34 +724,41 @@ const QuestionWithPresentation = () => {
               <button
                 type="button"
                 className={primaryBtn}
-                disabled={syncing}
+                disabled={
+                  syncing ||
+                  saving ||
+                  preparingNext
+                }
                 onClick={() => {
                   void syncLatest();
                 }}
               >
                 {syncing
                   ? '최신 상태 확인 중…'
-                  : '최신 상태 불러오기'}
+                  : preparingNext
+                    ? '다음 질문 준비 중…'
+                    : '최신 상태 불러오기'}
               </button>
             </div>
           )}
 
           {checkpoint && (
             <>
-              <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
+              <p className="mb-6 text-sm leading-relaxed text-on-surface-variant">
                 예상과 달랐던 전공이나 아직 낯선 전공을
                 선택할 수 있어요.
                 선택하지 않고 넘어가도 괜찮습니다.
-                이 반응은 후보 점수나 추천 순위를 변경하지 않습니다.
+                이 반응은 후보 점수나 추천 순위를
+                변경하지 않습니다.
               </p>
 
               {checkpoint.shownCandidates.length === 0 ? (
-                <p className="rounded-xl bg-surface-container-low p-5 text-sm text-on-surface-variant mb-6">
+                <p className="mb-6 rounded-xl bg-surface-container-low p-5 text-sm text-on-surface-variant">
                   현재 제시된 후보가 없습니다.
                   확인 후 다음 질문을 진행할 수 있어요.
                 </p>
               ) : (
-                <div className="space-y-3 mb-6">
+                <div className="mb-6 space-y-3">
                   {checkpoint.shownCandidates.map(
                     (major) => {
                       const unexpected =
@@ -596,16 +776,20 @@ const QuestionWithPresentation = () => {
                           key={major.majorCode}
                           className="rounded-xl border border-outline-variant/30 p-4"
                         >
-                          <h2 className="font-bold text-primary-container mb-3">
+                          <h2 className="mb-3 font-bold text-primary-container">
                             {major.majorName}
                           </h2>
 
                           <div className="flex flex-wrap gap-4">
-                            <label className="inline-flex min-h-[44px] items-center gap-2 text-sm text-on-surface-variant cursor-pointer">
+                            <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 text-sm text-on-surface-variant">
                               <input
                                 type="checkbox"
                                 checked={unexpected}
-                                disabled={saving || syncing}
+                                disabled={
+                                  saving ||
+                                  syncing ||
+                                  preparingNext
+                                }
                                 onChange={() =>
                                   toggle(
                                     'unexpected',
@@ -614,14 +798,19 @@ const QuestionWithPresentation = () => {
                                 }
                                 className="h-5 w-5 accent-secondary"
                               />
+
                               예상과 달랐어요
                             </label>
 
-                            <label className="inline-flex min-h-[44px] items-center gap-2 text-sm text-on-surface-variant cursor-pointer">
+                            <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 text-sm text-on-surface-variant">
                               <input
                                 type="checkbox"
                                 checked={unfamiliar}
-                                disabled={saving || syncing}
+                                disabled={
+                                  saving ||
+                                  syncing ||
+                                  preparingNext
+                                }
                                 onChange={() =>
                                   toggle(
                                     'unfamiliar',
@@ -630,6 +819,7 @@ const QuestionWithPresentation = () => {
                                 }
                                 className="h-5 w-5 accent-secondary"
                               />
+
                               아직 낯설어요
                             </label>
                           </div>
@@ -640,10 +830,12 @@ const QuestionWithPresentation = () => {
                 </div>
               )}
 
-              <p className="text-xs text-on-surface-variant mb-5">
-                예상과 다른 후보 {selected.unexpected.length}개
+              <p className="mb-5 text-xs text-on-surface-variant">
+                예상과 다른 후보{' '}
+                {selected.unexpected.length}개
                 {' · '}
-                낯선 후보 {selected.unfamiliar.length}개
+                낯선 후보{' '}
+                {selected.unfamiliar.length}개
               </p>
 
               {error && (
@@ -655,17 +847,24 @@ const QuestionWithPresentation = () => {
                 </p>
               )}
 
+              {/* /next 응답 대기 중 확인 버튼 비활성화 */}
               <button
                 type="button"
                 onClick={() => {
                   void submit();
                 }}
-                disabled={saving || syncing}
+                disabled={
+                  saving ||
+                  syncing ||
+                  preparingNext
+                }
                 className={`${primaryBtn} w-full`}
               >
-                {saving || syncing
-                  ? '반응을 저장하고 질문을 준비하는 중…'
-                  : '확인하고 다음 질문으로'}
+                {preparingNext
+                  ? '다음 질문 준비 중…'
+                  : saving || syncing
+                    ? '반응을 저장하고 질문을 준비하는 중…'
+                    : '확인하고 다음 질문으로'}
               </button>
             </>
           )}
