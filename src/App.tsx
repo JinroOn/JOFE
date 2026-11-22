@@ -1,6 +1,13 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import type { ReactNode } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Link, useLocation, useNavigationType } from 'react-router-dom';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  Link,
+  useLocation,
+} from 'react-router-dom';
 import useAuthStore from './store/useAuthStore';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
@@ -41,7 +48,6 @@ import SharedResult from './pages/Analysis/SharedResult';
 import ErrorPage from './pages/Error';
 import SessionModal from './pages/Auth/components/SessionModal';
 
-// 없는 주소에 대한 사용자용 안내 화면
 const NotFoundPage = () => (
   <main className="w-full min-h-[60vh] flex items-center justify-center px-4 py-16">
     <div className="w-full max-w-lg text-center">
@@ -79,7 +85,6 @@ const NotFoundPage = () => (
           >
             home
           </span>
-
           홈으로 돌아가기
         </Link>
 
@@ -94,118 +99,383 @@ const NotFoundPage = () => (
   </main>
 );
 
-const AdminRedirect = ({ children }: { children: ReactNode }) => {
+const AdminRedirect = ({
+  children,
+}: {
+  children: ReactNode;
+}) => {
   const { user } = useAuthStore();
-  if (user?.role === 'admin') return <Navigate to="/admin" replace />;
+
+  if (user?.role === 'admin') {
+    return <Navigate to="/admin" replace />;
+  }
+
   return <>{children}</>;
 };
 
-const UserOnlyRoute = ({ children }: { children: ReactNode }) => {
+const UserOnlyRoute = ({
+  children,
+}: {
+  children: ReactNode;
+}) => {
   const { isLoggedIn, user } = useAuthStore();
-  if (!isLoggedIn) return <Navigate to="/auth/login" replace />;
-  if (user?.role === 'admin') return <Navigate to="/admin" replace />;
+
+  if (!isLoggedIn) {
+    return <Navigate to="/auth/login" replace />;
+  }
+
+  if (user?.role === 'admin') {
+    return <Navigate to="/admin" replace />;
+  }
+
   return <>{children}</>;
 };
 
-const AdminOnlyRoute = ({ children }: { children: ReactNode }) => {
+const AdminOnlyRoute = ({
+  children,
+}: {
+  children: ReactNode;
+}) => {
   const { isLoggedIn, user } = useAuthStore();
-  if (!isLoggedIn) return <Navigate to="/auth/login" replace />;
-  if (user?.role !== 'admin') return <Navigate to="/" replace />;
+
+  if (!isLoggedIn) {
+    return <Navigate to="/auth/login" replace />;
+  }
+
+  if (user?.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+
   return <>{children}</>;
 };
 
 const AppLayout = () => {
   const location = useLocation();
-  const navigationType = useNavigationType();
-  const sessionExpired = useAuthStore((s) => s.sessionExpired);
 
-  // 새 화면으로 이동하면 맨 위에서 시작한다. 뒤로 가기(POP)는 브라우저의 위치 복원에 맡긴다.
-  useEffect(() => {
-    if (navigationType !== 'POP') window.scrollTo(0, 0);
-  }, [location.pathname, navigationType]);
-  const setSessionExpired = useAuthStore((s) => s.setSessionExpired);
-  const isAuthPage = location.pathname.startsWith('/auth');
+  const sessionExpired = useAuthStore(
+    (state) => state.sessionExpired,
+  );
+  const setSessionExpired = useAuthStore(
+    (state) => state.setSessionExpired,
+  );
+
+  const isAuthPage =
+    location.pathname.startsWith('/auth');
   const isMainPage = location.pathname === '/';
-  const isLoadingPage = location.pathname === '/diagnosis/loading';
+  const isLoadingPage =
+    location.pathname === '/diagnosis/loading';
   const isChatPage = location.pathname === '/ai-chat';
-  const isAdminPage = location.pathname.startsWith('/admin');
+  const isAdminPage =
+    location.pathname.startsWith('/admin');
+
+  // 추가: 페이지 경로가 바뀔 때 이전 스크롤 위치 초기화
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   return (
     <div className="flex flex-col min-h-screen">
-      {!isAuthPage && !isLoadingPage && !isChatPage && !isAdminPage && <Header />}
+      {!isAuthPage &&
+        !isLoadingPage &&
+        !isChatPage &&
+        !isAdminPage && <Header />}
+
       <div className="flex-grow flex flex-col">
         <Routes>
-          <Route path="/" element={<AdminRedirect><Home /><Footer /></AdminRedirect>} />
+          <Route
+            path="/"
+            element={
+              <AdminRedirect>
+                <Home />
+                <Footer />
+              </AdminRedirect>
+            }
+          />
+
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/signup" element={<Signup />} />
-          <Route path="/auth/find-password" element={<FindPassword />} />
-          <Route path="/diagnosis" element={<UserOnlyRoute><DiagnosisIntro /></UserOnlyRoute>} />
-          <Route path="/diagnosis/basic-info" element={<UserOnlyRoute><DiagnosisMajor /></UserOnlyRoute>} />
-          <Route path="/diagnosis/tendency" element={<UserOnlyRoute><DiagnosisTendency /></UserOnlyRoute>} />
-          <Route path="/diagnosis/loading" element={<UserOnlyRoute><DiagnosisLoading /></UserOnlyRoute>} />
-          <Route path="/diagnosis/quiz" element={<UserOnlyRoute><DiagnosisQuiz /></UserOnlyRoute>} />
+          <Route
+            path="/auth/find-password"
+            element={<FindPassword />}
+          />
+
+          <Route
+            path="/diagnosis"
+            element={
+              <UserOnlyRoute>
+                <DiagnosisIntro />
+              </UserOnlyRoute>
+            }
+          />
+          <Route
+            path="/diagnosis/basic-info"
+            element={
+              <UserOnlyRoute>
+                <DiagnosisMajor />
+              </UserOnlyRoute>
+            }
+          />
+          <Route
+            path="/diagnosis/tendency"
+            element={
+              <UserOnlyRoute>
+                <DiagnosisTendency />
+              </UserOnlyRoute>
+            }
+          />
+          <Route
+            path="/diagnosis/loading"
+            element={
+              <UserOnlyRoute>
+                <DiagnosisLoading />
+              </UserOnlyRoute>
+            }
+          />
+          <Route
+            path="/diagnosis/quiz"
+            element={
+              <UserOnlyRoute>
+                <DiagnosisQuiz />
+              </UserOnlyRoute>
+            }
+          />
+
           <Route
             path="/diagnosis/exploration"
-            element={isExplorationEnabled ? <UserOnlyRoute><ExplorationIntro /></UserOnlyRoute> : <Navigate to="/diagnosis" replace />}
+            element={
+              isExplorationEnabled ? (
+                <UserOnlyRoute>
+                  <ExplorationIntro />
+                </UserOnlyRoute>
+              ) : (
+                <Navigate to="/diagnosis" replace />
+              )
+            }
           />
+
           <Route
             path="/diagnosis/exploration/session/:sessionId"
-            element={isExplorationEnabled ? <UserOnlyRoute><ExplorationQuestion /></UserOnlyRoute> : <Navigate to="/diagnosis" replace />}
+            element={
+              isExplorationEnabled ? (
+                <UserOnlyRoute>
+                  <ExplorationQuestion />
+                </UserOnlyRoute>
+              ) : (
+                <Navigate to="/diagnosis" replace />
+              )
+            }
           />
-          <Route path="/diagnosis/explore" element={<UserOnlyRoute><MajorExplore /></UserOnlyRoute>} />
-          <Route path="/analysis/weak" element={<UserOnlyRoute><WeakCapability /></UserOnlyRoute>} />
-          <Route path="/analysis/dashboard" element={<UserOnlyRoute><ResultHome /></UserOnlyRoute>} />
-          <Route path="/analysis/compare" element={<UserOnlyRoute><MajorCompare /></UserOnlyRoute>} />
+
+          <Route
+            path="/diagnosis/explore"
+            element={
+              <UserOnlyRoute>
+                <MajorExplore />
+              </UserOnlyRoute>
+            }
+          />
+          <Route
+            path="/analysis/weak"
+            element={
+              <UserOnlyRoute>
+                <WeakCapability />
+              </UserOnlyRoute>
+            }
+          />
+          <Route
+            path="/analysis/dashboard"
+            element={
+              <UserOnlyRoute>
+                <ResultHome />
+              </UserOnlyRoute>
+            }
+          />
+          <Route
+            path="/analysis/compare"
+            element={
+              <UserOnlyRoute>
+                <MajorCompare />
+              </UserOnlyRoute>
+            }
+          />
+
           <Route
             path="/analysis/exploration/:sessionId"
-            element={isExplorationEnabled ? <UserOnlyRoute><ExplorationResult /></UserOnlyRoute> : <Navigate to="/analysis/dashboard" replace />}
+            element={
+              isExplorationEnabled ? (
+                <UserOnlyRoute>
+                  <ExplorationResult />
+                </UserOnlyRoute>
+              ) : (
+                <Navigate
+                  to="/analysis/dashboard"
+                  replace
+                />
+              )
+            }
           />
           <Route
             path="/analysis/exploration/:sessionId/compare"
-            element={isExplorationEnabled ? <UserOnlyRoute><ExplorationCompare /></UserOnlyRoute> : <Navigate to="/analysis/dashboard" replace />}
+            element={
+              isExplorationEnabled ? (
+                <UserOnlyRoute>
+                  <ExplorationCompare />
+                </UserOnlyRoute>
+              ) : (
+                <Navigate
+                  to="/analysis/dashboard"
+                  replace
+                />
+              )
+            }
           />
           <Route
             path="/analysis/exploration/:sessionId/activities"
-            element={isExplorationEnabled ? <UserOnlyRoute><ExplorationActivities /></UserOnlyRoute> : <Navigate to="/analysis/dashboard" replace />}
+            element={
+              isExplorationEnabled ? (
+                <UserOnlyRoute>
+                  <ExplorationActivities />
+                </UserOnlyRoute>
+              ) : (
+                <Navigate
+                  to="/analysis/dashboard"
+                  replace
+                />
+              )
+            }
           />
           <Route
             path="/analysis/exploration/:sessionId/ask"
-            element={isExplorationEnabled ? <UserOnlyRoute><ExplorationAsk /></UserOnlyRoute> : <Navigate to="/analysis/dashboard" replace />}
+            element={
+              isExplorationEnabled ? (
+                <UserOnlyRoute>
+                  <ExplorationAsk />
+                </UserOnlyRoute>
+              ) : (
+                <Navigate
+                  to="/analysis/dashboard"
+                  replace
+                />
+              )
+            }
           />
           <Route
             path="/analysis/exploration/:sessionId/plan"
-            element={isExplorationEnabled ? <UserOnlyRoute><ExplorationPlan /></UserOnlyRoute> : <Navigate to="/analysis/dashboard" replace />}
+            element={
+              isExplorationEnabled ? (
+                <UserOnlyRoute>
+                  <ExplorationPlan />
+                </UserOnlyRoute>
+              ) : (
+                <Navigate
+                  to="/analysis/dashboard"
+                  replace
+                />
+              )
+            }
           />
-          <Route path="/analysis/*" element={<NotFoundPage />} />
-          <Route path="/library" element={<UserOnlyRoute><LibraryNotice /></UserOnlyRoute>} />
-          <Route path="/ai-chat" element={<UserOnlyRoute><AiChat /></UserOnlyRoute>} />
-          <Route path="/mypage" element={<UserOnlyRoute><MyPage /></UserOnlyRoute>} />
-          <Route path="/admin" element={<AdminOnlyRoute><AdminLayout /></AdminOnlyRoute>}>
+          <Route
+            path="/analysis/*"
+            element={<NotFoundPage />}
+          />
+
+          <Route
+            path="/library"
+            element={
+              <UserOnlyRoute>
+                <LibraryNotice />
+              </UserOnlyRoute>
+            }
+          />
+          <Route
+            path="/ai-chat"
+            element={
+              <UserOnlyRoute>
+                <AiChat />
+              </UserOnlyRoute>
+            }
+          />
+          <Route
+            path="/mypage"
+            element={
+              <UserOnlyRoute>
+                <MyPage />
+              </UserOnlyRoute>
+            }
+          />
+
+          <Route
+            path="/admin"
+            element={
+              <AdminOnlyRoute>
+                <AdminLayout />
+              </AdminOnlyRoute>
+            }
+          >
             <Route index element={<AdminDashboard />} />
-            <Route path="majors" element={<AdminMajorManage />} />
-            <Route path="notices" element={<AdminNoticeManage />} />
+            <Route
+              path="majors"
+              element={<AdminMajorManage />}
+            />
+            <Route
+              path="notices"
+              element={<AdminNoticeManage />}
+            />
             {isExplorationEnabled && (
               <>
-                <Route path="exploration-catalogs" element={<AdminExplorationCatalog />} />
-                <Route path="exploration-catalogs/:catalogId" element={<AdminExplorationCatalogDetail />} />
+                <Route
+                  path="exploration-catalogs"
+                  element={<AdminExplorationCatalog />}
+                />
+                <Route
+                  path="exploration-catalogs/:catalogId"
+                  element={
+                    <AdminExplorationCatalogDetail />
+                  }
+                />
                 <Route
                   path="exploration-catalogs/:catalogId/activities/:activityId"
-                  element={<AdminExplorationCatalogActivityDetail />}
+                  element={
+                    <AdminExplorationCatalogActivityDetail />
+                  }
                 />
               </>
             )}
           </Route>
-          <Route path="/results/share/:token" element={<SharedResult />} />
+
+          <Route
+            path="/results/share/:token"
+            element={<SharedResult />}
+          />
           <Route
             path="/exploration/share/:token"
-            element={isExplorationEnabled ? <ExplorationShared /> : <Navigate to="/" replace />}
+            element={
+              isExplorationEnabled ? (
+                <ExplorationShared />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            }
           />
-          <Route path="/error" element={<ErrorPage />} />
+          <Route
+            path="/error"
+            element={<ErrorPage />}
+          />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </div>
-      {!isAuthPage && !isMainPage && !isLoadingPage && !isChatPage && !isAdminPage && <FooterSimple />}
-      {sessionExpired && <SessionModal onClose={() => setSessionExpired(false)} />}
+
+      {!isAuthPage &&
+        !isMainPage &&
+        !isLoadingPage &&
+        !isChatPage &&
+        !isAdminPage && <FooterSimple />}
+
+      {sessionExpired && (
+        <SessionModal
+          onClose={() => setSessionExpired(false)}
+        />
+      )}
     </div>
   );
 };
