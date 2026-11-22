@@ -1,5 +1,6 @@
 import { useLayoutEffect } from 'react';
 import type { ReactNode } from 'react';
+
 import {
   BrowserRouter,
   Routes,
@@ -10,6 +11,7 @@ import {
 } from 'react-router-dom';
 
 import useAuthStore from './store/useAuthStore';
+
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import FooterSimple from './components/layout/FooterSimple';
@@ -43,18 +45,18 @@ import AdminLayout from './pages/Admin';
 import AdminDashboard from './pages/Admin/Dashboard';
 import AdminMajorManage from './pages/Admin/MajorManage';
 import AdminNoticeManage from './pages/Admin/NoticeManage';
+
 import AdminExplorationCatalog from './pages/Admin/ExplorationCatalog';
 import AdminExplorationCatalogDetail from './pages/Admin/ExplorationCatalog/Detail';
 import AdminExplorationCatalogActivityDetail from './pages/Admin/ExplorationCatalog/ActivityDetail';
 
-import SharedResult from './pages/Analysis/SharedResult';
 import ErrorPage from './pages/Error';
 import SessionModal from './pages/Auth/components/SessionModal';
 
 const NotFoundPage = () => (
-  <main className="w-full min-h-[60vh] flex items-center justify-center px-4 py-16">
+  <main className="flex min-h-[60vh] w-full items-center justify-center px-4 py-16">
     <div className="w-full max-w-lg text-center">
-      <div className="mx-auto mb-6 w-20 h-20 rounded-full bg-surface-container-low flex items-center justify-center">
+      <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-surface-container-low">
         <span
           className="material-symbols-outlined text-5xl text-secondary"
           aria-hidden="true"
@@ -63,24 +65,24 @@ const NotFoundPage = () => (
         </span>
       </div>
 
-      <p className="text-sm font-bold text-secondary mb-3">
+      <p className="mb-3 text-sm font-bold text-secondary">
         404
       </p>
 
-      <h1 className="text-2xl sm:text-3xl font-bold text-primary-container mb-4">
+      <h1 className="mb-4 text-2xl font-bold text-primary-container sm:text-3xl">
         페이지를 찾을 수 없습니다
       </h1>
 
-      <p className="text-sm sm:text-base leading-relaxed text-on-surface-variant mb-8 break-keep">
+      <p className="mb-8 text-sm leading-relaxed text-on-surface-variant sm:text-base">
         요청하신 페이지의 주소가 잘못되었거나
         페이지가 이동 또는 삭제되었을 수 있습니다.
         주소를 다시 확인해 주세요.
       </p>
 
-      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+      <div className="flex flex-col justify-center gap-3 sm:flex-row">
         <Link
           to="/"
-          className="min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-primary-container text-white font-bold px-6 py-3"
+          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-primary-container px-6 py-3 font-bold text-white"
         >
           <span
             className="material-symbols-outlined text-xl"
@@ -93,12 +95,55 @@ const NotFoundPage = () => (
 
         <Link
           to="/library"
-          className="min-h-[44px] inline-flex items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-lowest font-semibold text-primary-container px-6 py-3"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-6 py-3 font-semibold text-primary-container"
         >
           공지사항
         </Link>
       </div>
     </div>
+  </main>
+);
+
+// 기존 진단 공유 링크는 API를 호출하지 않고
+// 서비스 종료 안내만 표시합니다.
+const LegacyShareUnavailable = () => (
+  <main className="flex min-h-[60vh] items-center justify-center bg-surface px-4 py-12">
+    <section className="w-full max-w-lg rounded-2xl bg-surface-container-lowest p-8 text-center shadow-sm">
+      <span
+        className="material-symbols-outlined mb-4 text-5xl text-secondary"
+        aria-hidden="true"
+      >
+        info
+      </span>
+
+      <h1 className="mb-3 text-xl font-bold text-primary-container">
+        이전 방식 진단의 공유 결과는 더 이상 제공하지 않습니다
+      </h1>
+
+      <p className="mb-6 text-sm leading-relaxed text-on-surface-variant">
+        현재 진로온에서는 전공 탐색 진단을 제공하고 있습니다.
+        새 진단을 완료한 후 탐색 결과를 확인하고
+        공유할 수 있습니다.
+      </p>
+
+      <div className="flex flex-col justify-center gap-3 sm:flex-row">
+        <Link
+          to="/"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-outline-variant/30 px-5 py-3 font-semibold text-primary-container"
+        >
+          홈으로 돌아가기
+        </Link>
+
+        {isExplorationEnabled && (
+          <Link
+            to={diagnosisEntryPath}
+            className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-primary-container px-5 py-3 font-bold text-white"
+          >
+            전공 탐색 진단 시작하기
+          </Link>
+        )}
+      </div>
+    </section>
   </main>
 );
 
@@ -177,11 +222,10 @@ const AppLayout = () => {
   }, [location.pathname]);
 
   return (
-    <div className="flex flex-col min-h-screen">
-      {!isAuthPage &&
-        !isAdminPage && <Header />}
+    <div className="flex min-h-screen flex-col">
+      {!isAuthPage && !isAdminPage && <Header />}
 
-      <div className="flex-grow flex flex-col">
+      <div className="flex flex-grow flex-col">
         <Routes>
           <Route
             path="/"
@@ -193,22 +237,14 @@ const AppLayout = () => {
             }
           />
 
-          <Route
-            path="/auth/login"
-            element={<Login />}
-          />
-
-          <Route
-            path="/auth/signup"
-            element={<Signup />}
-          />
-
+          <Route path="/auth/login" element={<Login />} />
+          <Route path="/auth/signup" element={<Signup />} />
           <Route
             path="/auth/find-password"
             element={<FindPassword />}
           />
 
-          {/* 이전 방식의 모든 진단 시작 주소를 새 진단으로 통일 */}
+          {/* 이전 진단 시작 주소는 탐색 진단으로 이동 */}
           {[
             '/diagnosis',
             '/diagnosis/basic-info',
@@ -269,7 +305,6 @@ const AppLayout = () => {
             }
           />
 
-          {/* 이전 방식의 역량 분석은 새 결과 안내로 연결 */}
           <Route
             path="/analysis/weak"
             element={
@@ -393,7 +428,6 @@ const AppLayout = () => {
             }
           />
 
-          {/* 일반 AI 채팅 대신 탐색 결과 기반 AI 상담 */}
           <Route
             path="/ai-chat"
             element={
@@ -445,9 +479,7 @@ const AppLayout = () => {
 
                 <Route
                   path="exploration-catalogs/:catalogId"
-                  element={
-                    <AdminExplorationCatalogDetail />
-                  }
+                  element={<AdminExplorationCatalogDetail />}
                 />
 
                 <Route
@@ -460,22 +492,20 @@ const AppLayout = () => {
             )}
           </Route>
 
-          {/* 과거 완료한 기존 방식의 공유 결과는 유지 */}
+          {/* 기존 진단 공유는 더 이상 제공하지 않음 */}
           <Route
             path="/results/share/:token"
-            element={<SharedResult />}
+            element={<LegacyShareUnavailable />}
           />
 
+          {/* 탐색 진단 결과 공유는 정상 유지 */}
           <Route
             path="/exploration/share/:token"
             element={
               isExplorationEnabled ? (
                 <ExplorationShared />
               ) : (
-                <Navigate
-                  to="/"
-                  replace
-                />
+                <Navigate to="/" replace />
               )
             }
           />
@@ -492,27 +522,23 @@ const AppLayout = () => {
         </Routes>
       </div>
 
-      {!isAuthPage &&
-        !isMainPage &&
-        !isAdminPage && <FooterSimple />}
+      {!isAuthPage && !isMainPage && !isAdminPage && (
+        <FooterSimple />
+      )}
 
       {sessionExpired && (
         <SessionModal
-          onClose={() =>
-            setSessionExpired(false)
-          }
+          onClose={() => setSessionExpired(false)}
         />
       )}
     </div>
   );
 };
 
-function App() {
-  return (
-    <BrowserRouter>
-      <AppLayout />
-    </BrowserRouter>
-  );
-}
+const App = () => (
+  <BrowserRouter>
+    <AppLayout />
+  </BrowserRouter>
+);
 
 export default App;
