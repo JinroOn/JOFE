@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listExplorationSessions } from '../../../../api/exploration';
-import { getInProgressSession } from '../../../../api/diagnosis';
 import { isExplorationMock } from '../../../../config/features';
 import useExplorationStore from '../../../../store/useExplorationStore';
 import type { ExplorationSessionSummary, ExplorationStage } from '../../../../types/exploration';
-import type { DiagnosisSession } from '../../../../types/diagnosis';
 import MockBanner from '../components/MockBanner';
 import AbandonSessionDialog from './AbandonSessionDialog';
 
@@ -38,7 +36,6 @@ const ExplorationIntro = () => {
   const errorCode = useExplorationStore((s) => s.errorCode);
 
   const [sessions, setSessions] = useState<ExplorationSessionSummary[]>([]);
-  const [legacy, setLegacy] = useState<DiagnosisSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState(false);
   const [listAttempt, setListAttempt] = useState(0);
@@ -82,12 +79,6 @@ const ExplorationIntro = () => {
     };
   }, [listAttempt]);
 
-  useEffect(() => {
-    let alive = true;
-    getInProgressSession().then((data) => { if (alive) setLegacy(data?.session ?? null); });
-    return () => { alive = false; };
-  }, []);
-
   const closeAbandon = (terminal = false) => {
     const store = useExplorationStore.getState();
     if (terminal && store.session?.sessionId === selectedSession?.sessionId) store.reset();
@@ -113,7 +104,7 @@ const ExplorationIntro = () => {
   };
 
   const starting = phase === 'STARTING';
-  const hasResume = sessions.length > 0 || legacy !== null;
+  const hasResume = sessions.length > 0;
 
   return (
     <div className="min-h-screen bg-surface">
@@ -254,31 +245,6 @@ const ExplorationIntro = () => {
                 </li>
               ))}
 
-              {legacy && (
-                <li>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/diagnosis/basic-info')}
-                    className="w-full min-h-[44px] flex items-center justify-between gap-3 text-left bg-surface-container-lowest border border-outline-variant/30 rounded-brand px-5 py-4 hover:border-secondary/50 motion-safe:transition-colors"
-                  >
-                    <span>
-                      <span className="block font-semibold text-primary-container">
-                        이전 방식 진단 이어하기
-                      </span>
-                      <span className="block text-xs text-on-surface-variant mt-0.5">
-                        {formatDate(legacy.startedAt)} 시작 · 성향·역량 진단
-                      </span>
-                    </span>
-
-                    <span
-                      className="material-symbols-outlined text-secondary"
-                      aria-hidden="true"
-                    >
-                      arrow_forward
-                    </span>
-                  </button>
-                </li>
-              )}
             </ul>
           </section>
         )}

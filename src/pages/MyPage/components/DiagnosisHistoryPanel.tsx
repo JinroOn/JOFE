@@ -151,7 +151,9 @@ const DiagnosisHistoryPanel = ({
           const title =
             `${diagnosisName} 진단 #${item.sessionId}`;
 
-          const status = STATUS[item.status];
+          const status = !isExploration && item.status === 'in_progress'
+            ? { label: '서비스 종료', cls: STATUS.abandoned.cls }
+            : STATUS[item.status];
           const action = historyActionPath(item);
           const unavailable =
             historyUnavailableMessage(item);

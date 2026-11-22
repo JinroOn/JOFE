@@ -61,7 +61,7 @@ const MyPage = () => {
 
   const latest =
     isExplorationEnabled && history.source === 'unified'
-      ? summary?.latestResult
+      ? summary?.latestByType.EXPLORATION_V1
       : summary?.latestByType.LEGACY;
 
   const allCompletedTimes =

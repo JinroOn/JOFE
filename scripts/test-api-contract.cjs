@@ -436,18 +436,18 @@ test('network, authentication and integrity errors never silently erase explorat
   }
 });
 
-test('history navigation follows server actions and never follows API links', () => {
+test('history navigation resumes only exploration and preserves archived result links', () => {
   const { historyActionPath, historyUnavailableMessage } = compile('src/utils/diagnosisHistory.ts');
   assert.equal(historyActionPath(historyFixture.items[0]), '/analysis/exploration/11');
   assert.equal(historyActionPath(historyFixture.items[1]), '/analysis/dashboard?view=legacy&resultId=101');
-  assert.equal(historyActionPath(historyFixture.items[5]), '/diagnosis');
+  assert.equal(historyActionPath(historyFixture.items[5]), null);
   assert.equal(historyActionPath(historyFixture.items[6]), '/diagnosis/exploration/session/16');
   assert.equal(historyActionPath({ ...historyFixture.items[0], nextAction: 'NONE' }), null);
   for (const item of historyFixture.items.slice(2, 5)) {
     assert.equal(historyActionPath(item), null);
     assert.ok(historyUnavailableMessage(item));
   }
-  assert.equal(historyUnavailableMessage(historyFixture.items[5]), null);
+  assert.match(historyUnavailableMessage(historyFixture.items[5]), /이전 방식의 진단이 종료됐어요/);
 });
 
 test('history renders mixed IDs and distinct unavailable result states without result buttons', () => {

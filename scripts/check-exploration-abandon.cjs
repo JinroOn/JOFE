@@ -102,7 +102,8 @@ const detail = session => ({ session, issued: [{ stage: 1, effective: true, answ
     await check('진행 중 탐색형에만 중단 제공·완료/레거시 보호·취소/ESC는 POST 없음', async () => {
       await visit();
       assert.equal(await page.getByRole('button', { name: /전공 탐색 진단 #\d+ 중단/ }).count(), 1);
-      await page.getByRole('button', { name: /이전 방식 진단 이어하기/ }).waitFor();
+      assert.equal(await page.getByRole('button', { name: /이전 방식 진단 이어하기/ }).count(), 0);
+      assert.equal(gets.includes('/api/diagnoses/sessions/me/in-progress'), false);
       await open();
       await confirm().waitFor();
       await dialog.getByText('전공 탐색 진단 #42', { exact: true }).waitFor();
@@ -138,7 +139,7 @@ const detail = session => ({ session, issued: [{ stage: 1, effective: true, answ
       await dialog.waitFor({ state: 'hidden' });
       assert.equal(await page.evaluate(async () => (await import('/src/store/useExplorationStore.ts')).default.getState().session), null);
       assert.equal(otherWrites.length, 0);
-      await page.getByRole('button', { name: '새로 시작하기', exact: true }).click();
+      await page.getByRole('button', { name: '검사 시작하기', exact: true }).click();
       await page.waitForURL('**/diagnosis/exploration/session/99');
       assert.deepEqual(otherWrites, ['/api/exploration/v1/sessions']);
     });

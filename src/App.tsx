@@ -17,11 +17,6 @@ import Login from './pages/Auth/Login';
 import Signup from './pages/Auth/Signup';
 import FindPassword from './pages/Auth/FindPassword';
 import MyPage from './pages/MyPage';
-import DiagnosisIntro from './pages/Diagnosis/Intro';
-import DiagnosisMajor from './pages/Diagnosis/Major';
-import DiagnosisLoading from './pages/Diagnosis/Loading';
-import DiagnosisQuiz from './pages/Diagnosis/Quiz';
-import DiagnosisTendency from './pages/Diagnosis/Tendency';
 import ExplorationIntro from './pages/Diagnosis/Exploration/Intro';
 import ExplorationQuestion from './pages/Diagnosis/Exploration/QuestionWithPresentation';
 import ExplorationResult from './pages/Analysis/ExplorationResult';
@@ -30,12 +25,9 @@ import ExplorationActivities from './pages/Analysis/ExplorationActivities';
 import ExplorationAsk from './pages/Analysis/ExplorationAsk';
 import ExplorationPlan from './pages/Analysis/ExplorationPlan';
 import ExplorationShared from './pages/Analysis/ExplorationShared';
-import { isExplorationEnabled } from './config/features';
+import { diagnosisEntryPath, isExplorationEnabled } from './config/features';
 import LibraryNotice from './pages/Library/Notice';
-import AiChat from './pages/AiChat';
 import MajorExplore from './pages/Analysis/MajorExplore';
-import WeakCapability from './pages/Analysis/WeakCapability';
-import MajorCompare from './pages/Analysis/MajorCompare';
 import ResultHome from './pages/Analysis/ResultHome';
 import AdminLayout from './pages/Admin';
 import AdminDashboard from './pages/Admin/Dashboard';
@@ -162,9 +154,6 @@ const AppLayout = () => {
   const isAuthPage =
     location.pathname.startsWith('/auth');
   const isMainPage = location.pathname === '/';
-  const isLoadingPage =
-    location.pathname === '/diagnosis/loading';
-  const isChatPage = location.pathname === '/ai-chat';
   const isAdminPage =
     location.pathname.startsWith('/admin');
 
@@ -176,8 +165,6 @@ const AppLayout = () => {
   return (
     <div className="flex flex-col min-h-screen">
       {!isAuthPage &&
-        !isLoadingPage &&
-        !isChatPage &&
         !isAdminPage && <Header />}
 
       <div className="flex-grow flex flex-col">
@@ -199,46 +186,9 @@ const AppLayout = () => {
             element={<FindPassword />}
           />
 
-          <Route
-            path="/diagnosis"
-            element={
-              <UserOnlyRoute>
-                <DiagnosisIntro />
-              </UserOnlyRoute>
-            }
-          />
-          <Route
-            path="/diagnosis/basic-info"
-            element={
-              <UserOnlyRoute>
-                <DiagnosisMajor />
-              </UserOnlyRoute>
-            }
-          />
-          <Route
-            path="/diagnosis/tendency"
-            element={
-              <UserOnlyRoute>
-                <DiagnosisTendency />
-              </UserOnlyRoute>
-            }
-          />
-          <Route
-            path="/diagnosis/loading"
-            element={
-              <UserOnlyRoute>
-                <DiagnosisLoading />
-              </UserOnlyRoute>
-            }
-          />
-          <Route
-            path="/diagnosis/quiz"
-            element={
-              <UserOnlyRoute>
-                <DiagnosisQuiz />
-              </UserOnlyRoute>
-            }
-          />
+          {['/diagnosis', '/diagnosis/basic-info', '/diagnosis/tendency', '/diagnosis/quiz', '/diagnosis/loading'].map((path) => (
+            <Route key={path} path={path} element={<Navigate to={diagnosisEntryPath} replace />} />
+          ))}
 
           <Route
             path="/diagnosis/exploration"
@@ -248,7 +198,7 @@ const AppLayout = () => {
                   <ExplorationIntro />
                 </UserOnlyRoute>
               ) : (
-                <Navigate to="/diagnosis" replace />
+                <Navigate to="/analysis/dashboard" replace />
               )
             }
           />
@@ -261,7 +211,7 @@ const AppLayout = () => {
                   <ExplorationQuestion />
                 </UserOnlyRoute>
               ) : (
-                <Navigate to="/diagnosis" replace />
+                <Navigate to="/analysis/dashboard" replace />
               )
             }
           />
@@ -274,14 +224,7 @@ const AppLayout = () => {
               </UserOnlyRoute>
             }
           />
-          <Route
-            path="/analysis/weak"
-            element={
-              <UserOnlyRoute>
-                <WeakCapability />
-              </UserOnlyRoute>
-            }
-          />
+          <Route path="/analysis/weak" element={<Navigate to="/analysis/dashboard" replace />} />
           <Route
             path="/analysis/dashboard"
             element={
@@ -290,14 +233,7 @@ const AppLayout = () => {
               </UserOnlyRoute>
             }
           />
-          <Route
-            path="/analysis/compare"
-            element={
-              <UserOnlyRoute>
-                <MajorCompare />
-              </UserOnlyRoute>
-            }
-          />
+          <Route path="/analysis/compare" element={<Navigate to="/analysis/dashboard?next=compare" replace />} />
 
           <Route
             path="/analysis/exploration/:sessionId"
@@ -387,14 +323,7 @@ const AppLayout = () => {
               </UserOnlyRoute>
             }
           />
-          <Route
-            path="/ai-chat"
-            element={
-              <UserOnlyRoute>
-                <AiChat />
-              </UserOnlyRoute>
-            }
-          />
+          <Route path="/ai-chat" element={<Navigate to="/analysis/dashboard?next=ask" replace />} />
           <Route
             path="/mypage"
             element={
@@ -467,8 +396,6 @@ const AppLayout = () => {
 
       {!isAuthPage &&
         !isMainPage &&
-        !isLoadingPage &&
-        !isChatPage &&
         !isAdminPage && <FooterSimple />}
 
       {sessionExpired && (

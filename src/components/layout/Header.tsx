@@ -3,10 +3,7 @@ import { Link, NavLink } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
 import { logout as logoutApi } from '../../api/auth';
 import logo from '../../assets/logo.svg';
-import {
-  diagnosisEntryPath,
-  isExplorationEnabled,
-} from '../../config/features';
+import { diagnosisEntryPath } from '../../config/features';
 
 type NavItem = {
   label: string;
@@ -16,31 +13,19 @@ type NavItem = {
 
 const NAV_LINKS: NavItem[] = [
   {
-    label: '역량진단',
+    label: '전공 탐색 진단',
     to: diagnosisEntryPath,
-    sub: [
-      {
-        label: isExplorationEnabled
-          ? '전공 탐색 진단'
-          : '전공 진단',
-        to: diagnosisEntryPath,
-      },
-    ],
   },
   {
     label: '진로분석',
-    to: '/analysis',
+    to: '/analysis/dashboard',
     sub: [
       {
         label: '결과 리포트',
         to: '/analysis/dashboard',
       },
       {
-        label: '취약 역량 분석',
-        to: '/analysis/weak',
-      },
-      {
-        label: '전공 탐색',
+        label: '전공 둘러보기',
         to: '/diagnosis/explore',
       },
     ],
@@ -179,7 +164,7 @@ const Header = () => {
               to="/ai-chat"
               className="px-4 py-2 bg-secondary-fixed text-secondary font-extrabold text-[16px] rounded-[8px] shadow-sm hover:opacity-80 transition-opacity"
             >
-              AI챗봇
+              AI 상담
             </Link>
           </div>
         </div>
@@ -355,7 +340,7 @@ const Header = () => {
             }
             className="py-2 text-[16px] font-extrabold text-secondary border-b border-outline-variant/10"
           >
-            AI챗봇
+            AI 상담
           </Link>
 
           <div className="flex gap-3 mt-2">

@@ -105,15 +105,16 @@ fs.mkdirSync(output, { recursive: true });
         await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
         await page.screenshot({ path: path.join(output, 'history-dev-desktop.png'), fullPage: true });
       });
-      await check('실제 DEV 완료 결과 열기와 레거시 이어하기 이동', async () => {
+      await check('실제 DEV 완료 결과 열기와 이전 방식 이어하기 제거', async () => {
         const complete = actualRows.find((item) => item.type === 'EXPLORATION_V1' && item.nextAction === 'VIEW_RESULT');
         await row(`전공 탐색 진단 #${complete.sessionId}`).getByRole('button', { name: '결과 보기' }).click();
         await page.waitForURL(`**/analysis/exploration/${complete.sessionId}`);
         await page.getByRole('heading', { name: /먼저 탐색해볼 수 있는 전공이에요|탐색을 시작할 작은 활동/ }).waitFor();
         await load();
         const resume = actualRows.find((item) => item.type === 'LEGACY' && item.nextAction === 'RESUME');
-        await row(`이전 방식 진단 #${resume.sessionId}`).getByRole('button', { name: '이어하기' }).click();
-        await page.waitForURL('**/diagnosis');
+        const archived = row(`이전 방식 진단 #${resume.sessionId}`);
+        await archived.getByText('이전 방식의 진단이 종료됐어요.').waitFor();
+        assert.equal(await archived.getByRole('button', { name: '이어하기' }).count(), 0);
       });
     } else {
       await check('혼합 ID·서버 순서·결과 가용성 5종', async () => {
@@ -136,6 +137,8 @@ fs.mkdirSync(output, { recursive: true });
         assert.equal(await panel.getByRole('listitem').count(), 8);
         assert.equal(await row('전공 탐색 진단 #17').getByRole('button').count(), 0);
         assert.equal(await row('전공 탐색 진단 #16').getByRole('button', { name: '이어하기' }).count(), 1);
+        await row('이전 방식 진단 #15').getByText('이전 방식의 진단이 종료됐어요.').waitFor();
+        assert.equal(await row('이전 방식 진단 #15').getByRole('button', { name: '이어하기' }).count(), 0);
       });
       await check('프론트 경로로 이동하고 선택한 레거시 결과 ID 유지', async () => {
         await row('전공 탐색 진단 #11').getByRole('button', { name: '결과 보기' }).click();

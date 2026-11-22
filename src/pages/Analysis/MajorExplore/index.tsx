@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type { Major } from './types';
 import { getMajors } from '../../../api/major';
 import { addFavorite, getFavorites } from '../../../api/user';
@@ -8,8 +7,6 @@ import MajorCard from './components/MajorCard';
 import DetailPanel from './components/DetailPanel';
 
 const MajorExplore = () => {
-  const navigate = useNavigate();
-
   const [majors, setMajors] = useState<Major[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -17,7 +14,6 @@ const MajorExplore = () => {
   const [favoriteError, setFavoriteError] = useState(false);
 
   const [selectedMajor, setSelectedMajor] = useState<Major | null>(null);
-  const [compareList, setCompareList] = useState<Major[]>([]);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<number>>(
     new Set(),
   );
@@ -123,27 +119,6 @@ const MajorExplore = () => {
     });
   }, [majors, searchQuery, selectedCategories]);
 
-  // 전공 비교 바구니 추가
-  const handleAddToCompare = (major: Major) => {
-    setCompareList((previous) => {
-      if (
-        previous.some((item) => item.id === major.id) ||
-        previous.length >= 3
-      ) {
-        return previous;
-      }
-
-      return [...previous, major];
-    });
-  };
-
-  // 전공 비교 바구니 제거
-  const handleRemoveFromCompare = (id: number) => {
-    setCompareList((previous) =>
-      previous.filter((major) => major.id !== id),
-    );
-  };
-
   // 전공 목록 다시 불러오기
   const handleRetry = () => {
     setLoading(true);
@@ -152,11 +127,7 @@ const MajorExplore = () => {
   };
 
   return (
-    <div
-      className={`min-h-screen bg-surface ${
-        compareList.length > 0 ? 'pb-36' : 'pb-16'
-      }`}
-    >
+    <div className="min-h-screen bg-surface pb-16">
       <main className="max-w-[1280px] mx-auto pt-6 sm:pt-8 px-4 sm:px-8 flex flex-col md:flex-row gap-8">
         {/* 전공 검색 및 필터 */}
         <aside className="hidden md:block w-72 flex-shrink-0">
@@ -327,122 +298,11 @@ const MajorExplore = () => {
         <DetailPanel
           major={selectedMajor}
           onClose={() => setSelectedMajor(null)}
-          onAddToCompare={handleAddToCompare}
-          inCompare={compareList.some(
-            (major) => major.id === selectedMajor.id,
-          )}
           bookmarked={bookmarkedIds.has(selectedMajor.id)}
           onBookmark={handleBookmark}
         />
       )}
 
-      {/* 전공 비교 바구니 */}
-      {compareList.length > 0 && (
-        <div className="fixed bottom-0 left-0 w-full z-40 px-4 sm:px-8 pb-4 sm:pb-6">
-          <div className="max-w-[1280px] mx-auto">
-            <div className="bg-primary-container/90 backdrop-blur-2xl rounded-2xl flex items-center px-4 sm:px-8 py-4 sm:h-24 shadow-2xl border border-white/5 gap-4">
-              <div className="flex-grow flex items-center gap-4 sm:gap-6 min-w-0">
-                <div className="text-white shrink-0">
-                  <div className="text-[10px] sm:text-xs font-bold opacity-60 uppercase tracking-tighter">
-                    비교 바구니
-                  </div>
-
-                  <div className="text-base sm:text-lg font-bold">
-                    <span className="text-secondary-container">
-                      {compareList.length}
-                    </span>
-                    <span className="opacity-60">/3</span>
-                  </div>
-                </div>
-
-                {/* 데스크톱 비교 목록 */}
-                <div className="hidden sm:flex gap-3">
-                  {Array.from({ length: 3 }, (_, index) => {
-                    const major = compareList[index];
-
-                    if (major) {
-                      return (
-                        <div
-                          key={major.id}
-                          className="w-32 h-14 bg-white/10 rounded-xl border border-white/20 flex items-center px-3 gap-2 relative group overflow-hidden"
-                        >
-                          <span className="text-[11px] text-white font-bold truncate">
-                            {major.name}
-                          </span>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleRemoveFromCompare(major.id)
-                            }
-                            aria-label={`${major.name} 비교에서 제외`}
-                            className="absolute right-1 top-1 p-1 bg-error rounded-full flex items-center justify-center"
-                          >
-                            <span className="material-symbols-outlined text-[12px] text-white">
-                              close
-                            </span>
-                          </button>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div
-                        key={`empty-${index}`}
-                        className="w-32 h-14 bg-white/5 border border-dashed border-white/20 rounded-xl flex items-center justify-center"
-                      >
-                        <span className="material-symbols-outlined text-white/30">
-                          add
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* 모바일 비교 목록 */}
-                <div className="sm:hidden flex gap-2 overflow-x-auto">
-                  {compareList.map((major) => (
-                    <div
-                      key={major.id}
-                      className="shrink-0 flex items-center gap-1.5 bg-white/10 rounded-lg px-3 py-1.5 border border-white/20"
-                    >
-                      <span className="text-[11px] text-white font-bold max-w-[80px] truncate">
-                        {major.name}
-                      </span>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleRemoveFromCompare(major.id)
-                        }
-                        aria-label={`${major.name} 비교에서 제외`}
-                      >
-                        <span className="material-symbols-outlined text-[14px] text-white/60">
-                          close
-                        </span>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  navigate(
-                    `/analysis/compare?ids=${compareList
-                      .map((major) => major.id)
-                      .join(',')}`,
-                  )
-                }
-                className="shrink-0 bg-[#FFAB00] text-primary-container font-bold px-4 sm:px-8 py-3 sm:py-4 rounded-xl shadow-lg hover:scale-105 active:scale-95 transition-all text-sm sm:text-base"
-              >
-                상세 비교
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

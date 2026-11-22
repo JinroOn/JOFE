@@ -91,15 +91,11 @@ const ScoreSection = ({
 const DetailPanel = ({
   major,
   onClose,
-  onAddToCompare,
-  inCompare,
   bookmarked,
   onBookmark,
 }: {
   major: Major;
   onClose: () => void;
-  onAddToCompare: (major: Major) => void;
-  inCompare: boolean;
   bookmarked: boolean;
   onBookmark: (id: number) => void | Promise<void>;
 }) => {
@@ -405,25 +401,6 @@ const DetailPanel = ({
             {bookmarked ? '북마크됨' : '북마크'}
           </button>
 
-          {/* 전공 비교 */}
-          <button
-            type="button"
-            onClick={() => onAddToCompare(major)}
-            disabled={inCompare}
-            className={`flex-[1.5] py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
-              inCompare
-                ? 'bg-surface-container text-outline cursor-not-allowed'
-                : 'bg-[#FFAB00] text-primary-container shadow-lg hover:opacity-90 active:scale-95'
-            }`}
-          >
-            <span className="material-symbols-outlined">
-              compare_arrows
-            </span>
-
-            {inCompare
-              ? '비교 목록에 담김'
-              : '전공 비교에 담기'}
-          </button>
         </div>
       </div>
     </div>
