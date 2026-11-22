@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
 import type { DiagnosisHistoryController } from '../../../hooks/useDiagnosisHistory';
 import { deleteSession } from '../../../api/diagnosis';
+
 import {
   isExplorationEnabled,
   diagnosisEntryPath,
 } from '../../../config/features';
+
 import {
   historyActionPath,
   historyUnavailableMessage,
@@ -32,11 +35,15 @@ const DiagnosisHistoryPanel = ({
   history: DiagnosisHistoryController;
 }) => {
   const navigate = useNavigate();
-  const [deleting, setDeleting] = useState(false);
-  const [toDelete, setToDelete] = useState<number | null>(
-    null,
-  );
-  const [deleteError, setDeleteError] = useState(false);
+
+  const [deleting, setDeleting] =
+    useState(false);
+
+  const [toDelete, setToDelete] =
+    useState<number | null>(null);
+
+  const [deleteError, setDeleteError] =
+    useState(false);
 
   const remove = async () => {
     if (toDelete === null || deleting) return;
@@ -46,6 +53,7 @@ const DiagnosisHistoryPanel = ({
 
     try {
       await deleteSession(toDelete);
+
       setToDelete(null);
       await history.refresh();
     } catch {
@@ -67,7 +75,9 @@ const DiagnosisHistoryPanel = ({
 
         {history.items.length > 0 && (
           <span className="text-sm text-on-surface-variant">
-            {history.hasMore ? '불러온' : '총'}{' '}
+            {history.hasMore
+              ? '불러온'
+              : '총'}{' '}
             {history.items.length}건
           </span>
         )}
@@ -75,7 +85,9 @@ const DiagnosisHistoryPanel = ({
         {history.phase === 'READY' && (
           <button
             type="button"
-            onClick={() => void history.refresh()}
+            onClick={() =>
+              void history.refresh()
+            }
             className="min-h-[44px] text-sm font-bold text-secondary"
           >
             이력 새로고침
@@ -108,13 +120,15 @@ const DiagnosisHistoryPanel = ({
           className="rounded-2xl bg-white p-8 text-center"
         >
           <p>
-            진단 이력을 불러오지 못했어요. 잠시 후
-            다시 확인해주세요.
+            진단 이력을 불러오지 못했어요.
+            잠시 후 다시 확인해주세요.
           </p>
 
           <button
             type="button"
-            onClick={() => void history.refresh()}
+            onClick={() =>
+              void history.refresh()
+            }
             className="min-h-[44px] mt-3 font-bold text-secondary"
           >
             다시 불러오기
@@ -126,9 +140,12 @@ const DiagnosisHistoryPanel = ({
         history.items.length === 0 && (
           <div className="rounded-2xl bg-white p-10 text-center text-on-surface-variant">
             <p>진단 기록이 없습니다.</p>
+
             <button
               type="button"
-              onClick={() => navigate(diagnosisEntryPath)}
+              onClick={() =>
+                navigate(diagnosisEntryPath)
+              }
               className="min-h-[44px] mt-3 font-bold text-secondary"
             >
               진단 시작하기
@@ -141,7 +158,6 @@ const DiagnosisHistoryPanel = ({
           const isExploration =
             item.type === 'EXPLORATION_V1';
 
-          // 탐색 진단이 꺼지면 '이전 방식' 대신 '전공 진단'
           const diagnosisName = isExploration
             ? '전공 탐색'
             : isExplorationEnabled
@@ -151,8 +167,18 @@ const DiagnosisHistoryPanel = ({
           const title =
             `${diagnosisName} 진단 #${item.sessionId}`;
 
-          const status = STATUS[item.status];
-          const action = historyActionPath(item);
+          const status =
+            !isExploration &&
+            item.status === 'in_progress'
+              ? {
+                  label: '서비스 종료',
+                  cls: STATUS.abandoned.cls,
+                }
+              : STATUS[item.status];
+
+          const action =
+            historyActionPath(item);
+
           const unavailable =
             historyUnavailableMessage(item);
 
@@ -196,7 +222,9 @@ const DiagnosisHistoryPanel = ({
                 {action && (
                   <button
                     type="button"
-                    onClick={() => navigate(action)}
+                    onClick={() =>
+                      navigate(action)
+                    }
                     className="min-h-[44px] rounded-lg bg-surface-container px-3 text-xs font-bold"
                   >
                     {item.nextAction === 'RESUME'
@@ -236,8 +264,9 @@ const DiagnosisHistoryPanel = ({
           className="mt-4 text-sm text-error"
         >
           <p>
-            이력을 더 불러오지 못했어요. 다시 시도하거나
-            이력을 새로고침해주세요.
+            이력을 더 불러오지 못했어요.
+            다시 시도하거나 이력을
+            새로고침해주세요.
           </p>
         </div>
       )}
@@ -246,7 +275,9 @@ const DiagnosisHistoryPanel = ({
         <button
           type="button"
           disabled={history.loadingMore}
-          onClick={() => void history.loadMore()}
+          onClick={() =>
+            void history.loadMore()
+          }
           className="mt-5 min-h-[44px] w-full rounded-xl border border-outline-variant px-5 py-3 font-bold text-secondary disabled:opacity-50"
         >
           {history.loadingMore
@@ -273,8 +304,9 @@ const DiagnosisHistoryPanel = ({
             </h3>
 
             <p className="text-sm text-on-surface-variant">
-              진단 #{toDelete}의 모든 답변과 결과가
-              삭제됩니다. 복구할 수 없습니다.
+              진단 #{toDelete}의 모든 답변과
+              결과가 삭제됩니다.
+              복구할 수 없습니다.
             </p>
 
             {deleteError && (
@@ -291,7 +323,9 @@ const DiagnosisHistoryPanel = ({
               <button
                 type="button"
                 disabled={deleting}
-                onClick={() => setToDelete(null)}
+                onClick={() =>
+                  setToDelete(null)
+                }
                 className="min-h-[44px] flex-1 rounded-lg border border-outline-variant font-bold"
               >
                 취소
@@ -300,10 +334,14 @@ const DiagnosisHistoryPanel = ({
               <button
                 type="button"
                 disabled={deleting}
-                onClick={() => void remove()}
+                onClick={() =>
+                  void remove()
+                }
                 className="min-h-[44px] flex-1 rounded-lg bg-error text-white font-bold"
               >
-                {deleting ? '삭제 중…' : '삭제'}
+                {deleting
+                  ? '삭제 중…'
+                  : '삭제'}
               </button>
             </div>
           </div>

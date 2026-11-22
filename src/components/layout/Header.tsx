@@ -3,49 +3,36 @@ import { Link, NavLink } from 'react-router-dom';
 import useAuthStore from '../../store/useAuthStore';
 import { logout as logoutApi } from '../../api/auth';
 import logo from '../../assets/logo.svg';
-import {
-  diagnosisEntryPath,
-  isExplorationEnabled,
-} from '../../config/features';
+import { diagnosisEntryPath } from '../../config/features';
 
 type NavItem = {
   label: string;
   to: string;
-  sub?: { label: string; to: string }[];
+  sub?: {
+    label: string;
+    to: string;
+  }[];
 };
 
 const NAV_LINKS: NavItem[] = [
   {
-    label: '역량진단',
+    label: '전공 탐색 진단',
     to: diagnosisEntryPath,
-    sub: [
-      {
-        label: isExplorationEnabled
-          ? '전공 탐색 진단'
-          : '전공 진단',
-        to: diagnosisEntryPath,
-      },
-    ],
   },
   {
     label: '진로분석',
-    to: '/analysis',
+    to: '/analysis/dashboard',
     sub: [
       {
         label: '결과 리포트',
         to: '/analysis/dashboard',
       },
       {
-        label: '취약 역량 분석',
-        to: '/analysis/weak',
-      },
-      {
-        label: '전공 탐색',
+        label: '전공 둘러보기',
         to: '/diagnosis/explore',
       },
     ],
   },
-  // 하위 메뉴가 하나뿐이라 펼치지 않고 바로 이동한다
   {
     label: '공지사항',
     to: '/library',
@@ -60,16 +47,14 @@ const Header = () => {
     refreshToken,
   } = useAuthStore();
 
-  const [mobileOpen, setMobileOpen] =
-    useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const [openMenu, setOpenMenu] =
     useState<string | null>(null);
 
-  const closeTimer =
-    useRef<ReturnType<typeof setTimeout> | null>(
-      null,
-    );
+  const closeTimer = useRef<
+    ReturnType<typeof setTimeout> | null
+  >(null);
 
   const handleLogout = async () => {
     if (refreshToken) {
@@ -82,9 +67,7 @@ const Header = () => {
     setOpenMenu(null);
   };
 
-  const handleMenuEnter = (
-    label: string,
-  ) => {
+  const handleMenuEnter = (label: string) => {
     if (closeTimer.current) {
       clearTimeout(closeTimer.current);
     }
@@ -100,7 +83,6 @@ const Header = () => {
   };
 
   return (
-    // Safari에서 반투명 배경과 backdrop-blur 조합 제거
     <header className="sticky top-0 z-50 isolate bg-[#f8fafc] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]">
       <nav className="max-w-[1280px] mx-auto px-4 sm:px-8 h-20 flex items-center justify-between">
         <div className="flex items-center gap-10">
@@ -113,14 +95,16 @@ const Header = () => {
           </Link>
 
           <div className="hidden md:flex items-center gap-6">
-            {NAV_LINKS.map(
-              ({ label, to, sub }) => !sub ? (
+            {NAV_LINKS.map(({ label, to, sub }) =>
+              !sub ? (
                 <NavLink
                   key={to}
                   to={to}
                   className={({ isActive }) =>
                     `text-[16px] font-bold hover:opacity-70 transition-opacity ${
-                      isActive ? 'text-secondary' : 'text-[#0a192f]'
+                      isActive
+                        ? 'text-secondary'
+                        : 'text-[#0a192f]'
                     }`
                   }
                 >
@@ -156,9 +140,7 @@ const Header = () => {
                           onClick={() =>
                             setOpenMenu(null)
                           }
-                          className={({
-                            isActive,
-                          }) =>
+                          className={({ isActive }) =>
                             `block px-4 py-2.5 text-sm font-medium hover:bg-surface-container-low transition-colors ${
                               isActive
                                 ? 'text-secondary font-bold'
@@ -179,7 +161,7 @@ const Header = () => {
               to="/ai-chat"
               className="px-4 py-2 bg-secondary-fixed text-secondary font-extrabold text-[16px] rounded-[8px] shadow-sm hover:opacity-80 transition-opacity"
             >
-              AI챗봇
+              AI 상담
             </Link>
           </div>
         </div>
@@ -221,6 +203,7 @@ const Header = () => {
                       <span className="material-symbols-outlined text-base">
                         person
                       </span>
+
                       프로필 보기
                     </Link>
 
@@ -235,6 +218,7 @@ const Header = () => {
                         <span className="material-symbols-outlined text-base">
                           admin_panel_settings
                         </span>
+
                         관리자
                       </Link>
                     )}
@@ -249,6 +233,7 @@ const Header = () => {
                       <span className="material-symbols-outlined text-base">
                         logout
                       </span>
+
                       로그아웃
                     </button>
                   </div>
@@ -298,10 +283,9 @@ const Header = () => {
       </nav>
 
       {mobileOpen && (
-        // 모바일 메뉴도 불투명 배경을 사용합니다.
         <div className="md:hidden bg-[#f8fafc] border-t border-outline-variant/20 px-4 sm:px-8 py-6 flex flex-col gap-2 shadow-lg">
-          {NAV_LINKS.map(
-            ({ label, to, sub }) => !sub ? (
+          {NAV_LINKS.map(({ label, to, sub }) =>
+            !sub ? (
               <NavLink
                 key={to}
                 to={to}
@@ -310,7 +294,9 @@ const Header = () => {
                 }
                 className={({ isActive }) =>
                   `py-2 text-[16px] font-bold border-b border-outline-variant/10 ${
-                    isActive ? 'text-secondary' : 'text-[#0a192f]'
+                    isActive
+                      ? 'text-secondary'
+                      : 'text-[#0a192f]'
                   }`
                 }
               >
@@ -330,9 +316,7 @@ const Header = () => {
                       onClick={() =>
                         setMobileOpen(false)
                       }
-                      className={({
-                        isActive,
-                      }) =>
+                      className={({ isActive }) =>
                         `text-sm py-1.5 text-[#0a192f] ${
                           isActive
                             ? 'text-secondary font-bold'
@@ -355,7 +339,7 @@ const Header = () => {
             }
             className="py-2 text-[16px] font-extrabold text-secondary border-b border-outline-variant/10"
           >
-            AI챗봇
+            AI 상담
           </Link>
 
           <div className="flex gap-3 mt-2">

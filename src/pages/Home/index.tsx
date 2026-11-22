@@ -1,4 +1,3 @@
-
 import { useNavigate } from 'react-router-dom';
 import { diagnosisEntryPath } from '../../config/features';
 import useAuthStore from '../../store/useAuthStore';
@@ -22,96 +21,73 @@ const Home = () => {
   const features = [
     {
       icon: 'fact_check',
-      title: '단계별 전공 진단',
-      description: '기본 정보, 성향, 역량 문항에 차례로 답합니다.',
+      title: '전공 탐색 진단',
+      description:
+        '관심 있는 분야와 활동, 배우고 싶은 내용을 답하면 다음 질문이 정해집니다.',
       iconStyle: 'bg-[#EAF5FF] text-[#087D9C]',
       path: diagnosisEntryPath,
     },
     {
       icon: 'insights',
-      title: '9가지 성향 지표',
-      description: '둘 중 가까운 쪽을 고르는 12개 문항으로 학업 성향을 살펴봅니다.',
+      title: '탐색 결과',
+      description:
+        '먼저 알아볼 전공과 그 전공에 연결된 내 응답을 확인합니다.',
       iconStyle: 'bg-[#FFF4EA] text-[#FF762E]',
-      path: '/diagnosis/tendency',
-    },
-    {
-      icon: 'fitness_center',
-      title: '공통 기초 역량 확인',
-      description: '전공 학습에 필요한 9가지 기초 역량을 문항으로 확인합니다.',
-      iconStyle: 'bg-[#F0F3F8] text-[#172B46]',
-      path: '/analysis/weak',
-    },
-    {
-      icon: 'event_note',
-      title: '12주 학습 로드맵',
-      description: '보완하면 좋을 역량을 바탕으로 주차별 학습 계획을 만듭니다.',
-      iconStyle: 'bg-[#EAF5FF] text-[#087D9C]',
-      path: '/analysis/weak',
-    },
-    {
-      icon: 'school',
-      title: '전공 탐색',
-      description: '전공별 소개와 요구 역량을 살펴보고 관심 전공으로 저장할 수 있습니다.',
-      iconStyle: 'bg-[#FFF4EA] text-[#FF762E]',
-      path: '/diagnosis/explore',
+      path: '/analysis/dashboard',
     },
     {
       icon: 'compare_arrows',
-      title: '유사 전공 비교',
-      description: '전공 간 요구 역량 차이를 나란히 비교합니다.',
+      title: '후보 전공 비교',
+      description:
+        '두 전공의 학습 주제와 활동을 나란히 살펴봅니다.',
       iconStyle: 'bg-[#F0F3F8] text-[#172B46]',
-      path: '/analysis/compare',
+      path: '/analysis/dashboard?next=compare',
     },
     {
-      icon: 'trending_up',
-      title: '강점·준비 요소 분석',
-      description: '내 역량과 전공 요구 역량을 비교해 강점과 보완할 점을 보여줍니다.',
-      iconStyle: 'bg-[#EAF5FF] text-[#087D9C]',
-      path: '/analysis/dashboard',
+      icon: 'science',
+      title: '탐색 활동',
+      description:
+        '관심 전공의 공부를 경험해 볼 수 있는 작은 활동을 해 봅니다.',
+      iconStyle: 'bg-[#FFF4EA] text-[#FF762E]',
+      path: '/analysis/dashboard?next=activities',
     },
     {
       icon: 'support_agent',
       title: 'AI 결과 상담',
-      description: '진단 결과에 대해 궁금한 점을 AI에게 물어볼 수 있습니다.',
-      iconStyle: 'bg-[#FFF4EA] text-[#FF762E]',
+      description:
+        '내 결과나 전공 비교에서 생긴 질문을 AI에 물어봅니다.',
+      iconStyle: 'bg-[#F0F3F8] text-[#172B46]',
       path: '/ai-chat',
     },
-  ];
-
-  const oldFeatures = [
-    '정적인 문항 위주의 자기보고식 검사',
-    '단순 흥미 위주의 결과 도출',
-    '결과가 왜 나왔는지 알기 어려움',
-  ];
-
-  const newFeatures = [
-    '단순 흥미검사만으로 전공을 추천하지 않음',
-    '성향과 역량을 함께 확인',
-    '추천 이유와 준비 요소를 함께 제공',
-    'AI가 진단 결과를 쉽게 풀어 설명',
-    '보완할 역량에 맞춘 12주 학습 로드맵',
-    '유사 전공 비교 가능',
+    {
+      icon: 'event_note',
+      title: '12주 탐색 계획',
+      description:
+        '선택한 전공을 더 알아보고 싶을 때 주차별 계획을 만듭니다.',
+      iconStyle: 'bg-[#EAF5FF] text-[#087D9C]',
+      path: '/analysis/dashboard?next=plan',
+    },
   ];
 
   const processSteps = [
     {
       number: '01',
       title: '진단',
-      description: '기본 정보를 입력하고 성향·역량 문항에 답합니다.',
+      description: '관심과 경험을 묻는 문항에 답합니다.',
       style: 'bg-[#E9EDF2] text-[#10213A]',
     },
     {
       number: '02',
       title: '결과 확인',
       description:
-        '먼저 살펴볼 전공과 추천 이유, 내 역량과 전공 요구 역량의 차이를 확인합니다.',
+        '먼저 살펴볼 전공과 내 응답이 연결된 이유를 확인합니다.',
       style: 'bg-[#00C8E8] text-[#0D1C32]',
     },
     {
       number: '03',
-      title: '학습 계획',
+      title: '후보 탐색',
       description:
-        '보완할 역량을 바탕으로 12주 학습 로드맵을 받아봅니다.',
+        '후보를 비교하고 작은 활동을 해 본 뒤 필요하면 12주 계획을 만듭니다.',
       style: 'bg-[#0D1C32] text-white',
     },
   ];
@@ -128,6 +104,7 @@ const Home = () => {
               <span className="material-symbols-outlined text-[18px]">
                 psychology
               </span>
+
               <span className="text-sm">
                 AI 기반 맞춤형 진로 설계 시스템
               </span>
@@ -136,15 +113,20 @@ const Home = () => {
             <h1 className="text-[38px] sm:text-5xl lg:text-[58px] font-extrabold text-[#050505] leading-[1.15] tracking-tight mb-7 font-headline">
               나의 가능성에 맞는
               <br />
+
               <span className="text-[#00677F]">
                 전공을 찾아드려요
               </span>
             </h1>
 
             <p className="text-[15px] sm:text-base text-[#5B6470] leading-[1.9] mb-9 max-w-[540px] mx-auto lg:mx-0 font-body">
-              성향과 역량 문항에 답하면 먼저 살펴볼 전공과 그 이유를 정리해 드려요.
+              관심 분야와 경험, 배우고 싶은 내용에 답하면
+              먼저 살펴볼 전공을 안내해요.
+
               <br className="hidden sm:block" />
-              AI는 결과를 쉽게 풀어 설명하고, 합격 가능성은 판단하지 않습니다.
+
+              후보 전공을 비교하고 짧은 활동으로
+              관심을 구체화할 수 있어요.
             </p>
 
             <div className="flex justify-center lg:justify-start">
@@ -153,7 +135,7 @@ const Home = () => {
                 onClick={handleStartDiagnosis}
                 className="px-8 py-4 bg-[#FFAB00] text-[#0D1C32] font-extrabold rounded-xl shadow-[0_8px_20px_rgba(255,171,0,0.15)] hover:bg-[#F5A000] hover:-translate-y-1 transition-all active:scale-95"
               >
-                전공 진단 시작하기
+                전공 탐색 진단 시작하기
               </button>
             </div>
           </div>
@@ -174,7 +156,9 @@ const Home = () => {
                     <div className="w-11 h-11 shrink-0 bg-[#007B98] rounded-xl flex items-center justify-center text-white">
                       <span
                         className="material-symbols-outlined text-[22px]"
-                        style={{ fontVariationSettings: "'FILL' 1" }}
+                        style={{
+                          fontVariationSettings: "'FILL' 1",
+                        }}
                       >
                         analytics
                       </span>
@@ -218,7 +202,9 @@ const Home = () => {
               <button
                 key={feature.title}
                 type="button"
-                onClick={() => navigate(feature.path)}
+                onClick={() =>
+                  navigate(feature.path)
+                }
                 aria-label={`${feature.title} 페이지로 이동`}
                 className="w-full min-h-[180px] text-left bg-white p-5 rounded-xl shadow-[0_8px_22px_rgba(15,35,60,0.06)] hover:-translate-y-1 hover:shadow-[0_14px_28px_rgba(15,35,60,0.10)] transition-all duration-300 group"
               >
@@ -239,74 +225,6 @@ const Home = () => {
                 </p>
               </button>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 기존 검사와 비교 */}
-      <section className="bg-[#F7FAFD] px-5 sm:px-8 py-20 lg:py-24">
-        <div className="max-w-[1020px] mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-[25px] sm:text-[29px] font-extrabold text-[#080808] mb-3">
-              기존 적성검사와 무엇이 다른가요?
-            </h2>
-
-            <p className="text-sm text-[#68717D]">
-              흥미 하나만 보지 않고 성향과 역량을 함께 보며, 추천 이유를 설명합니다.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 rounded-xl overflow-hidden shadow-[0_12px_35px_rgba(15,35,60,0.08)]">
-            <div className="bg-white px-7 py-9 sm:px-10 sm:py-10 lg:px-12">
-              <h3 className="flex items-center gap-2 text-[#8B9BB1] font-bold text-[15px] mb-8">
-                <span className="material-symbols-outlined text-[18px]">
-                  history
-                </span>
-                기존 적성검사
-              </h3>
-
-              <ul className="space-y-6">
-                {oldFeatures.map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-start gap-3 text-[13px] text-[#626B77]"
-                  >
-                    <span className="material-symbols-outlined text-[#EF4444] text-[19px] shrink-0">
-                      close
-                    </span>
-
-                    <span className="leading-relaxed">{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="bg-[#0D1C32] px-7 py-9 sm:px-10 sm:py-10 lg:px-12">
-              <h3 className="flex items-center gap-2 text-[#00D2F5] font-bold text-[15px] mb-8">
-                <span className="material-symbols-outlined text-[19px]">
-                  auto_awesome
-                </span>
-                JinroOn AI 진단
-              </h3>
-
-              <ul className="space-y-5">
-                {newFeatures.map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-start gap-3 text-[13px] text-white"
-                  >
-                    <span
-                      className="material-symbols-outlined text-[#00A6BE] text-[18px] shrink-0"
-                      style={{ fontVariationSettings: "'FILL' 1" }}
-                    >
-                      check_circle
-                    </span>
-
-                    <span className="leading-relaxed">{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
           </div>
         </div>
       </section>

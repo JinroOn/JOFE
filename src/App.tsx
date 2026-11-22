@@ -8,35 +8,37 @@ import {
   Link,
   useLocation,
 } from 'react-router-dom';
+
 import useAuthStore from './store/useAuthStore';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import FooterSimple from './components/layout/FooterSimple';
+
 import Home from './pages/Home';
 import Login from './pages/Auth/Login';
 import Signup from './pages/Auth/Signup';
 import FindPassword from './pages/Auth/FindPassword';
 import MyPage from './pages/MyPage';
-import DiagnosisIntro from './pages/Diagnosis/Intro';
-import DiagnosisMajor from './pages/Diagnosis/Major';
-import DiagnosisLoading from './pages/Diagnosis/Loading';
-import DiagnosisQuiz from './pages/Diagnosis/Quiz';
-import DiagnosisTendency from './pages/Diagnosis/Tendency';
+
 import ExplorationIntro from './pages/Diagnosis/Exploration/Intro';
 import ExplorationQuestion from './pages/Diagnosis/Exploration/QuestionWithPresentation';
+
 import ExplorationResult from './pages/Analysis/ExplorationResult';
 import ExplorationCompare from './pages/Analysis/ExplorationCompare';
 import ExplorationActivities from './pages/Analysis/ExplorationActivities';
 import ExplorationAsk from './pages/Analysis/ExplorationAsk';
 import ExplorationPlan from './pages/Analysis/ExplorationPlan';
 import ExplorationShared from './pages/Analysis/ExplorationShared';
-import { isExplorationEnabled } from './config/features';
+
+import {
+  diagnosisEntryPath,
+  isExplorationEnabled,
+} from './config/features';
+
 import LibraryNotice from './pages/Library/Notice';
-import AiChat from './pages/AiChat';
 import MajorExplore from './pages/Analysis/MajorExplore';
-import WeakCapability from './pages/Analysis/WeakCapability';
-import MajorCompare from './pages/Analysis/MajorCompare';
 import ResultHome from './pages/Analysis/ResultHome';
+
 import AdminLayout from './pages/Admin';
 import AdminDashboard from './pages/Admin/Dashboard';
 import AdminMajorManage from './pages/Admin/MajorManage';
@@ -44,6 +46,7 @@ import AdminNoticeManage from './pages/Admin/NoticeManage';
 import AdminExplorationCatalog from './pages/Admin/ExplorationCatalog';
 import AdminExplorationCatalogDetail from './pages/Admin/ExplorationCatalog/Detail';
 import AdminExplorationCatalogActivityDetail from './pages/Admin/ExplorationCatalog/ActivityDetail';
+
 import SharedResult from './pages/Analysis/SharedResult';
 import ErrorPage from './pages/Error';
 import SessionModal from './pages/Auth/components/SessionModal';
@@ -155,20 +158,20 @@ const AppLayout = () => {
   const sessionExpired = useAuthStore(
     (state) => state.sessionExpired,
   );
+
   const setSessionExpired = useAuthStore(
     (state) => state.setSessionExpired,
   );
 
   const isAuthPage =
     location.pathname.startsWith('/auth');
-  const isMainPage = location.pathname === '/';
-  const isLoadingPage =
-    location.pathname === '/diagnosis/loading';
-  const isChatPage = location.pathname === '/ai-chat';
+
+  const isMainPage =
+    location.pathname === '/';
+
   const isAdminPage =
     location.pathname.startsWith('/admin');
 
-  // 추가: 페이지 경로가 바뀔 때 이전 스크롤 위치 초기화
   useLayoutEffect(() => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
@@ -176,8 +179,6 @@ const AppLayout = () => {
   return (
     <div className="flex flex-col min-h-screen">
       {!isAuthPage &&
-        !isLoadingPage &&
-        !isChatPage &&
         !isAdminPage && <Header />}
 
       <div className="flex-grow flex flex-col">
@@ -192,53 +193,40 @@ const AppLayout = () => {
             }
           />
 
-          <Route path="/auth/login" element={<Login />} />
-          <Route path="/auth/signup" element={<Signup />} />
+          <Route
+            path="/auth/login"
+            element={<Login />}
+          />
+
+          <Route
+            path="/auth/signup"
+            element={<Signup />}
+          />
+
           <Route
             path="/auth/find-password"
             element={<FindPassword />}
           />
 
-          <Route
-            path="/diagnosis"
-            element={
-              <UserOnlyRoute>
-                <DiagnosisIntro />
-              </UserOnlyRoute>
-            }
-          />
-          <Route
-            path="/diagnosis/basic-info"
-            element={
-              <UserOnlyRoute>
-                <DiagnosisMajor />
-              </UserOnlyRoute>
-            }
-          />
-          <Route
-            path="/diagnosis/tendency"
-            element={
-              <UserOnlyRoute>
-                <DiagnosisTendency />
-              </UserOnlyRoute>
-            }
-          />
-          <Route
-            path="/diagnosis/loading"
-            element={
-              <UserOnlyRoute>
-                <DiagnosisLoading />
-              </UserOnlyRoute>
-            }
-          />
-          <Route
-            path="/diagnosis/quiz"
-            element={
-              <UserOnlyRoute>
-                <DiagnosisQuiz />
-              </UserOnlyRoute>
-            }
-          />
+          {/* 이전 방식의 모든 진단 시작 주소를 새 진단으로 통일 */}
+          {[
+            '/diagnosis',
+            '/diagnosis/basic-info',
+            '/diagnosis/tendency',
+            '/diagnosis/quiz',
+            '/diagnosis/loading',
+          ].map((path) => (
+            <Route
+              key={path}
+              path={path}
+              element={
+                <Navigate
+                  to={diagnosisEntryPath}
+                  replace
+                />
+              }
+            />
+          ))}
 
           <Route
             path="/diagnosis/exploration"
@@ -248,7 +236,10 @@ const AppLayout = () => {
                   <ExplorationIntro />
                 </UserOnlyRoute>
               ) : (
-                <Navigate to="/diagnosis" replace />
+                <Navigate
+                  to="/analysis/dashboard"
+                  replace
+                />
               )
             }
           />
@@ -261,7 +252,10 @@ const AppLayout = () => {
                   <ExplorationQuestion />
                 </UserOnlyRoute>
               ) : (
-                <Navigate to="/diagnosis" replace />
+                <Navigate
+                  to="/analysis/dashboard"
+                  replace
+                />
               )
             }
           />
@@ -274,14 +268,18 @@ const AppLayout = () => {
               </UserOnlyRoute>
             }
           />
+
+          {/* 이전 방식의 역량 분석은 새 결과 안내로 연결 */}
           <Route
             path="/analysis/weak"
             element={
-              <UserOnlyRoute>
-                <WeakCapability />
-              </UserOnlyRoute>
+              <Navigate
+                to="/analysis/dashboard"
+                replace
+              />
             }
           />
+
           <Route
             path="/analysis/dashboard"
             element={
@@ -290,12 +288,14 @@ const AppLayout = () => {
               </UserOnlyRoute>
             }
           />
+
           <Route
             path="/analysis/compare"
             element={
-              <UserOnlyRoute>
-                <MajorCompare />
-              </UserOnlyRoute>
+              <Navigate
+                to="/analysis/dashboard?next=compare"
+                replace
+              />
             }
           />
 
@@ -314,6 +314,7 @@ const AppLayout = () => {
               )
             }
           />
+
           <Route
             path="/analysis/exploration/:sessionId/compare"
             element={
@@ -329,6 +330,7 @@ const AppLayout = () => {
               )
             }
           />
+
           <Route
             path="/analysis/exploration/:sessionId/activities"
             element={
@@ -344,6 +346,7 @@ const AppLayout = () => {
               )
             }
           />
+
           <Route
             path="/analysis/exploration/:sessionId/ask"
             element={
@@ -359,6 +362,7 @@ const AppLayout = () => {
               )
             }
           />
+
           <Route
             path="/analysis/exploration/:sessionId/plan"
             element={
@@ -374,6 +378,7 @@ const AppLayout = () => {
               )
             }
           />
+
           <Route
             path="/analysis/*"
             element={<NotFoundPage />}
@@ -387,14 +392,18 @@ const AppLayout = () => {
               </UserOnlyRoute>
             }
           />
+
+          {/* 일반 AI 채팅 대신 탐색 결과 기반 AI 상담 */}
           <Route
             path="/ai-chat"
             element={
-              <UserOnlyRoute>
-                <AiChat />
-              </UserOnlyRoute>
+              <Navigate
+                to="/analysis/dashboard?next=ask"
+                replace
+              />
             }
           />
+
           <Route
             path="/mypage"
             element={
@@ -412,27 +421,35 @@ const AppLayout = () => {
               </AdminOnlyRoute>
             }
           >
-            <Route index element={<AdminDashboard />} />
+            <Route
+              index
+              element={<AdminDashboard />}
+            />
+
             <Route
               path="majors"
               element={<AdminMajorManage />}
             />
+
             <Route
               path="notices"
               element={<AdminNoticeManage />}
             />
+
             {isExplorationEnabled && (
               <>
                 <Route
                   path="exploration-catalogs"
                   element={<AdminExplorationCatalog />}
                 />
+
                 <Route
                   path="exploration-catalogs/:catalogId"
                   element={
                     <AdminExplorationCatalogDetail />
                   }
                 />
+
                 <Route
                   path="exploration-catalogs/:catalogId/activities/:activityId"
                   element={
@@ -443,37 +460,47 @@ const AppLayout = () => {
             )}
           </Route>
 
+          {/* 과거 완료한 기존 방식의 공유 결과는 유지 */}
           <Route
             path="/results/share/:token"
             element={<SharedResult />}
           />
+
           <Route
             path="/exploration/share/:token"
             element={
               isExplorationEnabled ? (
                 <ExplorationShared />
               ) : (
-                <Navigate to="/" replace />
+                <Navigate
+                  to="/"
+                  replace
+                />
               )
             }
           />
+
           <Route
             path="/error"
             element={<ErrorPage />}
           />
-          <Route path="*" element={<NotFoundPage />} />
+
+          <Route
+            path="*"
+            element={<NotFoundPage />}
+          />
         </Routes>
       </div>
 
       {!isAuthPage &&
         !isMainPage &&
-        !isLoadingPage &&
-        !isChatPage &&
         !isAdminPage && <FooterSimple />}
 
       {sessionExpired && (
         <SessionModal
-          onClose={() => setSessionExpired(false)}
+          onClose={() =>
+            setSessionExpired(false)
+          }
         />
       )}
     </div>
